@@ -42,6 +42,7 @@ public class IntegerVector
 	static
 	{
 		try {
+			System.loadLibrary("dd");
 			System.loadLibrary("dv");
 		}
 		catch (UnsatisfiedLinkError e) {

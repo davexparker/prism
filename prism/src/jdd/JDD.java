@@ -149,6 +149,10 @@ public class JDD
 	static
 	{
 		try {
+			System.loadLibrary("dd");
+			System.loadLibrary("odd");
+			System.loadLibrary("dv");
+			System.loadLibrary("lpsolve55");
 			System.loadLibrary("jdd");
 		}
 		catch (UnsatisfiedLinkError e) {

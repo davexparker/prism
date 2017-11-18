@@ -53,6 +53,10 @@ public class JDDVars implements Iterable<JDDNode>
 	static
 	{
 		try {
+			System.loadLibrary("dd");
+			System.loadLibrary("dv");
+			System.loadLibrary("lpsolve55");
+			System.loadLibrary("odd");
 			System.loadLibrary("jdd");
 		}
 		catch (UnsatisfiedLinkError e) {
