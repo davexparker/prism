@@ -36,10 +36,16 @@ public class PrismNative
 	static
 	{
 		try {
-			System.loadLibrary("prism");
+			System.loadLibrary("dd");
+			System.loadLibrary("dv");
+			System.loadLibrary("lpsolve55");
+			System.loadLibrary("odd");
+			System.loadLibrary("jdd");
+			System.loadLibrary("dd");
 		}
 		catch (UnsatisfiedLinkError e) {
 			System.out.println(e);
+			e.printStackTrace();
 			System.exit(1);
 		}
 	}

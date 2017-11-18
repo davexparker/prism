@@ -28,6 +28,21 @@ package jdd;
 
 public class JDDTest
 {
+	static {
+		try {
+			System.loadLibrary("dd");
+			System.loadLibrary("odd");
+			System.loadLibrary("dv");
+			System.loadLibrary("lpsolve55");
+			System.loadLibrary("lpsolve55j");
+			System.loadLibrary("jdd");
+		}
+		catch (UnsatisfiedLinkError e) {
+			System.out.println(e);
+			System.exit(1);
+		}
+	}
+
 	public static void main(String[] args)
 	{
 		JDDNode a, b, c;

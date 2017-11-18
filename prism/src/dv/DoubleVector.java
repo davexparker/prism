@@ -43,6 +43,7 @@ public class DoubleVector
 	static
 	{
 		try {
+			System.loadLibrary("dd");
 			System.loadLibrary("dv");
 		}
 		catch (UnsatisfiedLinkError e) {
