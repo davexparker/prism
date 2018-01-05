@@ -26,15 +26,22 @@
 
 package explicit;
 
-import java.util.*;
+import java.util.BitSet;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import explicit.rewards.MCRewards;
 import parser.State;
 import parser.Values;
+import prism.ModelInfo;
+import prism.ModelInfoCopy;
 import prism.ModelType;
 import prism.PrismException;
 import prism.PrismNotSupportedException;
+import prism.RewardGenerator;
 import strat.MDStrategy;
 
 /**
@@ -224,5 +231,101 @@ public class DTMCFromMDPAndMDStrategy extends DTMCExplicit
 	public boolean equals(Object o)
 	{
 		throw new RuntimeException("Not implemented yet");
+	}
+	
+	/**
+	 * Convert model info for the MDP into a version for the DTMC.
+	 */
+	public ModelInfo convertModelInfo(ModelInfo modelInfo)
+	{
+		return new ModelInfoCopy(modelInfo)
+		{
+			@Override
+			public ModelType getModelType()
+			{
+				return ModelType.DTMC;
+			}
+		};
+	}
+	
+	/**
+	 * Convert a reward generator for the MDP into one for the DTMC.
+	 */
+	public RewardGenerator convertRewardGenerator(RewardGenerator mdpRewardGenerator)
+	{
+		return new RewardGenerator()
+		{
+			@Override
+			public List<String> getRewardStructNames()
+			{
+				// Names preserved
+				return mdpRewardGenerator.getRewardStructNames();
+			}
+			
+			@Override
+			public boolean rewardStructHasStateRewards(int r)
+			{
+				// MDP transition rewards are mapped to DTMC state rewards
+				return mdpRewardGenerator.rewardStructHasStateRewards(r) || mdpRewardGenerator.rewardStructHasTransitionRewards(r);
+			}
+			
+			@Override
+			public boolean rewardStructHasTransitionRewards(int r)
+			{
+				// MDP transition rewards are mapped to DTMC state rewards, so none here
+				return false;
+			}
+			
+			@Override
+			public boolean isRewardLookupSupported(RewardLookup lookup)
+			{
+				// Need to look up rewards by state index because strategy is indexed like that.
+				return lookup == RewardLookup.BY_STATE;
+			}
+			
+			@Override
+			public double getStateReward(int r, int s) throws PrismException
+			{
+				// Get state reward
+				double sr;
+				if (mdpRewardGenerator.isRewardLookupSupported(RewardLookup.BY_STATE_INDEX)) {
+					sr = mdpRewardGenerator.getStateReward(r, s);
+				} else if (mdpRewardGenerator.isRewardLookupSupported(RewardLookup.BY_STATE)) {
+					sr = mdpRewardGenerator.getStateReward(r, mdp.getStatesList().get(s));
+				} else {
+					throw new PrismException("Unsupported lookup mechanism for reward generator");
+				}
+				// Add chosen transition reward to state reward
+				if (strat.isChoiceDefined(s)) {
+					double tr;
+					if (mdpRewardGenerator.isRewardLookupSupported(RewardLookup.BY_STATE_INDEX)) {
+						tr = mdpRewardGenerator.getStateActionReward(r, s, strat.getChoiceAction(s));
+					} else if (mdpRewardGenerator.isRewardLookupSupported(RewardLookup.BY_STATE)) {
+						tr = mdpRewardGenerator.getStateActionReward(r, mdp.getStatesList().get(s), strat.getChoiceAction(s));
+					} else {
+						throw new PrismException("Unsupported lookup mechanism for reward generator");
+					}
+					return sr + tr;
+				} else {
+					return sr;
+				}
+			}
+
+			/**
+			 * Get the state-action reward of the {@code r}th reward structure for state {@code state} and action {@code action}
+			 * ({@code r} is indexed from 0, not from 1 like at the user (property language) level).
+			 * If a reward structure has no transition rewards, you can indicate this by implementing
+			 * the method {@link #rewardStructHasTransitionRewards(int)}, which may improve efficiency
+			 * and/or allow use of algorithms/implementations that do not support transition rewards rewards.
+			 * @param r The index of the reward structure to use
+			 * @param s The index of the state in which to evaluate the rewards
+			 * @param action The outgoing action label 
+			 */
+			public double getStateActionReward(int r, int s, Object action) throws PrismException
+			{
+				// MDP transition rewards are mapped to DTMC state rewards, so none here
+				return 0.0;
+			}
+		};
 	}
 }

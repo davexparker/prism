@@ -32,12 +32,14 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Stack;
 
 import dv.DoubleVector;
 import explicit.CTMC;
 import explicit.CTMCModelChecker;
 import explicit.ConstructModel;
 import explicit.DTMC;
+import explicit.DTMCFromMDPAndMDStrategy;
 import explicit.DTMCModelChecker;
 import explicit.ExplicitFiles2Model;
 import explicit.FastAdaptiveUniformisation;
@@ -71,6 +73,7 @@ import simulator.ModulesFileModelGeneratorSymbolic;
 import simulator.SimulatorEngine;
 import simulator.method.SimulationMethod;
 import sparse.PrismSparse;
+import strat.MDStrategy;
 import strat.Strategy;
 
 /**
@@ -269,9 +272,29 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 	// Built model storage - symbolic or explicit - at most one is non-null
 	private Model currentModel = null;
 	private explicit.Model currentModelExpl = null;
+	// Info about any strategy used to construct the current model
+	private Strategy strategy = null;
+	private boolean strategyApplied = false;
 	// Are we doing digital clocks translation for PTAs?
 	boolean digital = false;
 
+	// Stack of previously stored model states
+	private class ModelState {
+		public ModelSource source = ModelSource.PRISM_MODEL;
+		public ModelType type = null;
+		public ModelInfo info = null;
+		public ModulesFile modulesFile = null;
+		public ModelGenerator modelGen = null;
+		public RewardGenerator rewardGen = null;
+		public Values definedMFConstants = null;
+		public Model builtModel = null;
+		public explicit.Model builtModelExpl = null;
+		public Strategy strategy = null;
+		public boolean strategyApplied = false;
+		boolean digital = false;
+	}
+	private Stack<ModelState> modelStack = new Stack<>();
+	
 	// Info for explicit files load
 	private File explicitFilesStatesFile = null;
 	private File explicitFilesTransFile = null;
@@ -1948,6 +1971,41 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 		currentDefinedMFConstants = null;
 	}
 
+	private void pushCurrentModelToStack()
+	{
+		ModelState modelState = new ModelState();
+		modelState.source = currentModelSource;
+		modelState.type = currentModelType;
+		modelState.info = currentModelInfo;
+		modelState.modulesFile = currentModulesFile;
+		modelState.modelGen = currentModelGenerator;
+		modelState.rewardGen = currentRewardGenerator;
+		modelState.definedMFConstants = currentDefinedMFConstants;
+		modelState.builtModel = currentModel;
+		modelState.builtModelExpl = currentModelExpl;
+		modelState.strategy = strategy;
+		modelState.strategyApplied = strategyApplied;
+		modelState.digital = digital;
+		modelStack.push(modelState);
+	}
+	
+	private void popCurrentModelFromStack()
+	{
+		ModelState modelState = modelStack.pop();
+		currentModelSource = modelState.source;
+		currentModelType = modelState.type;
+		currentModelInfo = modelState.info;
+		currentModulesFile = modelState.modulesFile;
+		currentModelGenerator = modelState.modelGen;
+		currentRewardGenerator = modelState.rewardGen;
+		currentDefinedMFConstants = modelState.definedMFConstants;
+		currentModel = modelState.builtModel;
+		currentModelExpl = modelState.builtModelExpl;
+		strategy = modelState.strategy;
+		strategyApplied = modelState.strategyApplied;
+		digital = modelState.digital;
+	}
+	
 	/**
 	 * Get the type of the currently stored model.
 	 * @return
@@ -2284,6 +2342,47 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 		return model;
 	}
 
+	/**
+	 * Apply a strategy to the currently loaded (nondeterministic) model.
+	 * The resulting induced model then becomes the new current model.
+	 * Use {@link #unapplyStrategy()} to reverse this.
+	 */
+	public void applyStrategy(Strategy strategy)
+	{
+		if (strategy != null) {
+			if (getExplicit() && getBuiltModelExplicit() != null && getBuiltModelExplicit() instanceof explicit.NondetModel) {
+				if (strategy instanceof MDStrategy) {
+					// Construct induced model
+					explicit.Model inducedModel = ((explicit.NondetModel) getBuiltModelExplicit()).constructInducedModel((MDStrategy) strategy);
+					// Update stored model info
+					pushCurrentModelToStack();
+					// currentModelSource left untouched - no need to build again
+					currentModelInfo = ((DTMCFromMDPAndMDStrategy) inducedModel).convertModelInfo(currentModelInfo);
+					currentModelType = currentModelInfo.getModelType();
+					currentModulesFile = null;
+					currentModelGenerator = null;
+					currentRewardGenerator = ((DTMCFromMDPAndMDStrategy) inducedModel).convertRewardGenerator(currentRewardGenerator);
+					// currentDefinedMFConstants left untouched
+					currentModel = null;
+					currentModelExpl = inducedModel;
+					this.strategy = strategy;
+					strategyApplied = true;
+					digital = false;
+				}
+			}
+		} else {
+			unapplyStrategy();
+		}
+	}
+	
+	/**
+	 * Set the currently loaded model to be the one before {@link #applyStrategy(Strategy) was called}. 
+	 */
+	public void unapplyStrategy()
+	{
+		popCurrentModelFromStack();
+	}
+	
 	/**
 	 * Export the currently loaded and parsed PRISM model to a file.
 	 * @param file File to export to
