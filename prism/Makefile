@@ -272,11 +272,7 @@ endif
 # to make the distribution more 'portable'.
 # If this is a problem, the best solution is to create symlinks.
 
-# For CUDD, we default either to ./cudd or, if that does not exist, ../cudd
-# To override, comment out the first line and use the second (or specify from the command-line)
-CUDD_DIR =		$(shell if [ -d cudd ]; then echo cudd; else echo ../cudd; fi )
-#CUDD_DIR =		cudd
-
+CUDD_DIR =		../cudd
 SRC_DIR =		src
 CLASSES_DIR =	classes
 OBJ_DIR =		obj
