@@ -313,21 +313,10 @@ all: cuddpackage extpackages prism
 cuddpackage: checks
 	@if [ "$(CUDD_DIR)" = "" ]; then echo "Error: Cannot find CUDD"; exit 1; fi
 	@if [ ! -d "$(CUDD_DIR)" ]; then echo "Error: Cannot find CUDD"; exit 1; fi
-	@(if [ ! -h $(CUDD_DIR) ]; then \
-	  echo Making cudd ...; \
-	  cd $(CUDD_DIR) && \
-	  $(MAKE) C="$(C)" CC="$(C)" CPP="$(CPP)" CXX="$(CPP)" \
-	  XCFLAGS="$(CUDD_XCFLAGS)"; \
-	else \
-	  echo Skipping cudd make since it is a symlink...; \
-	fi)
+	@echo Making cudd ...; cd $(CUDD_DIR) && ./install.sh
 
-# Use this to force a build of CUDD, even if dir is just a symlink
-cuddpackageforce: checks
-	  @echo Making cudd ...; \
-	  cd $(CUDD_DIR) && \
-	  $(MAKE) C="$(C)" CC="$(C)" CPP="$(CPP)" \
-	  XCFLAGS="$(CUDD_XCFLAGS)";
+#	  $(MAKE) C="$(C)" CC="$(C)" CPP="$(CPP)" CXX="$(CPP)" \
+#	  XCFLAGS="$(CUDD_XCFLAGS)"; \
 
 # Use this to force a rebuild (with javacc) of the main parser
 parser:
@@ -631,7 +620,7 @@ celan: clean
 clean_all: checks clean_cudd clean_ext clean
 
 clean_cudd:
-	@(cd $(CUDD_DIR) && $(MAKE) distclean)
+	@(cd $(CUDD_DIR) && ./clean.sh)
 
 clean_ext:
 	@(for ext in $(EXT_PACKAGES); do \
