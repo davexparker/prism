@@ -158,25 +158,30 @@ WARNINGS = -Wformat
 ifeq ($(OSTYPE),linux)
 	ifeq ($(ARCH),amd64)
 		# Position Independent Code required on AMD64/Itanium
-		CUDD_XCFLAGS = -m64 -fPIC -DPIC $(DEBUG) $(WARNINGS)
-		CFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
-		CPPFLAGS = --std=c++11 $(CUDD_XCFLAGS) $(OPTIMISE)
-		LDFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
+		BASE_FLAGS = $(DEBUG) $(WARNINGS) $(OPTIMISE) -fPIC -DPIC
+		CUDD_CFLAGS = $(BASE_FLAGS)
+		CUDD_CXXFLAGS = $(BASE_FLAGS)
+		CFLAGS = $(BASE_FLAGS)
+		CPPFLAGS = --std=c++11 $(BASE_FLAGS)
+		LDFLAGS =$(BASE_FLAGS)
 		BINDISTSUFFIX = linux64
 	else
 	ifeq ($(ARCH),ia64)
 		# Position Independent Code required on AMD64/Itanium
-		# Note: We omit the -m64 flag from here since it seems to be unsupported by gcc on IA64
-		CUDD_XCFLAGS = -fPIC -DPIC $(DEBUG) $(WARNINGS)
-		CFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
-		CPPFLAGS = --std=c++11 $(CUDD_XCFLAGS) $(OPTIMISE)
-		LDFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
+		BASE_FLAGS = $(DEBUG) $(WARNINGS) $(OPTIMISE) -fPIC -DPIC
+		CUDD_CFLAGS = $(BASE_FLAGS)
+		CUDD_CXXFLAGS = $(BASE_FLAGS)
+		CFLAGS = $(BASE_FLAGS)
+		CPPFLAGS = --std=c++11 $(BASE_FLAGS)
+		LDFLAGS =$(BASE_FLAGS)
 		BINDISTSUFFIX = linux64
 	else
-		CUDD_XCFLAGS = -m32 -malign-double $(DEBUG) $(WARNINGS)
-		CFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
-		CPPFLAGS = --std=c++11 $(CUDD_XCFLAGS) $(OPTIMISE)
-		LDFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
+		BASE_FLAGS = $(DEBUG) $(WARNINGS) $(OPTIMISE) -malign-double
+		CUDD_CFLAGS = $(BASE_FLAGS)
+		CUDD_CXXFLAGS = $(BASE_FLAGS)
+		CFLAGS = $(BASE_FLAGS)
+		CPPFLAGS = --std=c++11 $(BASE_FLAGS)
+		LDFLAGS =$(BASE_FLAGS)
 		BINDISTSUFFIX = linux32
 	endif
 	endif
@@ -192,10 +197,12 @@ ifeq ($(OSTYPE),linux)
 endif
 # Solaris
 ifeq ($(OSTYPE),solaris)
-	CUDD_XCFLAGS = $(DEBUG) $(WARNINGS)
-	CFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
-	CPPFLAGS = --std=c++11 $(CUDD_XCFLAGS) $(OPTIMISE)
-	LDFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
+	BASE_FLAGS = $(DEBUG) $(WARNINGS) $(OPTIMISE)
+	CUDD_CFLAGS = $(BASE_FLAGS)
+	CUDD_CXXFLAGS = $(BASE_FLAGS)
+	CFLAGS = $(BASE_FLAGS)
+	CPPFLAGS = --std=c++11 $(BASE_FLAGS)
+	LDFLAGS =$(BASE_FLAGS)
 	BINDISTSUFFIX = solaris
 	BIN_TARGETS=prism.linux xprism.linux
 	JFLAGS = -encoding UTF8
@@ -211,20 +218,24 @@ ifeq ($(OSTYPE),cygwin)
 	ifeq ($(ARCH),x86_64)
 		C = /usr/bin/x86_64-w64-mingw32-gcc
 		CPP = /usr/bin/x86_64-w64-mingw32-g++
-		CUDD_XCFLAGS = -malign-double $(DEBUG) $(WARNINGS) -static-libgcc -static-libstdc++
-		CFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
+		BASE_FLAGS = $(DEBUG) $(WARNINGS) $(OPTIMISE) -malign-double -static-libgcc -static-libstdc++
+		CUDD_CFLAGS = $(BASE_FLAGS)
+		CUDD_CXXFLAGS = $(BASE_FLAGS)
+		CFLAGS = $(BASE_FLAGS)
 		# need -DWIN32 for lpsolve (WIN32 is only defined by mingw/gcc without --std=c++11)
-		CPPFLAGS = --std=c++11 -DWIN32 $(CUDD_XCFLAGS) $(OPTIMISE)
-		LDFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE) -Wl,--add-stdcall-alias -Wl,-Bstatic,--whole-archive -lpthread -Wl,-Bdynamic,--no-whole-archive
+		CPPFLAGS = --std=c++11 -DWIN32 $(BASE_FLAGS)
+		LDFLAGS =$(BASE_FLAGS) -Wl,--add-stdcall-alias -Wl,-Bstatic,--whole-archive -lpthread -Wl,-Bdynamic,--no-whole-archive
 		BINDISTSUFFIX = win64
 	else
 		C = /usr/bin/i686-w64-mingw32-gcc
 		CPP = /usr/bin/i686-w64-mingw32-g++
-		CUDD_XCFLAGS = -march=i686 -malign-double $(DEBUG) $(WARNINGS) -static-libgcc -static-libstdc++
-		CFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
+		BASE_FLAGS = $(DEBUG) $(WARNINGS) $(OPTIMISE) -malign-double -static-libgcc -static-libstdc++
+		CUDD_CFLAGS = $(BASE_FLAGS)
+		CUDD_CXXFLAGS = $(BASE_FLAGS)
+		CFLAGS = $(BASE_FLAGS)
 		# need -DWIN32 for lpsolve (WIN32 is only defined by mingw/gcc without --std=c++11)
-		CPPFLAGS = --std=c++11 -DWIN32 $(CUDD_XCFLAGS) $(OPTIMISE)
-		LDFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE) -Wl,--add-stdcall-alias -Wl,-Bstatic,--whole-archive -lpthread -Wl,-Bdynamic,--no-whole-archive
+		CPPFLAGS = --std=c++11 -DWIN32 $(BASE_FLAGS)
+		LDFLAGS =$(BASE_FLAGS) -Wl,--add-stdcall-alias -Wl,-Bstatic,--whole-archive -lpthread -Wl,-Bdynamic,--no-whole-archive
 		BINDISTSUFFIX = win32
 	endif
 	BIN_TARGETS=prism.cygwin xprism.linux prism.bat.win xprism.bat.win
@@ -241,17 +252,21 @@ endif
 # Darwin
 ifeq ($(OSTYPE),darwin)
 	ifeq ($(ARCH),x86_64)
-		CUDD_XCFLAGS = -arch x86_64 -fPIC -DPIC -fno-common $(DEBUG) $(WARNINGS)
-		CFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
-		CPPFLAGS = --std=c++11 $(CUDD_XCFLAGS) $(OPTIMISE)
-		LDFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE) -Wl,-search_paths_first
+		BASE_FLAGS = $(DEBUG) $(WARNINGS) $(OPTIMISE) -fPIC -DPIC -fno-common
+		CUDD_CFLAGS = $(BASE_FLAGS)
+		CUDD_CXXFLAGS = $(BASE_FLAGS)
+		CFLAGS = $(BASE_FLAGS)
+		CPPFLAGS = --std=c++11 $(BASE_FLAGS)
+		LDFLAGS =$(BASE_FLAGS) -Wl,-search_paths_first
 		BINDISTSUFFIX = osx64
 		BIN_TARGETS=prism.darwin64 xprism.linux
 	else
-		CUDD_XCFLAGS = -arch i386 -fno-common $(DEBUG) $(WARNINGS)
-		CFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
-		CPPFLAGS = --std=c++11 $(CUDD_XCFLAGS) $(OPTIMISE)
-		LDFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE) -Wl,-search_paths_first
+		BASE_FLAGS = $(DEBUG) $(WARNINGS) $(OPTIMISE) -fno-common
+		CUDD_CFLAGS = $(BASE_FLAGS)
+		CUDD_CXXFLAGS = $(BASE_FLAGS)
+		CFLAGS = $(BASE_FLAGS)
+		CPPFLAGS = --std=c++11 $(BASE_FLAGS)
+		LDFLAGS =$(BASE_FLAGS) -Wl,-search_paths_first
 		BINDISTSUFFIX = osx32
 		BIN_TARGETS=prism.darwin32 xprism.linux
 	endif
@@ -313,10 +328,10 @@ all: cuddpackage extpackages prism
 cuddpackage: checks
 	@if [ "$(CUDD_DIR)" = "" ]; then echo "Error: Cannot find CUDD"; exit 1; fi
 	@if [ ! -d "$(CUDD_DIR)" ]; then echo "Error: Cannot find CUDD"; exit 1; fi
-	@echo Making cudd ...; cd $(CUDD_DIR) && ./install.sh
-
-#	  $(MAKE) C="$(C)" CC="$(C)" CPP="$(CPP)" CXX="$(CPP)" \
-#	  XCFLAGS="$(CUDD_XCFLAGS)"; \
+	@echo Making cudd ...; cd $(CUDD_DIR) && \
+	CFLAGS="$(CUDD_CFLAGS)" CXXFLAGS="$(CUDD_CXXFLAGS)" \
+	MAKE="$(MAKE)" CC="$(C)" CXX="$(CPP)" \
+	./install.sh
 
 # Use this to force a rebuild (with javacc) of the main parser
 parser:
