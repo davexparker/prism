@@ -158,7 +158,7 @@ WARNINGS = -Wformat
 ifeq ($(OSTYPE),linux)
 	ifeq ($(ARCH),amd64)
 		# Position Independent Code required on AMD64/Itanium
-		CUDD_XCFLAGS = -m64 -fPIC -DPIC -DHAVE_IEEE_754 -DBSD -DSIZEOF_VOID_P=8 -DSIZEOF_LONG=8 $(DEBUG) $(WARNINGS)
+		CUDD_XCFLAGS = -m64 -fPIC -DPIC $(DEBUG) $(WARNINGS)
 		CFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
 		CPPFLAGS = --std=c++11 $(CUDD_XCFLAGS) $(OPTIMISE)
 		LDFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
@@ -167,13 +167,13 @@ ifeq ($(OSTYPE),linux)
 	ifeq ($(ARCH),ia64)
 		# Position Independent Code required on AMD64/Itanium
 		# Note: We omit the -m64 flag from here since it seems to be unsupported by gcc on IA64
-		CUDD_XCFLAGS = -fPIC -DPIC -DHAVE_IEEE_754 -DBSD -DSIZEOF_VOID_P=8 -DSIZEOF_LONG=8 $(DEBUG) $(WARNINGS)
+		CUDD_XCFLAGS = -fPIC -DPIC $(DEBUG) $(WARNINGS)
 		CFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
 		CPPFLAGS = --std=c++11 $(CUDD_XCFLAGS) $(OPTIMISE)
 		LDFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
 		BINDISTSUFFIX = linux64
 	else
-		CUDD_XCFLAGS = -m32 -malign-double -DHAVE_IEEE_754 -DBSD $(DEBUG) $(WARNINGS)
+		CUDD_XCFLAGS = -m32 -malign-double $(DEBUG) $(WARNINGS)
 		CFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
 		CPPFLAGS = --std=c++11 $(CUDD_XCFLAGS) $(OPTIMISE)
 		LDFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
@@ -192,7 +192,7 @@ ifeq ($(OSTYPE),linux)
 endif
 # Solaris
 ifeq ($(OSTYPE),solaris)
-	CUDD_XCFLAGS = -mcpu=ultrasparc -DHAVE_IEEE_754 -DUNIX100 -DEPD_BIG_ENDIAN $(DEBUG) $(WARNINGS)
+	CUDD_XCFLAGS = $(DEBUG) $(WARNINGS)
 	CFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
 	CPPFLAGS = --std=c++11 $(CUDD_XCFLAGS) $(OPTIMISE)
 	LDFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
@@ -211,7 +211,7 @@ ifeq ($(OSTYPE),cygwin)
 	ifeq ($(ARCH),x86_64)
 		C = /usr/bin/x86_64-w64-mingw32-gcc
 		CPP = /usr/bin/x86_64-w64-mingw32-g++
-		CUDD_XCFLAGS = -malign-double -DHAVE_IEEE_754 -DHAVE_GETRLIMIT=0 -DRLIMIT_DATA_DEFAULT=268435456 -DHAVE_SYS_RESOURCE_H=0 -DHAVE_SYS_WAIT_H=0 -DSIZEOF_VOID_P=8 -DSIZEOF_LONG=4 $(DEBUG) $(WARNINGS) -static-libgcc -static-libstdc++
+		CUDD_XCFLAGS = -malign-double $(DEBUG) $(WARNINGS) -static-libgcc -static-libstdc++
 		CFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
 		# need -DWIN32 for lpsolve (WIN32 is only defined by mingw/gcc without --std=c++11)
 		CPPFLAGS = --std=c++11 -DWIN32 $(CUDD_XCFLAGS) $(OPTIMISE)
@@ -220,7 +220,7 @@ ifeq ($(OSTYPE),cygwin)
 	else
 		C = /usr/bin/i686-w64-mingw32-gcc
 		CPP = /usr/bin/i686-w64-mingw32-g++
-		CUDD_XCFLAGS = -march=i686 -malign-double -DHAVE_IEEE_754 -DHAVE_GETRLIMIT=0 -DRLIMIT_DATA_DEFAULT=268435456 -DHAVE_SYS_RESOURCE_H=0 -DHAVE_SYS_WAIT_H=0 $(DEBUG) $(WARNINGS) -static-libgcc -static-libstdc++
+		CUDD_XCFLAGS = -march=i686 -malign-double $(DEBUG) $(WARNINGS) -static-libgcc -static-libstdc++
 		CFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
 		# need -DWIN32 for lpsolve (WIN32 is only defined by mingw/gcc without --std=c++11)
 		CPPFLAGS = --std=c++11 -DWIN32 $(CUDD_XCFLAGS) $(OPTIMISE)
@@ -241,14 +241,14 @@ endif
 # Darwin
 ifeq ($(OSTYPE),darwin)
 	ifeq ($(ARCH),x86_64)
-		CUDD_XCFLAGS = -arch x86_64 -fPIC -DPIC -DHAVE_IEEE_754 -DBSD -DSIZEOF_VOID_P=8 -DSIZEOF_LONG=8 -fno-common $(DEBUG) $(WARNINGS)
+		CUDD_XCFLAGS = -arch x86_64 -fPIC -DPIC -fno-common $(DEBUG) $(WARNINGS)
 		CFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
 		CPPFLAGS = --std=c++11 $(CUDD_XCFLAGS) $(OPTIMISE)
 		LDFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE) -Wl,-search_paths_first
 		BINDISTSUFFIX = osx64
 		BIN_TARGETS=prism.darwin64 xprism.linux
 	else
-		CUDD_XCFLAGS = -arch i386 -DHAVE_IEEE_754 -DBSD -fno-common $(DEBUG) $(WARNINGS)
+		CUDD_XCFLAGS = -arch i386 -fno-common $(DEBUG) $(WARNINGS)
 		CFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE)
 		CPPFLAGS = --std=c++11 $(CUDD_XCFLAGS) $(OPTIMISE)
 		LDFLAGS = $(CUDD_XCFLAGS) $(OPTIMISE) -Wl,-search_paths_first
