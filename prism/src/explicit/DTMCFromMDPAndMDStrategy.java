@@ -26,6 +26,7 @@
 
 package explicit;
 
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.Iterator;
@@ -218,7 +219,17 @@ public class DTMCFromMDPAndMDStrategy extends DTMCExplicit
 	@Override
 	public void vmMult(double vect[], double result[])
 	{
-		throw new RuntimeException("Not implemented yet");
+		// Initialise result to 0
+		Arrays.fill(result, 0);
+		// Go through matrix elements (by row)
+		for (int s = 0; s < numStates; s++) {
+			if (strat.isChoiceDefined(s)) {
+				for (Iterator<Entry<Integer, Double>> it = mdp.getTransitionsIterator(s, strat.getChoiceIndex(s)); it.hasNext();) {
+					Entry<Integer, Double> e = it.next();
+					result[e.getKey()] += e.getValue() * vect[s];
+				}
+			}
+		}
 	}
 
 	@Override
