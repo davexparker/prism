@@ -37,11 +37,13 @@ import java.util.PrimitiveIterator;
 import java.util.PrimitiveIterator.OfInt;
 import java.util.Vector;
 
+import parser.State;
 import parser.VarList;
 import parser.ast.Declaration;
 import parser.ast.DeclarationIntUnbounded;
 import parser.ast.Expression;
 import prism.ModelType;
+import parser.type.TypeInt;
 import prism.OptionsIntervalIteration;
 import prism.Prism;
 import prism.PrismComponent;
@@ -296,6 +298,30 @@ public class DTMCModelChecker extends ProbModelChecker
 		res.soln[stateOfInterest] = avg;
 		
 		return res;
+	}
+	
+	public Distribution computeInstantaneousExpressionDistribution(DTMC dtmc, int k, Expression expr) throws PrismException
+	{
+		if (expr.getType() != TypeInt.getInstance()) {
+			throw new PrismException("Can only build distributions over integer-valued expressions");
+		}
+		
+		// Compute (forward) transient probabilities
+		StateValues initDist = buildInitialDistribution(dtmc);
+		ModelCheckerResult res = computeTransientProbs(dtmc, k, initDist.getDoubleArray());
+		
+		// Compute distribution
+		Distribution dist = new Distribution();
+		List<State> statesList = dtmc.getStatesList();
+		int n = dtmc.getNumStates();
+		for (int i = 0; i < n; i++) {
+			int varVal = expr.evaluateInt(statesList.get(i));
+			if (res.soln[i] > 0) {
+				dist.add(varVal, res.soln[i]);
+			}
+		}
+		
+		return dist;
 	}
 	
 	public ModelCheckerResult computeCumulativeRewards(DTMC dtmc, MCRewards mcRewards, double t) throws PrismException
