@@ -27,7 +27,7 @@
 package parser.ast;
 
 import java.util.ArrayList;
-import java.util.BitSet;
+import java.util.Iterator;
 
 import param.BigRational;
 import parser.*;
@@ -38,17 +38,175 @@ import prism.PrismLangException;
 /**
  * Class to store a single update, i.e. a list of assignments of variables to expressions, e.g. (s'=1)&amp;(x'=x+1)
  */
-public class Update extends ASTElement
+public class Update extends ASTElement implements Iterable<Update.Element>
 {
-	// Lists of variable/expression pairs (and types)
-	private ArrayList<String> vars;
-	private ArrayList<Expression> exprs;
-	private ArrayList<Type> types;
-	// We also store an ExpressionIdent to match each variable.
-	// This is to just to provide positional info.
-	private ArrayList<ExpressionIdent> varIdents;
-	// The indices of each variable in the model to which it belongs
-	private ArrayList<Integer> indices;
+	/** A single assignment (e.g. s'=1) */
+	public static class Element {
+		/** The variable that is assigned to */
+		private String var;
+		/** The expression for the assignment value */
+		private Expression expr;
+		/** The type of the assignment (initially empty / unknown) */
+		private Type type;
+		/** The identifier expression for the variable (for position information, etc) */
+		private ExpressionIdent ident;
+		/** The variable index (initially unknown, i.e., -1) */
+		private int index;
+
+		/** Constructor */
+		public Element(ExpressionIdent v, Expression e)
+		{
+			var = v.getName();
+			expr = e;
+			type = null; // Type currently unknown
+			ident = v;
+			index = -1; // Index currently unknown
+		}
+
+		/** Shallow copy constructor */
+		public Element(Element other)
+		{
+			var = other.var;
+			expr = other.expr;
+			type = other.type;
+			ident = other.ident;
+			index = other.index;
+		}
+
+		// Getters
+
+		/** Get the name of the variable that is the assignment target */
+		public String getVar()
+		{
+			return var;
+		}
+
+		/** Get the update expression */
+		public Expression getExpression()
+		{
+			return expr;
+		}
+
+		/** Get the type of the update */
+		public Type getType()
+		{
+			return type;
+		}
+
+		/** Get the ExpressionIdent corresponding to the variable name (for position information) */
+		public ExpressionIdent getVarIdent()
+		{
+			return ident;
+		}
+
+		/** Set the name of the variable that is the assignment target */
+		public void setVar(String var)
+		{
+			this.var = var;
+		}
+
+		/** Get the variable index for the variable that is the assignment target */
+		public int getVarIndex()
+		{
+			return index;
+		}
+
+		// Setters
+		
+		/** Set the update expression */
+		public void setExpression(Expression expr)
+		{
+			this.expr = expr;
+		}
+
+		/** Set the type of the update */
+		public void setType(Type type)
+		{
+			this.type = type;
+		}
+
+		/** Set the ExpressionIdent corresponding to the variable name (for position information) */
+		public void setVarIdent(ExpressionIdent ident)
+		{
+			this.ident = ident;
+		}
+
+		/** Set the variable index for the variable that is the assignment target */
+		public void setVarIndex(int index)
+		{
+			this.index = index;
+		}
+
+		/**
+		 * Execute this update element, based on variable values specified as a Values object,
+		 * applying changes in variables to a second Values object. 
+		 * Values of any constants should also be provided.
+		 * @param constantValues Values for constants
+		 * @param oldValues Variable values in current state
+		 * @param newValues Values object to apply changes to
+		 */
+		public void update(Values constantValues, Values oldValues, Values newValues) throws PrismLangException
+		{
+			newValues.setValue(var, expr.evaluate(constantValues, oldValues));
+		}
+
+		/**
+		 * Execute this update element, based on variable values specified as a State object.
+		 * It is assumed that any constants have already been defined.
+		 * @param oldState Variable values in current state
+		 * @param newState State object to apply changes to
+		 */
+		public void update(State oldState, State newState) throws PrismLangException
+		{
+			update(oldState, newState, false);
+		}
+
+		/**
+		 * Execute this update element, based on variable values specified as a State object.
+		 * It is assumed that any constants have already been defined.
+		 * @param oldState Variable values in current state
+		 * @param newState State object to apply changes to
+		 * @param exact evaluate arithmetic expressions exactly?
+		 */
+		public void update(State oldState, State newState, boolean exact) throws PrismLangException
+		{
+			Object newValue;
+			if (exact) {
+				BigRational r = expr.evaluateExact(oldState);
+				// cast to Java data type
+				newValue = expr.getType().castFromBigRational(r);
+			} else {
+				newValue = expr.evaluate(oldState);
+			}
+			newState.setValue(index, newValue);
+		}
+		
+		/**
+		 * Check whether this update (from a particular state) would cause any errors, mainly variable overflows.
+		 * Variable ranges are specified in the passed in VarList.
+		 * Throws an exception if such an error occurs.
+		 */
+		public void checkUpdate(State oldState, VarList varList) throws PrismLangException
+		{
+			int valNew;
+			valNew = varList.encodeToInt(index, expr.evaluate(oldState));
+			if (valNew < varList.getLow(index) || valNew > varList.getHigh(index))
+				throw new PrismLangException("Value of variable " + var + " overflows", expr);
+		}
+
+
+		/** Perform deep copy for this element */
+		public Element deepCopy()
+		{
+			Element result = new Element((ExpressionIdent)ident.deepCopy(), expr.deepCopy());
+			result.type = type;
+			result.index = index;
+			return result;
+		}
+	}
+
+	private ArrayList<Element> elements;
+
 	// Parent Updates object
 	private Updates parent;
 
@@ -57,11 +215,7 @@ public class Update extends ASTElement
 	 */
 	public Update()
 	{
-		vars = new ArrayList<String>();
-		exprs = new ArrayList<Expression>();
-		types = new ArrayList<Type>();
-		varIdents = new ArrayList<ExpressionIdent>();
-		indices = new ArrayList<Integer>();
+		elements = new ArrayList<>();
 	}
 
 	// Set methods
@@ -73,11 +227,15 @@ public class Update extends ASTElement
 	 */
 	public void addElement(ExpressionIdent v, Expression e)
 	{
-		vars.add(v.getName());
-		exprs.add(e);
-		types.add(null); // Type currently unknown
-		varIdents.add(v);
-		indices.add(-1); // Index currently unknown
+		elements.add(new Element(v,e));
+	}
+
+	/**
+	 * Add a variable assignment (encoded as an Update.Element) to this update.
+	 */
+	public void addElement(Element e)
+	{
+		elements.add(e);
 	}
 
 	/**
@@ -87,8 +245,9 @@ public class Update extends ASTElement
 	 */
 	public void setVar(int i, ExpressionIdent v)
 	{
-		vars.set(i, v.getName());
-		varIdents.set(i, v);
+		Element e = elements.get(i);
+		e.var = v.getName();
+		e.ident = v;
 	}
 
 	/**
@@ -98,7 +257,7 @@ public class Update extends ASTElement
 	 */
 	public void setExpression(int i, Expression e)
 	{
-		exprs.set(i, e);
+		elements.get(i).expr = e;
 	}
 
 	/**
@@ -108,7 +267,7 @@ public class Update extends ASTElement
 	 */
 	public void setType(int i, Type t)
 	{
-		types.set(i, t);
+		elements.get(i).type = t;
 	}
 
 	/**
@@ -118,7 +277,7 @@ public class Update extends ASTElement
 	 */
 	public void setVarIndex(int i, int index)
 	{
-		indices.set(i, index);
+		elements.get(i).index = index;
 	}
 
 	/**
@@ -136,15 +295,21 @@ public class Update extends ASTElement
 	 */
 	public int getNumElements()
 	{
-		return vars.size();
+		return elements.size();
 	}
 
+	/** Get the update element (individual assignment) with the given index. */
+	public Element getElement(int index)
+	{
+		return elements.get(index);
+	}
+	
 	/**
 	 * Get the name of the {@code i}th variable in this update.
 	 */
 	public String getVar(int i)
 	{
-		return vars.get(i);
+		return elements.get(i).var;
 	}
 
 	/**
@@ -152,7 +317,7 @@ public class Update extends ASTElement
 	 */
 	public Expression getExpression(int i)
 	{
-		return exprs.get(i);
+		return elements.get(i).expr;
 	}
 
 	/**
@@ -160,7 +325,7 @@ public class Update extends ASTElement
 	 */
 	public Type getType(int i)
 	{
-		return types.get(i);
+		return elements.get(i).type;
 	}
 
 	/**
@@ -168,7 +333,7 @@ public class Update extends ASTElement
 	 */
 	public ExpressionIdent getVarIdent(int i)
 	{
-		return varIdents.get(i);
+		return elements.get(i).ident;
 	}
 
 	/**
@@ -176,7 +341,7 @@ public class Update extends ASTElement
 	 */
 	public int getVarIndex(int i)
 	{
-		return indices.get(i);
+		return elements.get(i).index;
 	}
 
 	/**
@@ -196,13 +361,8 @@ public class Update extends ASTElement
 	 */
 	public Values update(Values constantValues, Values oldValues) throws PrismLangException
 	{
-		int i, n;
-		Values res;
-		res = new Values(oldValues);
-		n = exprs.size();
-		for (i = 0; i < n; i++) {
-			res.setValue(getVar(i), getExpression(i).evaluate(constantValues, oldValues));
-		}
+		Values res = new Values(oldValues);
+		update(constantValues, oldValues, res);
 		return res;
 	}
 
@@ -216,10 +376,8 @@ public class Update extends ASTElement
 	 */
 	public void update(Values constantValues, Values oldValues, Values newValues) throws PrismLangException
 	{
-		int i, n;
-		n = exprs.size();
-		for (i = 0; i < n; i++) {
-			newValues.setValue(getVar(i), getExpression(i).evaluate(constantValues, oldValues));
+		for (Element e : this) {
+			e.update(constantValues, oldValues, newValues);
 		}
 	}
 
@@ -231,13 +389,8 @@ public class Update extends ASTElement
 	 */
 	public State update(State oldState) throws PrismLangException
 	{
-		int i, n;
-		State res;
-		res = new State(oldState);
-		n = exprs.size();
-		for (i = 0; i < n; i++) {
-			res.setValue(getVarIndex(i), getExpression(i).evaluate(oldState));
-		}
+		State res = new State(oldState);
+		update(oldState, res);
 		return res;
 	}
 
@@ -267,18 +420,8 @@ public class Update extends ASTElement
 	 */
 	public void update(State oldState, State newState, boolean exact) throws PrismLangException
 	{
-		int i, n;
-		n = exprs.size();
-		for (i = 0; i < n; i++) {
-			Object newValue;
-			if (exact) {
-				BigRational r = getExpression(i).evaluateExact(oldState);
-				// cast to Java data type
-				newValue = getExpression(i).getType().castFromBigRational(r);
-			} else {
-				newValue = getExpression(i).evaluate(oldState);
-			}
-			newState.setValue(getVarIndex(i), newValue);
+		for (Element e : this) {
+			e.update(oldState, newState, exact);
 		}
 	}
 
@@ -298,7 +441,7 @@ public class Update extends ASTElement
 	public void updatePartially(State oldState, State newState, int[] varMap) throws PrismLangException
 	{
 		int i, j, n;
-		n = exprs.size();
+		n = elements.size();
 		for (i = 0; i < n; i++) {
 			j = varMap[getVarIndex(i)];
 			if (j != -1) {
@@ -314,14 +457,10 @@ public class Update extends ASTElement
 	 */
 	public State checkUpdate(State oldState, VarList varList) throws PrismLangException
 	{
-		int i, n, valNew;
 		State res;
 		res = new State(oldState);
-		n = exprs.size();
-		for (i = 0; i < n; i++) {
-			valNew = varList.encodeToInt(i, getExpression(i).evaluate(oldState));
-			if (valNew < varList.getLow(i) || valNew > varList.getHigh(i))
-				throw new PrismLangException("Value of variable " + getVar(i) + " overflows", getExpression(i));
+		for (Element e : this) {
+			e.checkUpdate(oldState, varList);
 		}
 		return res;
 	}
@@ -336,6 +475,11 @@ public class Update extends ASTElement
 		return v.visit(this);
 	}
 
+	public Iterator<Element> iterator()
+	{
+		return elements.iterator();
+	}
+	
 	/**
 	 * Convert to string.
 	 */
@@ -344,13 +488,13 @@ public class Update extends ASTElement
 		int i, n;
 		String s = "";
 
-		n = exprs.size();
+		n = elements.size();
 		// normal case
 		if (n > 0) {
 			for (i = 0; i < n - 1; i++) {
-				s = s + "(" + vars.get(i) + "'=" + exprs.get(i) + ") & ";
+				s = s + "(" + getVar(i) + "'=" + getExpression(i) + ") & ";
 			}
-			s = s + "(" + vars.get(n - 1) + "'=" + exprs.get(n - 1) + ")";
+			s = s + "(" + getVar(n - 1) + "'=" + getExpression(n - 1) + ")";
 		}
 		// special (empty) case
 		else {
@@ -365,17 +509,14 @@ public class Update extends ASTElement
 	 */
 	public ASTElement deepCopy()
 	{
-		int i, n;
 		Update ret = new Update();
-		n = getNumElements();
-		for (i = 0; i < n; i++) {
-			ret.addElement((ExpressionIdent) getVarIdent(i).deepCopy(), getExpression(i).deepCopy());
-			ret.setType(i, getType(i));
-			ret.setVarIndex(i, getVarIndex(i));
+		for (Element e : this) {
+			ret.addElement(e.deepCopy());
 		}
 		ret.setPosition(this);
 		return ret;
 	}
+
 }
 
 //------------------------------------------------------------------------------
