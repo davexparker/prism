@@ -80,18 +80,6 @@ public class Rename extends ASTTraverseModify
 		if (s != null) e.setSynch(s);
 	}
 	
-	public void visitPost(Update e) throws PrismLangException
-	{
-		int i, n;
-		String s;
-		// Rename variables in update
-		n = e.getNumElements();
-		for (i = 0; i < n; i++) {
-			s = rm.getNewName(e.getVar(i));
-			if (s != null) e.setVar(i, new ExpressionIdent(s));
-		}
-	}
-
 	public void visitPost(ExpressionTemporal e) throws PrismLangException
 	{
 		// This renaming is only designed to be applied

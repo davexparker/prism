@@ -1,0 +1,11 @@
+// RESULT: true
+P>=1 [ G (x=1 => y=0) ];
+
+// RESULT: true
+P>=1 [ G (x=2 => y=3) ];
+
+// RESULT: true
+P>=1 [ G (x=3 => y=4) ];
+
+// RESULT: true
+P>=1 [ G (x=4 => y=3) ];

@@ -1,0 +1,1 @@
+-const M=2,N=3  -exportmodel arrays_init.prism.sta,tra -ex

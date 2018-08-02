@@ -177,18 +177,15 @@ public class ChoiceListFlexi //implements Choice
 
 	public String getUpdateString(int i, State currentState) throws PrismLangException
 	{
-		int j, n;
 		String s = "";
 		boolean first = true;
 		for (Update up : updates.get(i)) {
-			n = up.getNumElements();
-			for (j = 0; j < n; j++) {
+			for (UpdateElement ue : up) {
 				if (first)
 					first = false;
 				else
 					s += ", ";
-				BigRational newValue = up.getExpression(j).evaluateExact(currentState);
-				s += up.getVar(j) + "'=" + up.getExpression(j).getType().castFromBigRational(newValue);
+				s += ue.evaluate(currentState, true);
 			}
 		}
 		return s;

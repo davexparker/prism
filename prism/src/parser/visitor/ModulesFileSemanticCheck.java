@@ -45,6 +45,7 @@ public class ModulesFileSemanticCheck extends SemanticCheck
 	private Expression inInvariant = null;
 	private Expression inGuard = null;
 	//private Update inUpdate = null;
+	private Expression inUpdateVarRef = null;
 
 	public ModulesFileSemanticCheck(ModulesFile modulesFile)
 	{
@@ -158,11 +159,13 @@ public class ModulesFileSemanticCheck extends SemanticCheck
 
 	public void visitPost(DeclarationArray e) throws PrismLangException
 	{
-		if (e.getLow() != null && !e.getLow().isConstant()) {
-			throw new PrismLangException("Array lower bound \"" + e.getLow() + "\" is not constant", e.getLow());
+		// Arrays are not yet allowed in PTA models
+		if (modulesFile.getModelType() == ModelType.PTA) {
+			throw new PrismLangException("Arrays are not yet supported in PTA models", e);
 		}
-		if (e.getHigh() != null && !e.getHigh().isConstant()) {
-			throw new PrismLangException("Array upper bound \"" + e.getLow() + "\" is not constant", e.getLow());
+		// Array lengths must be constant
+		if (e.getLength() != null && !e.getLength().isConstant()) {
+			throw new PrismLangException("Array length \"" + e.getLength() + "\" is not constant", e.getLength());
 		}
 	}
 
@@ -243,20 +246,32 @@ public class ModulesFileSemanticCheck extends SemanticCheck
 		n = e.getNumElements();
 		for (i = 0; i < n; i++) {
 			// Check that the update is allowed to modify this variable
-			var = e.getVar(i);
+			var = e.getElement(i).getVarName();
 			isLocal = m.isLocalVariable(var);
 			isGlobal = isLocal ? false : modulesFile.isGlobalVariable(var);
 			if (!isLocal && !isGlobal) {
 				s = "Module \"" + m.getName() + "\" is not allowed to modify variable \"" + var + "\"";
-				throw new PrismLangException(s, e.getVarIdent(i));
+				throw new PrismLangException(s, e.getVarRef(i));
 			}
 			if (isGlobal && !c.getSynch().equals("")) {
 				s = "Synchronous command cannot modify global variable";
-				throw new PrismLangException(s, e.getVarIdent(i));
+				throw new PrismLangException(s, e.getVarRef(i));
 			}
 		}
 	}
 
+	public Object visit(UpdateElement e) throws PrismLangException
+	{
+		// Override this so we can keep track of when we are in am update variable reference
+		visitPre(e);
+		inUpdateVarRef = e.getVarRef();
+		if (e.getVarRef() != null) e.getVarRef().accept(this);
+		inUpdateVarRef = null;
+		if (e.getExpression() != null) e.getExpression().accept(this);
+		visitPost(e);
+		return null;
+	}
+	
 	public void visitPost(SystemRename e) throws PrismLangException
 	{
 		int i, n;
@@ -334,10 +349,10 @@ public class ModulesFileSemanticCheck extends SemanticCheck
 				throw new PrismLangException("Modules in a PTA cannot access non-local variables", e);
 			}
 		}*/
-		// Clock references, in models, can only appear in invariants and guards
+		// Clock references, in models, can only appear in invariants, guards and update var refs
 		// (Note: type checking has not been done, but we know types for ExpressionVars)
 		if (e.getType() instanceof TypeClock) {
-			if (inInvariant == null && inGuard == null) {
+			if (inInvariant == null && inGuard == null && inUpdateVarRef == null) {
 				throw new PrismLangException("Reference to a clock variable cannot appear here", e);
 			}
 		}

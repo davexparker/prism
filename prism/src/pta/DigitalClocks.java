@@ -226,7 +226,7 @@ public class DigitalClocks
 					expr.addOperand(Expression.Plus(new ExpressionVar(x, TypeInt.getInstance()), Expression.Int(1)));
 					expr.addOperand(Expression.Int(cMax + 1));
 					// Add to update
-					up.addElement(new ExpressionIdent(x), expr);
+					up.addElement(new ExpressionVar(x, TypeInt.getInstance()), expr);
 				}
 				ups = new Updates();
 				ups.addUpdate(Expression.Double(1.0), up);
@@ -254,9 +254,6 @@ public class DigitalClocks
 				n = e.getNumElements();
 				for (i = 0; i < n; i++) {
 					if (e.getType(i) instanceof TypeClock) {
-						// Don't actually need to set the type here since
-						// will be done in subsequent call to tidyUp() but do it anyway.
-						e.setType(i, TypeInt.getInstance());
 						// Scaling is done with division here, rather than multiplying clock like elsewhere
 						if (cci.getScaleFactor() > 1) {
 							exprFunc = new ExpressionFunc("floor");
@@ -530,7 +527,7 @@ public class DigitalClocks
 			n = e.getNumElements();
 			for (i = 0; i < n; i++) {
 				if (e.getType(i) instanceof TypeClock) {
-					clock = e.getVar(i);
+					clock = e.getElement(i).getVarName();
 					maxVal = ParserUtils.findMaxForIntExpression(e.getExpression(i), varList, constantValues);
 					updateMax(clock, maxVal);
 					allVals = ParserUtils.findAllValsForIntExpression(e.getExpression(i), varList, constantValues);

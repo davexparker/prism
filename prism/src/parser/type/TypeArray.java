@@ -2,7 +2,7 @@
 //	
 //	Copyright (c) 2002-
 //	Authors:
-//	* Dave Parker <david.parker@comlab.ox.ac.uk> (University of Oxford)
+//	* Dave Parker <d.a.parker@cs.bham.ac.uk> (University of Birmingham/Oxford)
 //	
 //------------------------------------------------------------------------------
 //	
@@ -28,6 +28,8 @@ package parser.type;
 
 import java.util.*;
 
+import prism.PrismLangException;
+
 public class TypeArray extends Type 
 {
 	private static Map<Type, TypeArray> singletons;
@@ -44,6 +46,14 @@ public class TypeArray extends Type
 		this.subType = subType;
 	}
 
+	public static TypeArray getInstance(Type subType)
+	{
+		if (!singletons.containsKey(subType))
+			singletons.put(subType, new TypeArray(subType));
+			
+		return singletons.get(subType);
+	}
+	
 	public Type getSubType() 
 	{
 		return subType;
@@ -54,27 +64,53 @@ public class TypeArray extends Type
 		this.subType = subType;
 	}
 	
-	public boolean equals(Object o)
-	{
-		if (o instanceof TypeArray)
-		{
-			TypeArray oa = (TypeArray)o;
-			return (subType.equals(oa.getSubType()));
-		}
-		
-		return false;
-	}
+	// Methods required for Type:
 	
+	@Override
 	public String getTypeString()
 	{
 		return "array of " + subType.getTypeString();
 	}
 	
-	public static TypeArray getInstance(Type subType)
+	@Override
+	public boolean isPrimitive()
 	{
-		if (!singletons.containsKey(subType))
-			singletons.put(subType, new TypeArray(subType));
-			
-		return singletons.get(subType);
+		return false;
+	}
+	
+	@Override
+	public Object defaultValue()
+	{
+		// No good option for this right now, since the size is unknown.
+		// So just return the default value for the subtype for now. 
+		return subType.defaultValue();
+	}
+	
+	@Override
+	public boolean canAssign(Type type)
+	{
+		return (type instanceof TypeArray) && (subType.canAssign(((TypeArray) type).getSubType()));
+	}
+	
+	@Override
+	public List<?> castValueTo(Object value) throws PrismLangException
+	{
+		if (value instanceof List<?>)
+			return (List<?>) value;
+		else
+			throw new PrismLangException("Can't convert " + value.getClass() + " to type " + getTypeString());
+	}
+
+	// Standard methods:
+	
+	@Override
+	public boolean equals(Object o)
+	{
+		if (o instanceof TypeArray) {
+			TypeArray oa = (TypeArray)o;
+			return (subType.equals(oa.getSubType()));
+		}
+		
+		return false;
 	}
 }

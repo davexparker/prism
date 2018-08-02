@@ -1,0 +1,16 @@
+// Simple test of arrays
+
+dtmc
+
+const int N;
+
+module M
+
+	i : [0..N] init 0;
+	x : array[N] of [0..N-1];
+	b : array[N] of bool;
+	
+	[] i<N -> (x[i]'=i) & (b[i]'=true) & (i'=i+1);
+	[] i=N -> true;
+	
+endmodule

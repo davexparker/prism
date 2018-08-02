@@ -1,0 +1,25 @@
+// Testing initial values of arrays
+// (plus misc use of constants and some error messages)
+
+dtmc
+
+const int M;
+const int N;
+
+module die1
+
+	x : [0..2];
+	y : bool;
+	
+	a1 : array[N] of [0..2];
+	a2 : array[N] of [0..4] init 3;
+	b1 : array[5] of array[3] of bool;
+	b2 : array[5] of array[3] of bool init true;
+	c1 : array[6] of array[2] of array[2] of [0..5];
+	c2 : array[6] of array[2] of array[2] of [0..5] init M;
+	
+	z : [0..4];
+	
+	[] true -> true;
+	
+endmodule

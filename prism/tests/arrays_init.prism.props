@@ -1,0 +1,30 @@
+// RESULT: 0
+//a1[0];
+
+// RESULT: 0
+//a1[N-1];
+
+// RESULT: 0
+//a2[3];
+
+// RESULT: false
+b1[3][2];
+
+// RESULT: true
+b2[3][2];
+
+// RESULT: 0
+c1[3][1][0];
+
+// RESULT: M
+c2[3][1][0];
+
+// RESULT: Error:out,of,bounds
+c2[3][1][-1];
+
+// RESULT: Error:out,of,bounds
+c2[3][2][0];
+
+// RESULT: Error:out,of,bounds
+c2[10+max(N,-N)][1][0];
+

@@ -291,7 +291,7 @@ public class PrismSyntaxHighlighter
 						output(t.image, KEYWORD, oType);
 					else if (t.kind == PrismParserConstants.REG_INT || t.kind == PrismParserConstants.REG_DOUBLE)
 						output(t.image, NUMERIC, oType);
-					else if (t.kind == PrismParserConstants.REG_IDENT || t.kind == PrismParserConstants.REG_IDENTPRIME)
+					else if (t.kind == PrismParserConstants.REG_IDENT)
 						output(t.image, IDENTIFIER, oType);
 					else if (t.kind == PrismParserConstants.PREPROC)
 						output(t.image, PREPROC, oType);

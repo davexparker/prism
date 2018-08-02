@@ -27,23 +27,20 @@
 
 package parser.ast;
 
-import parser.type.*;
+import parser.type.TypeArray;
 import parser.visitor.ASTVisitor;
 import prism.PrismLangException;
 
 public class DeclarationArray extends DeclarationType
 {
-	// Min array index
-	protected Expression low;
-	// Max array index
-	protected Expression high;
+	// Array length
+	protected Expression length;
 	// Type of object contained in this array
 	protected DeclarationType subtype;
 
-	public DeclarationArray(Expression low, Expression high, DeclarationType subtype)
+	public DeclarationArray(Expression length, DeclarationType subtype)
 	{
-		this.low = low;
-		this.high = high;
+		this.length = length;
 		this.subtype = subtype;
 		// The type stored for a Declaration/DeclarationType object
 		// is static - it is not computed during type checking.
@@ -52,85 +49,66 @@ public class DeclarationArray extends DeclarationType
 		setType(new TypeArray(subtype.getType()));
 	}
 
-	public void setLow(Expression l)
+	/**
+	 * Set the length of the array.
+	 */
+	public void setLength(Expression length)
 	{
-		low = l;
+		this.length = length;
 	}
 
-	public void setHigh(Expression h)
-	{
-		high = h;
-	}
-
+	/**
+	 * Set the subtype of the array.
+	 */
 	public void setSubtype(DeclarationType subtype)
 	{
 		this.subtype = subtype;
 	}
 
-	public Expression getLow()
+	/**
+	 * Get the length of the array.
+	 */
+	public Expression getLength()
 	{
-		return low;
+		return length;
 	}
 
-	public Expression getHigh()
-	{
-		return high;
-	}
-
+	/**
+	 * Get the subtype of the array.
+	 */
 	public DeclarationType getSubtype()
 	{
 		return subtype;
 	}
 
-	/**
-	 * Return the default start value for a variable of this type.
-	 */
+	@Override
 	public Expression getDefaultStart()
 	{
-		// TODO: what should be the default?
-		return null;
+		// Currently array elements are all initialised to the same value
+		// so we can just use the default value for the (primitive) subtype 
+		return subtype.getDefaultStart();
 	}
 	
-	/* TODO
-	@Override
-	public Expression getStart(ModulesFile parent)
-	{
-		if (parent != null && parent.getInitialStates() != null)
-			return null;
-
-		// TODO: what should be the default?
-		return start != null ? start : null;
-	}*/
-
 	// Methods required for ASTElement:
 	
-	/**
-	 * Visitor method.
-	 */
+	@Override
 	public Object accept(ASTVisitor v) throws PrismLangException
 	{
 		return v.visit(this);
 	}
 
-	/**
-	 * Convert to string.
-	 */
 	@Override
 	public String toString()
 	{
-		return "array [" + low + ".." + high + "] of " + subtype;
+		return "array[" + length + "] of " + subtype;
 	}
 
-	/**
-	 * Perform a deep copy.
-	 */
 	@Override
 	public ASTElement deepCopy()
 	{
-		Expression lowCopy = (low == null) ? null : low.deepCopy();
-		Expression highCopy = (high == null) ? null : high.deepCopy();
+		Expression lengthCopy = (length == null) ? null : length.deepCopy();
 		DeclarationType subtypeCopy = (DeclarationType) subtype.deepCopy();
-		DeclarationArray ret = new DeclarationArray(lowCopy, highCopy, subtypeCopy);
+		DeclarationArray ret = new DeclarationArray(lengthCopy, subtypeCopy);
 		ret.setPosition(this);
 		return ret;
 	}

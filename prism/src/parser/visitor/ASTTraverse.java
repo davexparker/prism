@@ -170,8 +170,7 @@ public class ASTTraverse implements ASTVisitor
 	public Object visit(DeclarationArray e) throws PrismLangException
 	{
 		visitPre(e);
-		if (e.getLow() != null) e.getLow().accept(this);
-		if (e.getHigh() != null) e.getHigh().accept(this);
+		if (e.getLength() != null) e.getLength().accept(this);
 		if (e.getSubtype() != null) e.getSubtype().accept(this);
 		visitPost(e);
 		return null;
@@ -264,7 +263,9 @@ public class ASTTraverse implements ASTVisitor
 	public Object visit(UpdateElement e) throws PrismLangException
 	{
 		visitPre(e);
+		if (e.getVarRef() != null) e.getVarRef().accept(this);
 		if (e.getExpression() != null) e.getExpression().accept(this);
+		visitPost(e);
 		return null;
 	}
 	public void visitPost(UpdateElement e) throws PrismLangException { defaultVisitPost(e); }
@@ -433,6 +434,17 @@ public class ASTTraverse implements ASTVisitor
 		return null;
 	}
 	public void visitPost(ExpressionUnaryOp e) throws PrismLangException { defaultVisitPost(e); }
+	// -----------------------------------------------------------------------------------
+	public void visitPre(ExpressionArrayAccess e) throws PrismLangException { defaultVisitPre(e); }
+	public Object visit(ExpressionArrayAccess e) throws PrismLangException
+	{
+		visitPre(e);
+		e.getArray().accept(this);
+		e.getIndex().accept(this);
+		visitPost(e);
+		return null;
+	}
+	public void visitPost(ExpressionArrayAccess e) throws PrismLangException { defaultVisitPost(e); }
 	// -----------------------------------------------------------------------------------
 	public void visitPre(ExpressionFunc e) throws PrismLangException { defaultVisitPre(e); }
 	public Object visit(ExpressionFunc e) throws PrismLangException

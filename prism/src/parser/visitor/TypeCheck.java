@@ -90,8 +90,26 @@ public class TypeCheck extends ASTTraverse
 
 	public void visitPost(Declaration e) throws PrismLangException
 	{
-		if (e.getStart() != null && !e.getType().canAssign(e.getStart().getType())) {
-			throw new PrismLangException("Type error: Initial value of variable \"" + e.getName() + "\" does not match", e.getStart());
+		// Check initial value if present
+		if (e.getStart() != null) {
+			if (e.getType().isPrimitive()) {
+				if (!e.getType().canAssign(e.getStart().getType())) {
+					throw new PrismLangException("Type error: Initial value of variable \"" + e.getName() + "\" does not match", e.getStart());
+				}
+			} else if (e.getType() instanceof TypeArray) {
+				// Get base type of array
+				Type baseType = e.getType();
+				while (baseType instanceof TypeArray) {
+					baseType = ((TypeArray) baseType).getSubType();
+				}
+				// Just allow single value for all array elements for now
+				if (!e.getStart().getType().isPrimitive()) {
+					throw new PrismLangException("Array elements can currently only be initialised to a common value", e.getStart());
+				}
+				if (!baseType.canAssign(e.getStart().getType())) {
+					throw new PrismLangException("Type error: Initial value of variable \"" + e.getName() + "\" does not match elements", e.getStart());
+				}
+			}
 		}
 	}
 
@@ -107,11 +125,8 @@ public class TypeCheck extends ASTTraverse
 
 	public void visitPost(DeclarationArray e) throws PrismLangException
 	{
-		if (e.getLow() != null && !TypeInt.getInstance().canAssign(e.getLow().getType())) {
-			throw new PrismLangException("Type error: Array lower bound \"" + e.getLow() + "\" is not an integer", e.getLow());
-		}
-		if (e.getHigh() != null && !TypeInt.getInstance().canAssign(e.getHigh().getType())) {
-			throw new PrismLangException("Type error: Array upper bound \"" + e.getHigh() + "\" is not an integer", e.getHigh());
+		if (e.getLength() != null && !TypeInt.getInstance().canAssign(e.getLength().getType())) {
+			throw new PrismLangException("Type error: Array length \"" + e.getLength() + "\" is not an integer", e.getLength());
 		}
 	}
 
@@ -134,24 +149,22 @@ public class TypeCheck extends ASTTraverse
 		}
 	}
 
-	public void visitPost(Update e) throws PrismLangException
+	public void visitPost(UpdateElement e) throws PrismLangException
 	{
-		int i, n;
-		n = e.getNumElements();
-		for (i = 0; i < n; i++) {
-			// Updates to non-clocks
-			if (!(e.getType(i) instanceof TypeClock)) {
-				if (!e.getType(i).canAssign(e.getExpression(i).getType())) {
-					throw new PrismLangException("Type error in update to variable \"" + e.getVar(i) + "\"", e.getExpression(i));
-				}
+		Type varType = e.getVarRef().getType();
+		Type exprType = e.getExpression().getType();
+		// Updates to non-clocks
+		if (!(varType instanceof TypeClock)) {
+			if (!varType.canAssign(exprType)) {
+				throw new PrismLangException("Type error in update: cannot assign " + exprType + " to " + varType, e);
 			}
-			// Updates to clocks
-			else {
-				if (!(e.getExpression(i).getType().equals(TypeInt.getInstance())))
-					throw new PrismLangException("Clocks can only be reset to constant integer values", e);
-				if (!(e.getExpression(i).isConstant()))
-					throw new PrismLangException("Clocks can only be reset to constant integer values", e);
-			}
+		}
+		// Updates to clocks
+		else {
+			if (!(exprType.equals(TypeInt.getInstance())))
+				throw new PrismLangException("Clocks can only be reset to constant integer values", e);
+			if (!(e.getExpression().isConstant()))
+				throw new PrismLangException("Clocks can only be reset to constant integer values", e);
 		}
 	}
 
@@ -333,6 +346,19 @@ public class TypeCheck extends ASTTraverse
 			e.setType(t);
 			break;
 		}
+	}
+
+	public void visitPost(ExpressionArrayAccess e) throws PrismLangException
+	{
+		Type tArray = e.getArray().getType();
+		Type tIndex = e.getIndex().getType();
+		if (!(tArray instanceof TypeArray)) {
+			throw new PrismLangException("Type error: " + e.getArray() + " is not an array", e);
+		}
+		if (!(tIndex instanceof TypeInt)) {
+			throw new PrismLangException("Type error: array index " + e.getIndex() + " is not an integer", e.getIndex());
+		}
+		e.setType(((TypeArray) tArray).getSubType());
 	}
 
 	public void visitPost(ExpressionFunc e) throws PrismLangException

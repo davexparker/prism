@@ -2,7 +2,7 @@
 //	
 //	Copyright (c) 2002-
 //	Authors:
-//	* Dave Parker <david.parker@comlab.ox.ac.uk> (University of Oxford, formerly University of Birmingham)
+//	* Dave Parker <d.a.parker@cs.bham.ac.uk> (University of Birmingham/Oxford)
 //	
 //------------------------------------------------------------------------------
 //	
@@ -26,24 +26,52 @@
 
 package parser;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Vector;
 
-import prism.*;
-import parser.ast.*;
-import parser.type.*;
+import param.BigRational;
+import parser.ast.ASTElement;
+import parser.ast.Declaration;
+import parser.ast.DeclarationArray;
+import parser.ast.DeclarationBool;
+import parser.ast.DeclarationClock;
+import parser.ast.DeclarationInt;
+import parser.ast.DeclarationIntUnbounded;
+import parser.ast.DeclarationType;
+import parser.ast.Expression;
+import parser.ast.ExpressionArrayAccess;
+import parser.ast.ExpressionVar;
+import parser.ast.Module;
+import parser.ast.ModulesFile;
+import parser.type.Type;
+import parser.type.TypeBool;
+import parser.type.TypeInt;
+import parser.visitor.ASTTraverse;
+import prism.PrismLangException;
+import prism.PrismUtils;
 
 /**
- * Class to store information about the set of variables in a PRISM model.
+ * Class to store information about the set of variables in a model.
  * Assumes that any constants in the model have been given fixed values.
- * Thus, initial/min/max values for all variables are known.
+ * Thus, initial/min/max values for all variables and array lengths are known.
  * VarList also takes care of how each variable will be encoded to an integer
  * (e.g. for (MT)BDD representation).
  */
 public class VarList
 {
-	// List of variables
+	// Are we in "exact" mode? (using exact arithmetic to evaluate constants/expressions)
+	private boolean exact;
+	
+	// List of (top-level) variables
 	private List<Var> vars;
-	// Mapping from names to indices
+	// List of all (primitive) variables, expanding arrays etc.
+	private List<VarPrimitive> allVars;
+	
+	// Mapping from (top-level) variable names to index in "vars" list
 	private Map<String, Integer> nameMap;
 	// Total number of bits needed  to encode
 	private int totalNumBits;
@@ -54,36 +82,44 @@ public class VarList
 	public VarList()
 	{
 		vars = new ArrayList<Var>();
+		allVars = new ArrayList<VarPrimitive>();
 		nameMap = new HashMap<String, Integer>();
 		totalNumBits = 0;
 	}
 
 	/**
 	 * Construct variable list for a ModulesFile.
+	 * @param modulesFile The ModulesFile
 	 */
 	public VarList(ModulesFile modulesFile) throws PrismLangException
 	{
+		this(modulesFile, false);
+	}
+	
+	/**
+	 * Construct variable list for a ModulesFile.
+	 * @param modulesFile The ModulesFile
+	 * @param exact use exact arithmetic in evaluation of init values?
+	 */
+	public VarList(ModulesFile modulesFile, boolean exact) throws PrismLangException
+	{
 		this();
-
-		int i, j, n, n2;
-		parser.ast.Module module;
-		Declaration decl;
+		
+		this.exact = exact;
 
 		// First add all globals to the list
-		n = modulesFile.getNumGlobals();
-		for (i = 0; i < n; i++) {
-			decl = modulesFile.getGlobal(i);
-			addVar(decl, -1, modulesFile.getConstantValues());
+		int numGlobals = modulesFile.getNumGlobals();
+		for (int i = 0; i < numGlobals; i++) {
+			addVar(modulesFile.getGlobal(i), -1, modulesFile.getConstantValues());
 		}
 
-		// Then add all module variables to the list
-		n = modulesFile.getNumModules();
-		for (i = 0; i < n; i++) {
-			module = modulesFile.getModule(i);
-			n2 = module.getNumDeclarations();
-			for (j = 0; j < n2; j++) {
-				decl = module.getDeclaration(j);
-				addVar(decl, i, modulesFile.getConstantValues());
+		// Then add all module local variables to the list
+		int numModules = modulesFile.getNumModules();
+		for (int i = 0; i < numModules; i++) {
+			Module module = modulesFile.getModule(i);
+			int numLocals = module.getNumDeclarations();
+			for (int j = 0; j < numLocals; j++) {
+				addVar(module.getDeclaration(j), i, modulesFile.getConstantValues());
 			}
 		}
 	}
@@ -110,6 +146,7 @@ public class VarList
 	 */
 	public void addVar(int i, Declaration decl, int module, Values constantValues) throws PrismLangException
 	{
+		//TODO
 		Var var = createVar(decl, module, constantValues);
 		vars.add(i, var);
 		totalNumBits += getRangeLogTwo(i);
@@ -123,88 +160,144 @@ public class VarList
 	}
 
 	/**
-	 * Create a new variable object to the store in the list.
+	 * Create and return a new variable object to store in the list.
+	 * Variable objects for all primitive variables are also created
+	 * and stored in the allVars list along the way.
 	 * @param decl Declaration defining the variable
 	 * @param module Index of module containing variable
 	 * @param constantValues Values of constants needed to evaluate low/high/etc.
 	 */
 	private Var createVar(Declaration decl, int module, Values constantValues) throws PrismLangException
 	{
-		Var var;
-		int low, high, start;
-		DeclarationType declType;
-
-		// Create new Var object
-		var = new Var();
-
-		// Store name/type/module
-		var.decl = decl;
+		Var var = createVar(decl, "", decl.getDeclType(), decl.getStartOrDefault(), constantValues);
 		var.module = module;
-
-		declType = decl.getDeclType();
-		// Variable is a bounded integer
-		if (declType instanceof DeclarationInt) {
-			DeclarationInt intdecl = (DeclarationInt) declType;
-			low = intdecl.getLow().evaluateInt(constantValues);
-			high = intdecl.getHigh().evaluateInt(constantValues);
-			start = decl.getStartOrDefault().evaluateInt(constantValues);
-			// Check range is valid
-			if (high - low <= 0) {
-				String s = "Invalid range (" + low + "-" + high + ") for variable \"" + decl.getName() + "\"";
-				throw new PrismLangException(s, decl);
-			}
-			if ((long) high - (long) low >= Integer.MAX_VALUE) {
-				String s = "Range for variable \"" + decl.getName() + "\" (" + low + "-" + high + ") is too big";
-				throw new PrismLangException(s, decl);
-			}
-			// Check start is valid
-			if (start < low || start > high) {
-				String s = "Invalid initial value (" + start + ") for variable \"" + decl.getName() + "\"";
-				throw new PrismLangException(s, decl);
-			}
-		}
-		// Variable is a Boolean
-		else if (declType instanceof DeclarationBool) {
-			low = 0;
-			high = 1;
-			start = (decl.getStartOrDefault().evaluateBoolean(constantValues)) ? 1 : 0;
-		}
-		// Variable is a clock
-		else if (declType instanceof DeclarationClock) {
-			// Create dummy info
-			low = 0;
-			high = 1;
-			start = 0;
-		}
-		// Variable is an (unbounded) integer
-		else if (declType instanceof DeclarationIntUnbounded) {
-			// Create dummy range info
-			low = 0;
-			high = 1;
-			start = decl.getStartOrDefault().evaluateInt(constantValues);
-		}
-		else {
-			throw new PrismLangException("Unknown variable type \"" + declType + "\" in declaration", decl);
-		}
-
-		// Store low/high/start and return
-		var.low = low;
-		var.high = high;
-		var.start = start;
-
 		return var;
 	}
 
 	/**
-	 * Get the number of variables stored in this list.  
+	 * Recursive helper function for {@link #createVar(Declaration, int, Values)}
+	 * @param decl Declaration defining the variable (or its parent)
+	 * @param nameSuffix Suffix to be added to the name of new variables created
+	 * @param declType DeclarationType defining the variable's type
+	 * @param exprInit Expression defining the initial state of the variable 
+	 * @param constantValues Values of constants needed to evaluate low/high/etc.
 	 */
-	public int getNumVars()
+	private Var createVar(Declaration decl, String nameSuffix, DeclarationType declType, Expression exprInit, Values constantValues) throws PrismLangException
+	{
+		int startIndex = allVars.size();
+		Var var = null;
+		
+		// Primitive variables
+		if (declType.getType().isPrimitive()) {
+
+			// Evaluate initial value
+			Object initialValue;
+			if (exact) {
+				BigRational r = exprInit.evaluateExact(constantValues);
+				initialValue = declType.getType().castFromBigRational(r);
+			} else {
+				initialValue = exprInit.evaluate(constantValues);
+				initialValue = declType.getType().castValueTo(initialValue);
+			}
+
+			// Variable is a bounded integer
+			if (declType instanceof DeclarationInt) {
+
+				DeclarationInt intdecl = (DeclarationInt) declType;
+				int low = intdecl.getLow().evaluateInt(constantValues);
+				int high = intdecl.getHigh().evaluateInt(constantValues);
+				int start = exprInit.evaluateInt(constantValues);
+				// Check range is valid
+				if (high - low <= 0) {
+					String s = "Invalid range (" + low + "-" + high + ") for variable \"" + decl.getName() + "\"";
+					throw new PrismLangException(s, decl);
+				}
+				if ((long) high - (long) low >= Integer.MAX_VALUE) {
+					String s = "Range for variable \"" + decl.getName() + "\" (" + low + "-" + high + ") is too big";
+					throw new PrismLangException(s, decl);
+				}
+				// Check start is valid
+				if (start < low || start > high) {
+					String s = "Invalid initial value (" + start + ") for variable \"" + decl.getName() + "\"";
+					throw new PrismLangException(s, decl);
+				}
+				var = new VarPrimitive(decl.getName() + nameSuffix, declType.getType(), initialValue, low, high, start);
+				allVars.add((VarPrimitive) var);
+			}
+
+			// Variable is a Boolean
+			else if (declType instanceof DeclarationBool) {
+				int start = exprInit.evaluateBoolean(constantValues) ? 1 : 0;
+				var = new VarPrimitive(decl.getName() + nameSuffix, declType.getType(), initialValue, 0, 1, start);
+				allVars.add((VarPrimitive) var);
+			}
+
+			// Variable is a clock
+			else if (declType instanceof DeclarationClock) {
+				// Just use dummy info
+				var = new VarPrimitive(decl.getName() + nameSuffix, declType.getType(), 0, 0, 1, 0);
+				allVars.add((VarPrimitive) var);
+			}
+
+			// Variable is an (unbounded) integer
+			else if (declType instanceof DeclarationIntUnbounded) {
+				// Just use dummy range info
+				int start = exprInit.evaluateInt(constantValues);
+				var = new VarPrimitive(decl.getName() + nameSuffix, declType.getType(), initialValue, 0, 1, start);
+				allVars.add((VarPrimitive) var);
+			}
+		}
+		// Variable is an array
+		else if (declType instanceof DeclarationArray) {
+			int length = ((DeclarationArray) declType).getLength().evaluateInt(constantValues);
+			if (length < 0) {
+				String s = "Invalid size (" + length + ") for array \"" + decl.getName() + "\"";
+				throw new PrismLangException(s, decl);
+			}
+			VarArray varArray = new VarArray(decl.getName() + nameSuffix, declType.getType());
+			for (int i = 0; i < length; i++) {
+				Var varElement = createVar(decl, nameSuffix + "[" + i + "]", ((DeclarationArray) declType).getSubtype(), exprInit, constantValues);
+				varArray.elements.add(varElement);
+			}
+			varArray.elementSize = varArray.elements.get(0).numPrimitives;
+			var = varArray;
+		}
+		// Unknown variable type
+		else {
+			throw new PrismLangException("Unknown variable type \"" + declType + "\" in declaration", decl);
+
+		}
+		
+		// Store indexing info
+		var.startIndex = startIndex;
+		var.endIndex = allVars.size() - 1;
+		var.numPrimitives = var.endIndex - var.startIndex + 1; 
+		// Store name/type/module
+		var.decl = decl;
+		
+		return var;
+	}
+	
+	/**
+	 * Get the number of (top-level) variables stored in this list.
+	 * E.g. this returns 3 for variable list { a, b[2], c[2][2] } 
+	 */
+	public int getNumTopLevelVars()
 	{
 		return vars.size();
 	}
 
 	/**
-	 * Look up the index of a variable, as stored in this list, by name.
+	 * Get the number of (primitive) variables stored in this list.  
+	 * E.g. this returns 1+2+4=7 for variable list { a, b[2], c[2][2] } 
+	 */
+	public int getNumVars()
+	{
+		return allVars.size();
+	}
+
+	/**
+	 * Look up the index of a (top-level) variable, as stored in this list, by name.
 	 * Returns -1 if there is no such variable. 
 	 */
 	public int getIndex(String name)
@@ -214,7 +307,7 @@ public class VarList
 	}
 
 	/**
-	 * Check if there is a variable of a given name in this list.
+	 * Check if there is a (top-level) variable of a given name in this list.
 	 */
 	public boolean exists(String name)
 	{
@@ -222,7 +315,7 @@ public class VarList
 	}
 
 	/**
-	 * Get the declaration of the ith variable in this list.
+	 * Get the declaration of the ith (top-level) variable in this list.
 	 */
 	public Declaration getDeclaration(int i)
 	{
@@ -230,24 +323,11 @@ public class VarList
 	}
 
 	/**
-	 * Get the index in this VarList for a given declaration.
-	 */
-	public int getIndexFromDeclaration(Declaration d)
-	{
-		for (int i=0;i<vars.size();i++) {
-			if (vars.get(i).decl == d) {
-				return i;
-			}
-		}
-		return -1;
-	}
-
-	/**
-	 * Get the name of the ith variable in this list.
+	 * Get the name of the ith (primitive) variable in this list.
 	 */
 	public String getName(int i)
 	{
-		return vars.get(i).decl.getName();
+		return allVars.get(i).name;
 	}
 
 	/**
@@ -255,7 +335,15 @@ public class VarList
 	 */
 	public Type getType(int i)
 	{
-		return vars.get(i).decl.getDeclType().getType();
+		return allVars.get(i).type;
+	}
+
+	/**
+	 * Get the initial value of the ith variable in this list.
+	 */
+	public Object getInitialValue(int i)
+	{
+		return allVars.get(i).init;
 	}
 
 	/**
@@ -263,7 +351,7 @@ public class VarList
 	 */
 	public int getModule(int i)
 	{
-		return vars.get(i).module;
+		return allVars.get(i).module;
 	}
 
 	/**
@@ -271,7 +359,7 @@ public class VarList
 	 */
 	public int getLow(int i)
 	{
-		return vars.get(i).low;
+		return allVars.get(i).low;
 	}
 
 	/**
@@ -279,7 +367,7 @@ public class VarList
 	 */
 	public int getHigh(int i)
 	{
-		return vars.get(i).high;
+		return allVars.get(i).high;
 	}
 
 	/**
@@ -287,7 +375,7 @@ public class VarList
 	 */
 	public int getRange(int i)
 	{
-		return vars.get(i).high - vars.get(i).low + 1;
+		return getHigh(i) - getLow(i) + 1;
 	}
 
 	/**
@@ -311,9 +399,53 @@ public class VarList
 	 */
 	public int getStart(int i)
 	{
-		return vars.get(i).start;
+		return allVars.get(i).start;
 	}
 
+	/**
+	 * Add variable indexing info recursively to an ASTElement.
+	 * In particular, set the variable index on ExpressionVar objects
+	 * and the array length and element size for  ExpressionArrayAccess objects.
+	 */
+	public void addVarIndexing(ASTElement e) throws PrismLangException
+	{
+		// Do this is using a visitor template since we want to traverse the whole AST element.
+		// Can just use ASTTraverse, not ASTTraverseModify, even though we do make changes to
+		// the ASTElements, because we just call set methods, never actually replace whole elements.
+		
+		// For ASTElements making up variable references, e.g. an ExpressionVar nested inside
+		// one or more ExpressionArrayAccess objects, we override visit to return a Var object,
+		// as needed to compute the indexing info.
+		
+		e.accept(new ASTTraverse()
+		{
+			public Object visit(ExpressionArrayAccess varRef) throws PrismLangException
+			{
+				// Recurse on the index - there could be variable/array references in there
+				varRef.getIndex().accept(this);
+				// And recurse on the array, to get get the Var object for the child
+				VarArray varArray = (VarArray) varRef.getArray().accept(this); 
+				// Set the indexing info and return
+				varRef.setVarIndexElementSize(varArray.elementSize);
+				varRef.setArrayLength(varArray.elements.size());
+				return varArray.elements.get(0);
+			}
+			
+			public Object visit(ExpressionVar varRef) throws PrismLangException
+			{
+				// Look up the variable name and corresponding Var object 
+				int i = nameMap.get(varRef.getName());
+				if (i == -1) {
+					throw new PrismLangException("Unknown variable " + ((ExpressionVar) varRef).getName(), varRef);
+				}
+				Var var = vars.get(i);
+				// Set the indexing info and return
+				varRef.setVarIndex(var.startIndex);
+				return var;
+			}
+		});
+	}
+	
 	/**
 	 * Get the value (as an Object) of a variable, from the value encoded as an integer. 
 	 */
@@ -322,11 +454,11 @@ public class VarList
 		Type type = getType(var);
 		// Integer type
 		if (type instanceof TypeInt) {
-			return new Integer(val + getLow(var));
+			return val + getLow(var);
 		}
 		// Boolean type
 		else if (type instanceof TypeBool) {
-			return new Boolean(val != 0);
+			return val != 0;
 		}
 		// Anything else
 		return null;
@@ -387,6 +519,20 @@ public class VarList
 		else {
 			throw new PrismLangException("Unknown type " + type + " for variable " + getName(var));
 		}
+	}
+
+	/**
+	 * Create a State object representing the default initial state using these variables.
+	 */
+	public State getDefaultInitialState() throws PrismLangException
+	{
+		int numVars = getNumVars();
+		int count = 0;
+		State initialState = new State(numVars);
+		for (int i = 0; i < numVars; i++) {
+			initialState.setValue(count++, getInitialValue(i));
+		}
+		return initialState;
 	}
 
 	/**
@@ -501,49 +647,150 @@ public class VarList
 	}
 
 	/**
-	 * Clone this list.
+	 * Perform a deep copy.
 	 */
+	public VarList deepCopy()
+	{
+		VarList ret = new VarList();
+		ret.exact = exact;
+		int n = vars.size();
+		ret.vars = new ArrayList<Var>(n);
+		ret.nameMap = new HashMap<String, Integer>(n);
+		for (int i = 0; i < n; i++) {
+			ret.vars.add(vars.get(i).deepCopy());
+			ret.nameMap.put(getName(i), i);
+		}
+		n = allVars.size();
+		ret.allVars = new ArrayList<VarPrimitive>(n);
+		for (int i = 0; i < n; i++) {
+			ret.allVars.add(allVars.get(i).deepCopy());
+		}
+		return ret;
+	}
+	
+	@Override
 	public Object clone()
 	{
-		int i, n;
-		n = getNumVars();
-		VarList rv = new VarList();
-		rv.vars = new ArrayList<Var>(n);
-		rv.nameMap = new HashMap<String, Integer>(n);
-		for (i = 0; i < n; i++) {
-			rv.vars.add(new Var(vars.get(i)));
-			rv.nameMap.put(getName(i), i);
-		}
-		return rv;
+		return deepCopy();
 	}
 
 	/**
-	 * Class to store information about a single variable.
+	 * Class to store information about a single variable, or subvariable (e.g. array element)
 	 */
 	class Var
 	{
+		// Name
+		public String name;
+		// Type
+		public Type type;
 		// Basic info (name/type/etc.) stored as Declaration
 		public Declaration decl;
 		// Index of containing module (-1 for a global)
 		public int module;
+		// Start and end index for this in the list of all (primitive) vars
+		public int startIndex;
+		public int endIndex;
+		// Num vars this corresponds to when arrays etc. are expanded
+		public int numPrimitives;
+
+		/** Default constructor */
+		public Var(String name, Type type)
+		{
+			this.name = name;
+			this.type = type;
+		}
+
+		/** Copy constructor */
+		public Var(Var var)
+		{
+			name = var.name;
+			type = var.type;
+			decl = (Declaration) var.decl.deepCopy();
+			module = var.module;
+			startIndex = var.startIndex;
+			endIndex = var.endIndex;
+			numPrimitives = var.numPrimitives;
+		}
+		
+		@Override
+		public String toString()
+		{
+			return name + ":" + startIndex + "-" + endIndex;
+		}
+		
+		/**
+		 * Perform a deep copy.
+		 */
+		public Var deepCopy()
+		{
+			return new Var(this);
+		}
+	}
+	
+	class VarPrimitive extends Var
+	{
+		// Initial value
+		public Object init;
 		// Info about how variable is encoded as an integer
 		public int low;
 		public int high;
 		public int start;
-
-		// Default constructor
-		public Var()
+		
+		/** Default constructor */
+		public VarPrimitive(String name, Type type, Object init, int low, int high, int start)
 		{
+			super(name, type);
+			this.init = init;
+			this.low = low;
+			this.high = high;
+			this.start = start;
 		}
 
-		// Copy constructor
-		public Var(Var var)
+		/** Copy constructor */
+		public VarPrimitive(VarPrimitive var)
 		{
-			decl = (Declaration) var.decl.deepCopy();
-			module = var.module;
-			low = var.low;
-			high = var.high;
-			start = var.start;
+			super(var);
+			this.init = var.init;
+			this.low = var.low;
+			this.high = var.high;
+			this.start = var.start;
+		}
+
+		@Override
+		public VarPrimitive deepCopy()
+		{
+			return new VarPrimitive(this);
+		}
+	}
+	
+	class VarArray extends Var
+	{
+		// Elements of the array
+		public List<Var> elements = new ArrayList<>();
+		
+		// Size of each array element (in terms of number of primitive vars)
+		public int elementSize;
+		
+		/** Default constructor */
+		public VarArray(String name, Type type)
+		{
+			super(name, type);
+		}
+
+		/** Copy constructor */
+		public VarArray(VarArray var)
+		{
+			super(var);
+			for (Var element : var.elements) {
+				elements.add(element.deepCopy());
+			}
+			elementSize = var.elementSize;
+		}
+		
+		@Override
+		public VarArray deepCopy()
+		{
+			return new VarArray(this);
 		}
 	}
 }

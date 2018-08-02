@@ -303,12 +303,15 @@ public class PropertiesFile extends ASTElement
 		// Type checking
 		typeCheck(this);
 
-		// Set up some values for constants
-		// (without assuming any info about undefined constants)
-		//
-		// we use non-exact constant evaluation by default,
-		// for exact mode constants will be reevaluated later on
-		setSomeUndefinedConstants(null, false);
+		// If there are no undefined constants, set up values for constants
+		// (to avoid need for a later call to setUndefinedConstants).
+		// NB: Can't call setUndefinedConstants if there are undefined constants
+		// because semanticCheckAfterConstants may fail. 
+		if (getUndefinedConstants().isEmpty() && modulesFile.getUndefinedConstants().isEmpty()) {
+			// we use non-exact constant evaluation by default,
+			// for exact mode constants will be reevaluated later on
+			setUndefinedConstants(null, false);
+		}
 	}
 
 	// check formula identifiers
@@ -559,6 +562,7 @@ public class PropertiesFile extends ASTElement
 		constantValues = constantList.evaluateConstants(someValues, modulesFile.getConstantValues(), exact);
 		// Note: unlike ModulesFile, we don't trigger any semantic checks at this point
 		// This will usually be done on a per-property basis later
+		modulesFile.createVarList().addVarIndexing(this);
 	}
 
 	/**
@@ -589,6 +593,7 @@ public class PropertiesFile extends ASTElement
 		constantValues = constantList.evaluateSomeConstants(someValues, modulesFile.getConstantValues(), exact);
 		// Note: unlike ModulesFile, we don't trigger any semantic checks at this point
 		// This will usually be done on a per-property basis later
+		modulesFile.createVarList().addVarIndexing(this);
 	}
 
 	/**

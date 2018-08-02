@@ -1,0 +1,33 @@
+// Testing updates to array variables
+// (plus misc use of constants)
+
+dtmc
+
+const int N;
+const int M = N+1;
+
+module M
+
+	x : [0..10];
+	
+	a1 : array[N] of [0..2];
+	a2 : array[N] of [0..4] init 3;
+	b1 : array[5] of array[3] of bool;
+	b2 : array[5] of array[3] of bool init true;
+	c1 : array[6] of array[2] of array[2] of [0..5];
+	c2 : array[6] of array[2] of array[2] of [0..5] init 0;
+	
+	// update an array element to a constant value
+	[] x=0 -> (x'=x+1) & (a1[1]'=2); // a1[1] = 2
+	// update an array element using other array elements
+	[] x=1 -> (x'=x+1) & (a2[0]'=a2[1]-a1[1]); // a2[0] = 3-2 = 1
+	// update array elements indexed using variables
+	[] x=2 -> (x'=x+1) & (b1[x][x-1]'=true); // b1[2][1] = true
+	// update array elements indexed using other arrays
+	[] x=3 -> (x'=x+1) & (c1[a1[1]][a2[N-N]][0]'=7); // c1[2][1][0] = 7
+	
+//	[] x=4 -> (x'=x+1) & (a1[0]'=0) & (a1[1]'=0); // fails right now
+
+	[] x>4 -> true;
+	
+endmodule

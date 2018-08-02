@@ -27,16 +27,18 @@
 package parser.ast;
 
 import param.BigRational;
-import parser.*;
-import parser.visitor.*;
+import parser.EvaluateContext;
+import parser.type.Type;
+import parser.visitor.ASTVisitor;
 import prism.PrismLangException;
-import parser.type.*;
 
 public class ExpressionVar extends Expression
 {
-	// Variable name
+	/** Variable name */
 	private String name;
-	// The index of the variable in the model to which it belongs
+	
+	/** Index of the variable, in terms of the full list of primitive variables.
+	 *  cached for computation of variables indices to look up their values */
 	private int index;
 	
 	// Constructors
@@ -55,7 +57,7 @@ public class ExpressionVar extends Expression
 		name = n;
 	}
 	
-	public void setIndex(int i) 
+	public void setVarIndex(int i) 
 	{
 		index = i;
 	}
@@ -67,7 +69,7 @@ public class ExpressionVar extends Expression
 		return name;
 	}
 	
-	public int getIndex()
+	public int getVarIndex()
 	{
 		return index;
 	}
@@ -89,19 +91,20 @@ public class ExpressionVar extends Expression
 	@Override
 	public Object evaluate(EvaluateContext ec) throws PrismLangException
 	{
-		Object res = ec.getVarValue(name, index);
+		// Compute variable index and reset any offset
+		int varIndex = index + ec.getVarIndexOffset();
+		ec.setVarIndexOffset(0);
+		// Look up variable value
+		Object res = ec.getVarValue(name, varIndex);
 		if (res == null)
-			throw new PrismLangException("Could not evaluate variable", this);
+			throw new PrismLangException("Could not look up variable", this);
 		return res;
 	}
 
 	@Override
 	public BigRational evaluateExact(EvaluateContext ec) throws PrismLangException
 	{
-		Object res = ec.getVarValue(name, index);
-		if (res == null)
-			throw new PrismLangException("Could not evaluate variable", this);
-		return BigRational.from(res);
+		return BigRational.from(evaluate(ec));
 	}
 
 	@Override
@@ -122,7 +125,7 @@ public class ExpressionVar extends Expression
 	public Expression deepCopy()
 	{
 		ExpressionVar expr = new ExpressionVar(name, type);
-		expr.setIndex(index);
+		expr.setVarIndex(index);
 		expr.setPosition(this);
 		return expr;
 	}

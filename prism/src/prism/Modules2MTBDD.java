@@ -1867,21 +1867,21 @@ public class Modules2MTBDD
 		for (i = 0; i < n; i++) {
 		
 			// get variable
-			s = c.getVar(i);
+			s = c.getElement(i).getVarName();
 			v = varList.getIndex(s);
 			if (v == -1) {
-				throw new PrismLangException("Unknown variable \"" + s + "\" in update", c.getVarIdent(i));
+				throw new PrismLangException("Unknown variable \"" + s + "\" in update", c.getVarRef(i));
 			}
 			varsUsed[v] = true;
 			// check if the variable to be modified is valid
 			// (i.e. belongs to this module or is global)
 			if (varList.getModule(v) != -1 && varList.getModule(v) != m) {
-				throw new PrismLangException("Cannot modify variable \""+s+"\" from module \""+moduleNames[m]+"\"", c.getVarIdent(i));
+				throw new PrismLangException("Cannot modify variable \""+s+"\" from module \""+moduleNames[m]+"\"", c.getVarRef(i));
 			}
 			// print out a warning if this update is in a command with a synchronising
 			// action AND it modifies a global variable
 			if (varList.getModule(v) == -1 && synch) {
-				throw new PrismLangException("Synchronous command cannot modify global variable", c.getVarIdent(i));
+				throw new PrismLangException("Synchronous command cannot modify global variable", c.getVarRef(i));
 			}
 			// get some info on the variable
 			l = varList.getLow(v);

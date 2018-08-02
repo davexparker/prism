@@ -130,6 +130,9 @@ public class Modules2PTA extends PrismComponent
 			nonClocks = new ArrayList<String>();
 			for (Declaration decl : module.getDeclarations()) {
 				if (!(decl.getType() instanceof TypeClock)) {
+					if (decl.getType() instanceof TypeArray) {
+						throw new PrismLangException("Arrays are not yet supported in PTA models");
+					}
 					nonClocks.add(decl.getName());
 				}
 			}
@@ -282,13 +285,13 @@ public class Modules2PTA extends PrismComponent
 				numElements = up.getNumElements();
 				for (k = 0; k < numElements; k++) {
 					// Determine destination location and add to edge
-					if (up.getVar(k).equals(pc))
+					if (up.getElement(k).getVarName().equals(pc))
 						edge.setDestination(up.getExpression(k).evaluateInt(constantValues, pcValues));
 					else {
-						if (!clocks.contains(up.getVar(k)))
+						if (!clocks.contains(up.getElement(k).getVarName()))
 							throw new PrismLangException("Update to non-clock found", up);
 						int val = up.getExpression(k).evaluateInt(constantValues, pcValues);
-						edge.addReset(pta.getClockIndex(up.getVar(k)), val);
+						edge.addReset(pta.getClockIndex(up.getElement(k).getVarName()), val);
 					}
 				}
 				// If no destination found, must be a loop
@@ -524,6 +527,7 @@ public class Modules2PTA extends PrismComponent
 		}
 
 		// Build variable index mapping
+		// TODO: over VarList now (all primitives!)
 		numVars = modulesFile.getNumVars();
 		varMap = new int[numVars];
 		for (i = 0; i < numVars; i++) {
@@ -601,12 +605,12 @@ public class Modules2PTA extends PrismComponent
 							dest = states.getIndexOfLastAdd();
 							// Build new update
 							updateNew = new Update();
-							updateNew.addElement(new ExpressionIdent(pc), Expression.Int(dest));
+							updateNew.addElement(new ExpressionVar(pc, TypeInt.getInstance()), Expression.Int(dest));
 							numElements = update.getNumElements();
 							// Copy across rest of old update  
 							for (k = 0; k < numElements; k++) {
-								if (varMap[update.getVarIndex(k)] == -1) {
-									updateNew.addElement(update.getVarIdent(k), update.getExpression(k));
+								if (varMap[((ExpressionVar) update.getVarRef(k)).getVarIndex()] == -1) {
+									updateNew.addElement(update.getVarRef(k), update.getExpression(k));
 								}
 							}
 							// we translate the probability as well, as it may reference states

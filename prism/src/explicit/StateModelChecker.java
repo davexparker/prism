@@ -43,6 +43,7 @@ import java.util.Vector;
 import parser.State;
 import parser.Values;
 import parser.ast.Expression;
+import parser.ast.ExpressionArrayAccess;
 import parser.ast.ExpressionBinaryOp;
 import parser.ast.ExpressionConstant;
 import parser.ast.ExpressionFilter;
@@ -603,6 +604,10 @@ public class StateModelChecker extends PrismComponent
 		else if (expr instanceof ExpressionUnaryOp) {
 			res = checkExpressionUnaryOp(model, (ExpressionUnaryOp) expr, statesOfInterest);
 		}
+		// Arrays
+		else if (expr instanceof ExpressionArrayAccess) {
+			res = checkExpressionArrayAccess(model, (ExpressionArrayAccess) expr, statesOfInterest);
+		}
 		// Functions
 		else if (expr instanceof ExpressionFunc) {
 			res = checkExpressionFunc(model, (ExpressionFunc) expr, statesOfInterest);
@@ -727,6 +732,21 @@ public class StateModelChecker extends PrismComponent
 		res1.applyUnaryOp(op);
 
 		return res1;
+	}
+
+	/**
+	 * Model check an array access.
+	 * @param statesOfInterest the states of interest, see checkExpression()
+	 */
+	protected StateValues checkExpressionArrayAccess(Model model, ExpressionArrayAccess expr, BitSet statesOfInterest) throws PrismException
+	{
+		int numStates = model.getNumStates();
+		StateValues res = new StateValues(expr.getType(), model);
+		List<State> statesList = model.getStatesList();
+		for (int i = 0; i < numStates; i++) {
+			res.setValue(i, expr.evaluate(constantValues, statesList.get(i)));
+		}
+		return res;
 	}
 
 	/**

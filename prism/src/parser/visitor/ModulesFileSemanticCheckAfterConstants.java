@@ -52,6 +52,10 @@ public class ModulesFileSemanticCheckAfterConstants extends ASTTraverse
 
 	public void visitPost(Update e) throws PrismLangException
 	{
+		// TODO: This will currently wrongly complain about updates to different
+		// elements of an array in the same update - needs fixing
+		// (and moving to a place where the state context is known)
+		
 		int i, n;
 		String var;
 		Vector<String> varsUsed = new Vector<String>();
@@ -61,9 +65,9 @@ public class ModulesFileSemanticCheckAfterConstants extends ASTTraverse
 		// but one day we might need to worry about e.g. array indices...
 		n = e.getNumElements();
 		for (i = 0; i < n; i++) {
-			var = e.getVar(i);
+			var = e.getVarRef(i).toString();
 			if (varsUsed.contains(var)) {
-				throw new PrismLangException("Variable \"" + var + "\" is set twice in the same update", e.getVarIdent(i));
+				throw new PrismLangException("Variable \"" + var + "\" is set twice in the same update", e.getVarRef(i));
 			}
 			varsUsed.add(var);
 		}
