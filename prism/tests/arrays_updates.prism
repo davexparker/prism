@@ -20,11 +20,13 @@ module M
 	// update an array element to a constant value
 	[] x=0 -> (x'=x+1) & (a1[1]'=2); // a1[1] = 2
 	// update an array element using other array elements
-	[] x=1 -> (x'=x+1) & (a2[0]'=a2[1]-a1[1]); // a2[0] = 3-2 = 1
+	// (need strengthened guard for symbolic version for now)
+	[] x=1 & a2[1]>=a1[1] & a2[1]-a1[1]<=4 -> (x'=x+1) & (a2[0]'=a2[1]-a1[1]); // a2[0] = 3-2 = 1
 	// update array elements indexed using variables
 	[] x=2 -> (x'=x+1) & (b1[x][x-1]'=true); // b1[2][1] = true
 	// update array elements indexed using other arrays
-	[] x=3 -> (x'=x+1) & (c1[a1[1]][a2[N-N]][0]'=7); // c1[2][1][0] = 7
+	// (need strengthened guard for symbolic version for now)
+	[] x=3 & a2[N-N]>=0 & a2[N-N]<2 -> (x'=x+1) & (c1[a1[1]][a2[N-N]][0]'=5); // c1[2][1][0] = 5
 	
 //	[] x=4 -> (x'=x+1) & (a1[0]'=0) & (a1[1]'=0); // fails right now
 

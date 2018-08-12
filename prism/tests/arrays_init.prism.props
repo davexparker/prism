@@ -1,17 +1,26 @@
 // RESULT: 0
-//a1[0];
+a1[0];
 
 // RESULT: 0
-//a1[N-1];
+a1[N-1];
 
 // RESULT: 0
-//a2[3];
+a1[x];
+
+// RESULT: 3
+a2[1];
+
+// RESULT: 3
+a2[x+1];
 
 // RESULT: false
 b1[3][2];
 
 // RESULT: true
 b2[3][2];
+
+// RESULT: true
+b2[x+4][x+2];
 
 // RESULT: 0
 c1[3][1][0];

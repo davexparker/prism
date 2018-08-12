@@ -1,2 +1,4 @@
 -const N=2 -exportmodel arrays_access.prism.sta,tra -ex
--const N=2 -exportmodel arrays_access.prism.sta,tra -noprobchecks
+-const N=2 -exportmodel arrays_access.prism.sta,tra -h
+-const N=2 -exportmodel arrays_access.prism.sta,tra -s
+-const N=2 -exportmodel arrays_access.prism.sta,tra -m

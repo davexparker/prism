@@ -1,0 +1,17 @@
+// Simple test of arrays
+// (same as arrays_simple.prism, but diff variable order)
+
+dtmc
+
+const int N;
+
+module M
+
+	x : array[N] of [0..N-1];
+	i : [0..N] init 0;
+	b : array[N] of bool;
+	
+	[] i<N -> (x[i]'=i) & (b[i]'=true) & (i'=i+1);
+	[] i=N -> true;
+	
+endmodule

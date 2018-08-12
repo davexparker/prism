@@ -1,0 +1,6 @@
+(x[0],x[1],x[2],x[3],i,b[0],b[1],b[2],b[3])
+0:(0,0,0,0,0,false,false,false,false)
+1:(0,0,0,0,1,true,false,false,false)
+2:(0,1,0,0,2,true,true,false,false)
+3:(0,1,2,0,3,true,true,true,false)
+4:(0,1,2,3,4,true,true,true,true)

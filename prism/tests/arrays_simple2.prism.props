@@ -1,0 +1,5 @@
+// RESULT: 1
+P=? [ F (x[N-1]=N-1 & b[N-1]) ]
+
+// RESULT: 1
+P=? [ F[N,N] (x[N-1]=N-1 & b[N-1]) ]

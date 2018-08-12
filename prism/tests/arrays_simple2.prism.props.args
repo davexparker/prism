@@ -1,0 +1,4 @@
+-const N=4 -exportmodel arrays_simple2.prism.sta,tra -ex
+-const N=4 -exportmodel arrays_simple2.prism.sta,tra -h
+-const N=4 -exportmodel arrays_simple2.prism.sta,tra -m
+-const N=4 -exportmodel arrays_simple2.prism.sta,tra -s
