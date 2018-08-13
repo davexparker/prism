@@ -1,0 +1,25 @@
+// Arrays split across multiple modules
+
+dtmc
+
+const int N;
+
+module M1
+
+	i : [0..N] init 0;
+	b : array[N] of bool;
+	
+	[] i<N -> (b[i]'=(mod(j,2)=1)) & (i'=i+1);
+	[] i=N -> true;
+	
+endmodule
+
+module M2
+
+	x : array[N] of [0..1];
+	j : [0..N] init 0;
+	
+	[] j<N -> (x[j]'=mod(i,2)) & (j'=j+1);
+	[] j=N -> true;
+	
+endmodule

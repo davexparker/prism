@@ -169,9 +169,7 @@ public class VarList
 	 */
 	private Var createVar(Declaration decl, int module, Values constantValues) throws PrismLangException
 	{
-		Var var = createVar(decl, "", decl.getDeclType(), decl.getStartOrDefault(), constantValues);
-		var.module = module;
-		return var;
+		return createVar(decl, module, "", decl.getDeclType(), decl.getStartOrDefault(), constantValues);
 	}
 
 	/**
@@ -182,7 +180,7 @@ public class VarList
 	 * @param exprInit Expression defining the initial state of the variable 
 	 * @param constantValues Values of constants needed to evaluate low/high/etc.
 	 */
-	private Var createVar(Declaration decl, String nameSuffix, DeclarationType declType, Expression exprInit, Values constantValues) throws PrismLangException
+	private Var createVar(Declaration decl, int module, String nameSuffix, DeclarationType declType, Expression exprInit, Values constantValues) throws PrismLangException
 	{
 		int startIndex = allVars.size();
 		Var var = null;
@@ -256,7 +254,7 @@ public class VarList
 			}
 			VarArray varArray = new VarArray(decl.getName() + nameSuffix, declType.getType());
 			for (int i = 0; i < length; i++) {
-				Var varElement = createVar(decl, nameSuffix + "[" + i + "]", ((DeclarationArray) declType).getSubtype(), exprInit, constantValues);
+				Var varElement = createVar(decl, module, nameSuffix + "[" + i + "]", ((DeclarationArray) declType).getSubtype(), exprInit, constantValues);
 				varArray.elements.add(varElement);
 			}
 			varArray.elementSize = varArray.elements.get(0).numPrimitives;
@@ -268,12 +266,13 @@ public class VarList
 
 		}
 		
+		// Store declaration/module
+		var.decl = decl;
+		var.module = module;
 		// Store indexing info
 		var.startIndex = startIndex;
 		var.endIndex = allVars.size() - 1;
 		var.numPrimitives = var.endIndex - var.startIndex + 1; 
-		// Store name/type/module
-		var.decl = decl;
 		
 		return var;
 	}
