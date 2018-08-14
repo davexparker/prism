@@ -81,12 +81,17 @@ public class VarList
 	 */
 	public VarList()
 	{
+		initialise();
+	}
+
+	private void initialise()
+	{
 		vars = new ArrayList<Var>();
 		allVars = new ArrayList<VarPrimitive>();
 		nameMap = new HashMap<String, Integer>();
 		totalNumBits = 0;
 	}
-
+	
 	/**
 	 * Construct variable list for a ModulesFile.
 	 * @param modulesFile The ModulesFile
@@ -139,23 +144,43 @@ public class VarList
 	}
 
 	/**
-	 * Add a new variable at position i in the VarList.
+	 * Add a new variable to the start of the VarList.
+	 * Warning: this will result in some data being recreated in the list,
+	 * so you need to make sure that constantValues is the same as used for the existing variables.
 	 * @param decl Declaration defining the variable
 	 * @param module Index of module containing variable
 	 * @param constantValues Values of constants needed to evaluate low/high/etc.
 	 */
+	public void addVarAtStart(Declaration decl, int module, Values constantValues) throws PrismLangException
+	{
+		// Just recreate the data - easier and safer
+		int numVarsOld = vars.size();
+		List<Var> varsOld = vars;
+		initialise();
+		addVar(decl, module, constantValues);
+		for (int j = 0; j < numVarsOld; j++) {
+			Var varOld = varsOld.get(j); 
+			addVar(varOld.decl, varOld.module, constantValues);
+		}
+	}
+
+	/**
+	 * Add a new variable at position i in the VarList.
+	 * Index i refers to the indexing of primitive variables,
+	 * for backwards compatibility, which is a bit odd. Deprecated.
+	 * @param decl Declaration defining the variable
+	 * @param module Index of module containing variable
+	 * @param constantValues Values of constants needed to evaluate low/high/etc.
+	 * @deprecated If possible, use {@link #addVar(Declaration, int, Values)} or {@link #addVarAtStart(Declaration, int, Values)}
+	 */
 	public void addVar(int i, Declaration decl, int module, Values constantValues) throws PrismLangException
 	{
-		//TODO
-		Var var = createVar(decl, module, constantValues);
-		vars.add(i, var);
-		totalNumBits += getRangeLogTwo(i);
-		// Recompute name map
-		int j, n;
-		n = getNumVars();
-		nameMap = new HashMap<String, Integer>(n);
-		for (j = 0; j < n; j++) {
-			nameMap.put(getName(j), j);
+		if (i == 0) {
+			addVarAtStart(decl, module, constantValues);
+		} else if (i == allVars.size()) {
+			addVar(decl, module, constantValues);
+		} else {
+			throw new PrismLangException("Cannot add variable to position " + i + " of VarList");
 		}
 	}
 

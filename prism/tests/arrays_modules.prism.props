@@ -1,2 +1,5 @@
 // RESULT: 1
 P=? [ F (i=N & j=N) ]
+
+// RESULT: 1
+//P=? [ F G (i=N & j=N) ]
