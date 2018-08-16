@@ -865,9 +865,11 @@ Update Update() :
 void UpdateElement(Update update) :
 {
 	Expression var = null, expr = null;
+	Token begin = null;
 }
 {
-	<LPARENTH> var = UpdateVariableRef() <PRIME> <EQ> expr = Expression(false, false) <RPARENTH> { update.addElement(var, expr); }
+	begin = <LPARENTH> var = UpdateVariableRef() <PRIME> <EQ> expr = Expression(false, false) <RPARENTH>
+	{ UpdateElement ue = new UpdateElement(var, expr); ue.setPosition(begin, getToken(0)); update.addElement(ue); }
 }
 
 // Reference to a variable to be modified by an update
