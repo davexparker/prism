@@ -153,6 +153,10 @@ public class TypeCheck extends ASTTraverse
 	{
 		Type varType = e.getVarRef().getType();
 		Type exprType = e.getExpression().getType();
+		// Can only update primitive variables individually currently
+		if (!e.getType().isPrimitive()) {
+			throw new PrismLangException("Each primitive variable needs to be updated individually currently", e);
+		}
 		// Updates to non-clocks
 		if (!(varType instanceof TypeClock)) {
 			if (!varType.canAssign(exprType)) {
