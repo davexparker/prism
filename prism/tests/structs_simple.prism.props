@@ -1,0 +1,5 @@
+// RESULT: 1
+P=? [ G (s1.left=(!s1.right)) ]
+
+// RESULT: 1
+P=? [ G[2,2] s2.x=2 ]

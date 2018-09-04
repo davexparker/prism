@@ -298,6 +298,8 @@ public class Update extends ASTElement implements Iterable<UpdateElement>
 			}
 			int elementSize = ((ExpressionArrayAccess) varRef).getVarIndexElementSize();
 			return evalIndex * elementSize + computeVarIndex(((ExpressionArrayAccess) varRef).getArray(), state);
+		} else if (varRef instanceof ExpressionStructAccess) {
+			return ((ExpressionStructAccess) varRef).getVarIndexOffset() + computeVarIndex(((ExpressionStructAccess) varRef).getStruct(), state);
 		}
 		throw new PrismLangException("Invalid variable reference in update", varRef);
 	}
@@ -312,6 +314,8 @@ public class Update extends ASTElement implements Iterable<UpdateElement>
 			return ((ExpressionVar) varRef).getName();
 		} else if (varRef instanceof ExpressionArrayAccess) {
 			return extractVarNameFromVarRef(((ExpressionArrayAccess) varRef).getArray());
+		} else if (varRef instanceof ExpressionStructAccess) {
+			return extractVarNameFromVarRef(((ExpressionStructAccess) varRef).getStruct());
 		}
 		return null; 
 	}
@@ -330,6 +334,9 @@ public class Update extends ASTElement implements Iterable<UpdateElement>
 			Expression index = ((ExpressionArrayAccess) varRef).getIndex().deepCopy();
 			Object indexObj = exact ? index.getType().castFromBigRational(index.evaluateExact(state)) : index.evaluate(state);
 			return new ExpressionArrayAccess(array, Expression.Literal(indexObj));
+		} else if (varRef instanceof ExpressionStructAccess) {
+			Expression struct = evaluateVarRef(((ExpressionStructAccess) varRef).getStruct(), state, exact);
+			return new ExpressionStructAccess(struct, ((ExpressionStructAccess) varRef).getField());
 		}
 		return null; 
 	}

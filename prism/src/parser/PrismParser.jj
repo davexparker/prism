@@ -471,6 +471,7 @@ TOKEN :
 |	< R:				"R" >
 |	< S:				"S" >
 |	< STOCHASTIC:		"stochastic" >
+|	< STRUCT:			"struct" >
 |	< SYSTEM:			"system" >
 |	< TRUE:				"true" >
 |	< U:				"U" >
@@ -487,6 +488,7 @@ TOKEN :
 |	< COLON:		":" >
 |	< SEMICOLON:	";" >
 |	< COMMA:		"," >
+|	< DOT:			"." >
 |	< DOTS:			".." >
 |	< LPARENTH:		"(" >
 |	< RPARENTH:		")" >
@@ -767,6 +769,8 @@ DeclarationType DeclarationVarType() :
 {
 	Expression low = null, high = null, length = null;
 	DeclarationType declType, subtype;
+	DeclarationStruct structType;
+	String fieldName = null;
 	Token begin = null;
 }
 {
@@ -782,6 +786,11 @@ DeclarationType DeclarationVarType() :
 	| ( <CLOCK> { declType = new DeclarationClock(); } )
 	// Array variable declaration
 	| ( <ARRAY> <LBRACKET> length = Expression(false, false) <RBRACKET> <OF> subtype = DeclarationVarType() { declType = new DeclarationArray(length, subtype); } )
+	// Struct variable declaration
+	| ( <STRUCT> <LPARENTH> { declType = structType = new DeclarationStruct(); }
+	    fieldName = Identifier() <COLON> subtype = DeclarationVarType() { structType.addField(fieldName, subtype); }
+	    ( <COMMA> fieldName = Identifier() <COLON> subtype = DeclarationVarType() { structType.addField(fieldName, subtype); } )*
+	  <RPARENTH> )
 	))
 	{ declType.setPosition(begin, getToken(0)); return declType; }
 }
@@ -873,11 +882,11 @@ void UpdateElement(Update update) :
 }
 
 // Reference to a variable to be modified by an update
-// Currently, direct access to a single variable, maybe with array access
+// Currently, direct access to a single variable, maybe with array/struct access
 
 Expression UpdateVariableRef() :
 {
-	String s = null;
+	String s = null, field = null;
 	Expression ret = null, index = null;
 	Token begin = null;
 }
@@ -886,6 +895,8 @@ Expression UpdateVariableRef() :
 	(
 		( <LBRACKET> index = Expression(false, false) <RBRACKET> )
 		{ ret = new ExpressionArrayAccess(ret, index); ret.setPosition(begin, getToken(0)); }
+		| ( <DOT> field = Identifier() )
+		{ ret = new ExpressionStructAccess(ret, field); ret.setPosition(begin, getToken(0)); }
 	)*
 	{ return ret; }
 }
@@ -1372,16 +1383,16 @@ Expression ExpressionUnaryMinus(boolean prop, boolean pathprop) :
 		begin = <MINUS> expr = ExpressionUnaryMinus(prop, pathprop)
 		{ ret = new ExpressionUnaryOp(ExpressionUnaryOp.MINUS, expr); ret.setPosition(begin, getToken(0)); }
 	|
-		ret = ExpressionArrayAccess(prop, pathprop)
+		ret = ExpressionArrayOrStructAccess(prop, pathprop)
 	)
 	{ return ret; }
 }
 
 // Expression: array access
 
-Expression ExpressionArrayAccess(boolean prop, boolean pathprop) :
+Expression ExpressionArrayOrStructAccess(boolean prop, boolean pathprop) :
 {
-	String s = null;
+	String s = null, field = null;
 	Expression ret = null, index = null;
 	Token begin = null;
 }
@@ -1390,6 +1401,8 @@ Expression ExpressionArrayAccess(boolean prop, boolean pathprop) :
 	(
 		( <LBRACKET> index = Expression(prop, pathprop) <RBRACKET> )
 		{ ret = new ExpressionArrayAccess(ret, index); ret.setPosition(begin, getToken(0)); }
+		| ( <DOT> field = Identifier() )
+		{ ret = new ExpressionStructAccess(ret, field); ret.setPosition(begin, getToken(0)); }
 	)*
 	{ return ret; }
 }
@@ -1407,6 +1420,8 @@ Expression ExpressionBasic(boolean prop, boolean pathprop) :
 		ret = ExpressionFuncOrIdent(prop, pathprop)
 	|
 		ret = ExpressionFuncMinMax(prop, pathprop)
+	|
+		ret = ExpressionFuncStruct(prop, pathprop)
 	|
 		ret = ExpressionFuncOldStyle(prop, pathprop)
 	|
@@ -1445,13 +1460,17 @@ Expression ExpressionFuncOrIdent(boolean prop, boolean pathprop) :
 {
 	String s = null;
 	Expression ret = null;
+	List<Expression> exprList;
 	Token begin = null;
 }
 {
 	// If there is no "(...)", this is an identifier
 	s = Identifier() { ret = new ExpressionIdent(s); begin = getToken(0); }
 	// If there is, it's a function
-	( <LPARENTH> { ret = new ExpressionFunc(s); } ExpressionFuncArgs(prop, pathprop, (ExpressionFunc)ret) <RPARENTH> )?
+	( <LPARENTH> { ret = new ExpressionFunc(s); }
+		exprList = ExpressionList(prop, pathprop)
+		{ for (Expression expr : exprList) ((ExpressionFunc) ret).addOperand(expr); }
+	<RPARENTH> )?
 	{ ret.setPosition(begin, getToken(0)); return ret; }
 }
 
@@ -1461,12 +1480,33 @@ Expression ExpressionFuncMinMax(boolean prop, boolean pathprop) :
 {
 	String s = null;
 	ExpressionFunc func = null;
+	List<Expression> exprList;
 	Token begin = null;
 }
 {
 	( begin = <MIN> { s = "min"; } | begin = <MAX> { s = "max"; } ) 
-	{ func = new ExpressionFunc(s); } <LPARENTH>  ExpressionFuncArgs(prop, pathprop, func) <RPARENTH>
+	{ func = new ExpressionFunc(s); }
+	<LPARENTH>
+		exprList = ExpressionList(prop, pathprop)
+		{ for (Expression expr : exprList) func.addOperand(expr); }
+	<RPARENTH>
 	{ func.setPosition(begin, getToken(0)); return func; }
+}
+
+// Expression: struct function (treated differently because struct is a keyword)
+
+Expression ExpressionFuncStruct(boolean prop, boolean pathprop) :
+{
+	ExpressionStruct struct = new ExpressionStruct();
+	List<Expression> exprList;
+	Token begin = null;
+}
+{
+	begin = <STRUCT> <LPARENTH>
+		exprList = ExpressionList(prop, pathprop)
+		{ for (Expression expr : exprList) struct.addField(expr); }
+	<RPARENTH>
+	{ struct.setPosition(begin, getToken(0)); return struct; }
 }
 
 // Expression: old-style function, i.e. "func(name, ...)"
@@ -1475,22 +1515,31 @@ Expression ExpressionFuncOldStyle(boolean prop, boolean pathprop) :
 {
 	String s = null;
 	ExpressionFunc func = null;
+	List<Expression> exprList;
 	Token begin = null;
 }
 {
-	begin = <FUNC> <LPARENTH> ( <MIN> { s = "min"; } | <MAX> { s = "max"; } | s = Identifier() )
-	<COMMA> { func = new ExpressionFunc(s); func.setOldStyle(true); } ExpressionFuncArgs(prop, pathprop, func) <RPARENTH>
+	begin = <FUNC> <LPARENTH>
+		( <MIN> { s = "min"; } | <MAX> { s = "max"; } | s = Identifier() )
+		<COMMA> { func = new ExpressionFunc(s); func.setOldStyle(true); }
+		exprList = ExpressionList(prop, pathprop)
+		{ for (Expression expr : exprList) func.addOperand(expr); }
+	<RPARENTH>
 	{ func.setPosition(begin, getToken(0)); return func; }
 }
 
-// Arguments for a function in an expression
+// Non-empty list of expressions (e.g. arguments for a function)
 
-void ExpressionFuncArgs(boolean prop, boolean pathprop, ExpressionFunc func) :
+List<Expression> ExpressionList(boolean prop, boolean pathprop) :
 {
 	Expression expr;
+	List<Expression> exprList;
 }
 {
-	expr = Expression(prop, pathprop) { func.addOperand(expr); } ( <COMMA> expr = Expression(prop, pathprop) { func.addOperand(expr); })*
+	{ exprList = new ArrayList<Expression>(); }
+	expr = Expression(prop, pathprop) { exprList.add(expr); }
+	( <COMMA> expr = Expression(prop, pathprop) { exprList.add(expr); })*
+	{ return exprList; }
 }
 
 // Expression: literal

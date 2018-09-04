@@ -192,6 +192,19 @@ public class ASTTraverseModify implements ASTVisitor
 	}
 	public void visitPost(DeclarationArray e) throws PrismLangException { defaultVisitPost(e); }
 	// -----------------------------------------------------------------------------------
+	public void visitPre(DeclarationStruct e) throws PrismLangException { defaultVisitPre(e); }
+	public Object visit(DeclarationStruct e) throws PrismLangException
+	{
+		visitPre(e);
+		int n = e.getNumFields();
+		for (int i = 0; i < n; i++) {
+			if (e.getFieldType(i) != null) e.setFieldType(i, (DeclarationType)e.getFieldType(i).accept(this));
+		}
+		visitPost(e);
+		return e;
+	}
+	public void visitPost(DeclarationStruct e) throws PrismLangException { defaultVisitPost(e); }
+	// -----------------------------------------------------------------------------------
 	public void visitPre(DeclarationClock e) throws PrismLangException { defaultVisitPre(e); }
 	public Object visit(DeclarationClock e) throws PrismLangException
 	{
@@ -457,6 +470,16 @@ public class ASTTraverseModify implements ASTVisitor
 	}
 	public void visitPost(ExpressionArrayAccess e) throws PrismLangException { defaultVisitPost(e); }
 	// -----------------------------------------------------------------------------------
+	public void visitPre(ExpressionStructAccess e) throws PrismLangException { defaultVisitPre(e); }
+	public Object visit(ExpressionStructAccess e) throws PrismLangException
+	{
+		visitPre(e);
+		e.setStruct((Expression)(e.getStruct().accept(this)));
+		visitPost(e);
+		return e;
+	}
+	public void visitPost(ExpressionStructAccess e) throws PrismLangException { defaultVisitPost(e); }
+	// -----------------------------------------------------------------------------------
 	public void visitPre(ExpressionFunc e) throws PrismLangException { defaultVisitPre(e); }
 	public Object visit(ExpressionFunc e) throws PrismLangException
 	{
@@ -469,6 +492,19 @@ public class ASTTraverseModify implements ASTVisitor
 		return e;
 	}
 	public void visitPost(ExpressionFunc e) throws PrismLangException { defaultVisitPost(e); }
+	// -----------------------------------------------------------------------------------
+	public void visitPre(ExpressionStruct e) throws PrismLangException { defaultVisitPre(e); }
+	public Object visit(ExpressionStruct e) throws PrismLangException
+	{
+		visitPre(e);
+		int i, n = e.getNumFields();
+		for (i = 0; i < n; i++) {
+			if (e.getField(i) != null) e.setField(i, (Expression)(e.getField(i).accept(this)));
+		}
+		visitPost(e);
+		return e;
+	}
+	public void visitPost(ExpressionStruct e) throws PrismLangException { defaultVisitPost(e); }
 	// -----------------------------------------------------------------------------------
 	public void visitPre(ExpressionIdent e) throws PrismLangException { defaultVisitPre(e); }
 	public Object visit(ExpressionIdent e) throws PrismLangException

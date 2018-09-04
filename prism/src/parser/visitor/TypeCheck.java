@@ -92,11 +92,14 @@ public class TypeCheck extends ASTTraverse
 	{
 		// Check initial value if present
 		if (e.getStart() != null) {
-			if (e.getType().isPrimitive()) {
+			// For non-arrays:
+			if (!(e.getType() instanceof TypeArray)) {
 				if (!e.getType().canAssign(e.getStart().getType())) {
 					throw new PrismLangException("Type error: Initial value of variable \"" + e.getName() + "\" does not match", e.getStart());
 				}
-			} else if (e.getType() instanceof TypeArray) {
+			}
+			// For arrays:
+			else {
 				// Get base type of array
 				Type baseType = e.getType();
 				while (baseType instanceof TypeArray) {
@@ -365,6 +368,19 @@ public class TypeCheck extends ASTTraverse
 		e.setType(((TypeArray) tArray).getSubType());
 	}
 
+	public void visitPost(ExpressionStructAccess e) throws PrismLangException
+	{
+		Type tStruct = e.getStruct().getType();
+		if (!(tStruct instanceof TypeStruct)) {
+			throw new PrismLangException("Type error: " + e.getStruct() + " is not a struct", e);
+		}
+		int fieldIndex = ((TypeStruct) tStruct).getFieldIndex(e.getField());
+		if (fieldIndex == -1) {
+			throw new PrismLangException("Type error: struct has no field " + e.getField(), e);
+		}
+		e.setType(((TypeStruct) tStruct).getFieldType(fieldIndex));
+	}
+
 	public void visitPost(ExpressionFunc e) throws PrismLangException
 	{
 		int i, n;
@@ -459,6 +475,18 @@ public class TypeCheck extends ASTTraverse
 				e.setType(TypeVoid.getInstance());
 			break;
 		}
+	}
+
+	public void visitPost(ExpressionStruct e) throws PrismLangException
+	{
+		// Field types can be anything but are used to construct the type of this expression
+		// (note that field names are ommitted since not provided)
+		int n = e.getNumFields();
+		TypeStruct tStruct = new TypeStruct();
+		for (int i = 0; i < n; i++) {
+			tStruct.addField(null, e.getField(i).getType());
+		}
+		e.setType(tStruct);
 	}
 
 	public void visitPost(ExpressionIdent e) throws PrismLangException

@@ -41,9 +41,12 @@ import parser.ast.DeclarationBool;
 import parser.ast.DeclarationClock;
 import parser.ast.DeclarationInt;
 import parser.ast.DeclarationIntUnbounded;
+import parser.ast.DeclarationStruct;
 import parser.ast.DeclarationType;
 import parser.ast.Expression;
 import parser.ast.ExpressionArrayAccess;
+import parser.ast.ExpressionStruct;
+import parser.ast.ExpressionStructAccess;
 import parser.ast.ExpressionVar;
 import parser.ast.Module;
 import parser.ast.ModulesFile;
@@ -285,6 +288,25 @@ public class VarList
 			varArray.elementSize = varArray.elements.get(0).numPrimitives;
 			var = varArray;
 		}
+		// Variable is a struct
+		else if (declType instanceof DeclarationStruct) {
+			DeclarationStruct declStruct = (DeclarationStruct) declType;
+			int numFields = declStruct.getNumFields();
+			VarStruct varStruct = new VarStruct(decl.getName() + nameSuffix, declType.getType());
+			if (!(exprInit instanceof ExpressionStruct)) {
+				throw new PrismLangException("Struct variable can only be initialised to a struct", decl);
+			}
+			int fieldOffset = 0;
+			for (int i = 0; i < numFields; i++) {
+				String fieldName = declStruct.getFieldName(i);
+				Var varField = createVar(decl, module, nameSuffix + "." + fieldName, declStruct.getFieldType(i), ((ExpressionStruct) exprInit).getField(i), constantValues);
+				varStruct.fields.add(varField);
+				varStruct.fieldNames.add(fieldName);
+				varStruct.fieldOffsets.add(fieldOffset);
+				fieldOffset += varField.numPrimitives;
+			}
+			var = varStruct;
+		}
 		// Unknown variable type
 		else {
 			throw new PrismLangException("Unknown variable type \"" + declType + "\" in declaration", decl);
@@ -428,8 +450,9 @@ public class VarList
 
 	/**
 	 * Add variable indexing info recursively to an ASTElement.
-	 * In particular, set the variable index on ExpressionVar objects
-	 * and the array length and element size for  ExpressionArrayAccess objects.
+	 * In particular, set the variable index on ExpressionVar objects,
+	 * the array length and element size for ExpressionArrayAccess objects,
+	 * and the field info for ExpressionStructAccess objects.
 	 */
 	public void addVarIndexing(ASTElement e) throws PrismLangException
 	{
@@ -452,7 +475,21 @@ public class VarList
 				// Set the indexing info and return
 				varRef.setVarIndexElementSize(varArray.elementSize);
 				varRef.setArrayLength(varArray.elements.size());
+				// Var elements are all the same so just return the first one
 				return varArray.elements.get(0);
+			}
+			
+			public Object visit(ExpressionStructAccess varRef) throws PrismLangException
+			{
+				// Recurse on the struct, to get get the Var object for the child
+				VarStruct varStruct = (VarStruct) varRef.getStruct().accept(this); 
+				// Set the indexing info and return
+				int fieldNum = varStruct.fieldNames.indexOf(varRef.getField());
+				if (fieldNum == -1) {
+					throw new PrismLangException("Unknown field " + varRef.getField(), varRef);
+				}
+				varRef.setVarIndexOffset(varStruct.fieldOffsets.get(fieldNum));
+				return varStruct.fields.get(fieldNum);
 			}
 			
 			public Object visit(ExpressionVar varRef) throws PrismLangException
@@ -815,6 +852,45 @@ public class VarList
 		public VarArray deepCopy()
 		{
 			return new VarArray(this);
+		}
+	}
+	
+	class VarStruct extends Var
+	{
+		// Fields of the struct
+		public List<Var> fields = new ArrayList<>();
+		
+		// Names of each struct field
+		public List<String> fieldNames = new ArrayList<>();
+		
+		// Offsets of each struct field (in terms of number of primitive vars)
+		public List<Integer> fieldOffsets = new ArrayList<>();
+		
+		/** Default constructor */
+		public VarStruct(String name, Type type)
+		{
+			super(name, type);
+		}
+
+		/** Copy constructor */
+		public VarStruct(VarStruct var)
+		{
+			super(var);
+			for (Var field : var.fields) {
+				fields.add(field.deepCopy());
+			}
+			for (String name : var.fieldNames) {
+				fieldNames.add(name);
+			}
+			for (int offset : var.fieldOffsets) {
+				fieldOffsets.add(offset);
+			}
+		}
+		
+		@Override
+		public VarStruct deepCopy()
+		{
+			return new VarStruct(this);
 		}
 	}
 }

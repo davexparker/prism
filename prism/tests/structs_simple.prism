@@ -1,0 +1,17 @@
+// Simple test of structs
+
+dtmc
+
+const int N;
+
+module M
+
+	i : [0..3] init 0;
+	s1 : struct(left : bool, right : bool) init struct(false, true);
+	s2 : struct(x : [0..N], y : [N+1..N+2]) init struct(1, N+1);
+	
+	[] i=0 -> (s1.left'=s1.right) & (s1.right'=s1.left) & (i'=i+1);
+	[] i=1 & s2.x<N -> (s2.x'=s2.x+1) & (i'=i+1);
+	[] i>1 -> true;
+	
+endmodule

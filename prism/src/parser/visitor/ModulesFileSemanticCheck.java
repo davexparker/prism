@@ -26,6 +26,7 @@
 
 package parser.visitor;
 
+import java.util.HashSet;
 import java.util.Vector;
 
 import parser.ast.*;
@@ -166,6 +167,19 @@ public class ModulesFileSemanticCheck extends SemanticCheck
 		// Array lengths must be constant
 		if (e.getLength() != null && !e.getLength().isConstant()) {
 			throw new PrismLangException("Array length \"" + e.getLength() + "\" is not constant", e.getLength());
+		}
+	}
+
+	public void visitPost(DeclarationStruct e) throws PrismLangException
+	{
+		// Check for duplicate field names
+		HashSet<String> names = new HashSet<>(); 
+		int numFields = e.getNumFields();
+		for (int i = 0; i < numFields; i++) {
+			String fieldName = e.getFieldName(i);
+			if (!names.add(fieldName)) {
+				throw new PrismLangException("Duplicate field \"" + fieldName + "\" in struct declaration", e);
+			}
 		}
 	}
 
