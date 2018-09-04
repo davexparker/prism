@@ -32,3 +32,5 @@ module M
 	[] x>5 -> true;
 	
 endmodule
+
+label "label1" = (x=4 => y=3);

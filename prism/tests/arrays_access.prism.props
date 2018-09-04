@@ -1,3 +1,5 @@
+label "label2" = (x=4 => y=3);
+
 // RESULT: true
 P>=1 [ G (x=1 => y=0) ];
 
@@ -9,3 +11,9 @@ P>=1 [ G (x=3 => y=4) ];
 
 // RESULT: true
 P>=1 [ G (x=4 => y=3) ];
+
+// RESULT: true
+P>=1 [ G "label1" ];
+
+// RESULT: true
+P>=1 [ G "label2" ];

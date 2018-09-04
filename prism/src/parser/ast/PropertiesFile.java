@@ -560,9 +560,12 @@ public class PropertiesFile extends ASTElement
 	{
 		// Might need values for ModulesFile constants too
 		constantValues = constantList.evaluateConstants(someValues, modulesFile.getConstantValues(), exact);
+		// Add variable indexing now constants known (e.g. for array indices)
+		VarList varList = modulesFile.createVarList();
+		varList.addVarIndexing(this);
+		varList.addVarIndexing(combinedLabelList);
 		// Note: unlike ModulesFile, we don't trigger any semantic checks at this point
 		// This will usually be done on a per-property basis later
-		modulesFile.createVarList().addVarIndexing(this);
 	}
 
 	/**
@@ -591,9 +594,12 @@ public class PropertiesFile extends ASTElement
 	{
 		// Might need values for ModulesFile constants too
 		constantValues = constantList.evaluateSomeConstants(someValues, modulesFile.getConstantValues(), exact);
+		// Add variable indexing now constants known (e.g. for array indices)
+		VarList varList = modulesFile.createVarList();
+		varList.addVarIndexing(this);
+		varList.addVarIndexing(combinedLabelList);
 		// Note: unlike ModulesFile, we don't trigger any semantic checks at this point
 		// This will usually be done on a per-property basis later
-		modulesFile.createVarList().addVarIndexing(this);
 	}
 
 	/**

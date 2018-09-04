@@ -1054,6 +1054,7 @@ public class ModulesFile extends ASTElement implements ModelInfo
 		constantValues = constantList.evaluateConstants(someValues, null, exact);
 		createTheVarList();
 		doSemanticChecksAfterConstants();
+		// Add variable indexing now constants known (e.g. for array indices)
 		varList.addVarIndexing(this);
 	}
 
@@ -1071,6 +1072,7 @@ public class ModulesFile extends ASTElement implements ModelInfo
 		constantValues = constantList.evaluateSomeConstants(someValues, null, exact);
 		createTheVarList();
 		doSemanticChecksAfterConstants();
+		// Add variable indexing now constants known (e.g. for array indices)
 		varList.addVarIndexing(this);
 	}
 
