@@ -140,7 +140,13 @@ public class ExpressionArrayAccess extends Expression
 	@Override
 	public BigRational evaluateExact(EvaluateContext ec) throws PrismLangException
 	{
-		return BigRational.from(evaluate(ec));
+		// Evaluate/check index into array and adjust offset for variable lookup
+		int evalIndex = index.evaluateExact(ec).intValue();
+		if (evalIndex < 0 || evalIndex >= arrayLength) {
+			throw new PrismLangException("Array index out of bounds (index=" + evalIndex + ", length=" + arrayLength + ")", this);
+		}
+		ec.addToVarIndexOffset(evalIndex * varIndexElementSize);
+		return array.evaluateExact(ec);
 	}
 
 
