@@ -116,10 +116,10 @@ public class MDPModelChecker extends ProbModelChecker
 			PrismFileLog out = new PrismFileLog(getExportProductStatesFilename());
 			VarList newVarList = (VarList) modulesFile.createVarList().clone();
 			String daVar = "_da";
-			while (newVarList.getIndex(daVar) != -1) {
+			while (newVarList.exists(daVar)) {
 				daVar = "_" + daVar;
 			}
-			newVarList.addVar(0, new Declaration(daVar, new DeclarationIntUnbounded()), 1, null);
+			newVarList.addVarAtStart(new Declaration(daVar, new DeclarationIntUnbounded()), 1, null);
 			product.getProductModel().exportStates(Prism.EXPORT_PLAIN, newVarList, out);
 			out.close();
 		}
@@ -198,10 +198,10 @@ public class MDPModelChecker extends ProbModelChecker
 			PrismFileLog out = new PrismFileLog(getExportProductStatesFilename());
 			VarList newVarList = (VarList) modulesFile.createVarList().clone();
 			String daVar = "_da";
-			while (newVarList.getIndex(daVar) != -1) {
+			while (newVarList.exists(daVar)) {
 				daVar = "_" + daVar;
 			}
-			newVarList.addVar(0, new Declaration(daVar, new DeclarationIntUnbounded()), 1, null);
+			newVarList.addVarAtStart(new Declaration(daVar, new DeclarationIntUnbounded()), 1, null);
 			product.getProductModel().exportStates(Prism.EXPORT_PLAIN, newVarList, out);
 			out.close();
 		}
