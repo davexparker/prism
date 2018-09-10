@@ -1,0 +1,4 @@
+-const N=3 -exportmodel enums_simple.prism.sta,tra -ex
+-const N=3 -exportmodel enums_simple.prism.sta,tra -h
+-const N=3 -exportmodel enums_simple.prism.sta,tra -s
+-const N=3 -exportmodel enums_simple.prism.sta,tra -m

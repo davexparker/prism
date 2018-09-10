@@ -338,6 +338,16 @@ public abstract class ASTElement
 	}
 
 	/**
+	 * Find all references to enum constants, replace any identifier objects with literal objects
+	 * (i.e. convert ExpressionIdent -> ExpressionLiteral).
+	 */
+	public ASTElement findAllEnumConstants(Map<String, TypeEnum> enumConstTypes) throws PrismLangException
+	{
+		FindAllEnumConstants visitor = new FindAllEnumConstants(enumConstTypes);
+		return (ASTElement) accept(visitor);
+	}
+
+	/**
 	 * Get all labels (i.e. ExpressionLabel objects), store names in set.
 	 * Special labels "deadlock", "init" *are* included in the list.
 	 */

@@ -33,7 +33,6 @@ import jdd.*;
 import odd.*;
 import parser.VarList;
 import parser.ast.RelOp;
-import parser.type.*;
 
 /**
  * Class for state-indexed vectors of (integer or double) values,
@@ -636,16 +635,10 @@ public class StateValuesDV implements StateValues
 					outputLog.print("(");
 					j = varList.getNumVars();
 					for (i = 0; i < j; i++) {
-						// integer variable
-						if (varList.getType(i) instanceof TypeInt) {
-							outputLog.print(varValues[i] + varList.getLow(i));
-						}
-						// boolean variable
-						else {
-							outputLog.print(varValues[i] == 1);
-						}
-						if (i < j - 1)
+						outputLog.print(varList.decodeFromInt(i, varValues[i]).toString());
+						if (i < j - 1) {
 							outputLog.print(",");
+						}
 					}
 					outputLog.print(")");
 				}

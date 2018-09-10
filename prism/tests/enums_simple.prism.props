@@ -1,0 +1,13 @@
+// RESULT: 1
+P=? [ G (i=2 => e=f) ]
+
+// RESULT: 1
+P=? [ G[2,2] f=y ]
+
+// RESULT: 1
+P=? [ F G (i=3 & g=c) ]
+
+// RESULT: x
+f
+
+

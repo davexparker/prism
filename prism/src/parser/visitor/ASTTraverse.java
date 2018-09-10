@@ -166,6 +166,15 @@ public class ASTTraverse implements ASTVisitor
 	}
 	public void visitPost(DeclarationBool e) throws PrismLangException { defaultVisitPost(e); }
 	// -----------------------------------------------------------------------------------
+	public void visitPre(DeclarationEnum e) throws PrismLangException { defaultVisitPre(e); }
+	public Object visit(DeclarationEnum e) throws PrismLangException
+	{
+		visitPre(e);
+		visitPost(e);
+		return null;
+	}
+	public void visitPost(DeclarationEnum e) throws PrismLangException { defaultVisitPost(e); }
+	// -----------------------------------------------------------------------------------
 	public void visitPre(DeclarationArray e) throws PrismLangException { defaultVisitPre(e); }
 	public Object visit(DeclarationArray e) throws PrismLangException
 	{

@@ -315,6 +315,9 @@ public class PropertiesFile extends ASTElement
 		// Find all instances of variables (i.e. locate idents which are variables).
 		findAllVars(modelInfo.getVarNames(), modelInfo.getVarTypes());
 
+		// Find all instances of enum constants, replace identifiers.
+		findAllEnumConstants(modulesFile.getEnumConstantTypes());
+		
 		// Find all instances of property refs
 		findAllPropRefs(null, this);
 		// Check property references for cyclic dependencies

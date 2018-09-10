@@ -42,6 +42,7 @@ import prism.PrismLangException;
 import prism.PrismNotSupportedException;
 import prism.PrismUtils;
 import prism.DefinedConstant;
+import prism.EnumConstant;
 import prism.Point;
 import prism.Prism;
 import prism.TileList;
@@ -498,6 +499,17 @@ public class Property extends ASTElement
 				}
 			}
 		}
+		
+		// Enum-valued properties
+		else if (type instanceof TypeEnum) {
+			// Just compare strings - nothing fancy
+			if (!(result instanceof EnumConstant))
+				throw new PrismException("Result is wrong type for (enum-valued) property");
+			if (!((EnumConstant) result).getName().equals(strExpected)) {
+				throw new PrismException("Wrong result (expected " + strExpected + ", got " + result + ")");
+			}
+		}
+
 		else if (type instanceof TypeVoid && result instanceof TileList) { //Pareto curve
 
 			//Create the list of points from the expected results

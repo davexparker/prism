@@ -39,6 +39,7 @@ import parser.ast.Declaration;
 import parser.ast.DeclarationArray;
 import parser.ast.DeclarationBool;
 import parser.ast.DeclarationClock;
+import parser.ast.DeclarationEnum;
 import parser.ast.DeclarationInt;
 import parser.ast.DeclarationIntUnbounded;
 import parser.ast.DeclarationStruct;
@@ -52,8 +53,10 @@ import parser.ast.Module;
 import parser.ast.ModulesFile;
 import parser.type.Type;
 import parser.type.TypeBool;
+import parser.type.TypeEnum;
 import parser.type.TypeInt;
 import parser.visitor.ASTTraverse;
+import prism.EnumConstant;
 import prism.PrismLangException;
 import prism.PrismUtils;
 
@@ -258,6 +261,17 @@ public class VarList
 				allVars.add((VarPrimitive) var);
 			}
 
+			// Variable is an enum
+			else if (declType instanceof DeclarationEnum) {
+				if (!(initialValue instanceof EnumConstant)) {
+					throw new PrismLangException("Enum variables can only be initialised to an appropriate constant", decl);
+				}
+				int start = ((EnumConstant) initialValue).getIndex();
+				int size = ((DeclarationEnum) declType).getNumConstants();
+				var = new VarPrimitive(decl.getName() + nameSuffix, declType.getType(), initialValue, 0, size - 1, start);
+				allVars.add((VarPrimitive) var);
+			}
+
 			// Variable is a clock
 			else if (declType instanceof DeclarationClock) {
 				// Just use dummy info
@@ -449,6 +463,93 @@ public class VarList
 	}
 
 	/**
+	 * Get the value (as an Object) for the ith variable, from its encoding as an integer. 
+	 */
+	public Object decodeFromInt(int i, int val)
+	{
+		Type type = getType(i);
+		// Integer type
+		if (type instanceof TypeInt) {
+			return val + getLow(i);
+		}
+		// Boolean type
+		else if (type instanceof TypeBool) {
+			return val != 0;
+		}
+		// Enum type
+		else if (type instanceof TypeEnum) {
+			return ((TypeEnum) type).getConstant(val);
+		}
+		// Anything else
+		return null;
+	}
+
+	/**
+	 * Get the integer encoding of a value for the ith variable, specified as an Object.
+	 * The Object is assumed to be of correct type (e.g. Integer, Boolean).
+	 * Throws an exception if Object is of the wrong type.
+	 */
+	public int encodeToInt(int i, Object val) throws PrismLangException
+	{
+		Type type = getType(i);
+		try {
+			// Integer type
+			if (type instanceof TypeInt) {
+				return ((TypeInt) type).castValueTo(val).intValue() - getLow(i);
+			}
+			// Boolean type
+			else if (type instanceof TypeBool) {
+				return ((TypeBool) type).castValueTo(val).booleanValue() ? 1 : 0;
+			}
+			// Enum type
+			else if (type instanceof TypeEnum) {
+				return ((TypeEnum) type).castValueTo(val).getIndex();
+			}
+			// Anything else
+			else {
+				throw new PrismLangException("Unknown type " + type + " for variable " + getName(i));
+			}
+		} catch (ClassCastException e) {
+			throw new PrismLangException("Value " + val + " is wrong type for variable " + getName(i));
+		}
+	}
+
+	/**
+	 * Get the integer encoding of a value for the ith variable, specified as a string.
+	 */
+	public int encodeToIntFromString(int i, String s) throws PrismLangException
+	{
+		Type type = getType(i);
+		// Integer type
+		if (type instanceof TypeInt) {
+			try {
+				int iVal = Integer.parseInt(s);
+				return iVal - getLow(i);
+			} catch (NumberFormatException e) {
+				throw new PrismLangException("\"" + s + "\" is not a valid integer value");
+			}
+		}
+		// Boolean type
+		else if (type instanceof TypeBool) {
+			if (s.equals("true"))
+				return 1;
+			else if (s.equals("false"))
+				return 0;
+			else
+				throw new PrismLangException("\"" + s + "\" is not a valid Boolean value");
+
+		}
+		// Enum type
+		else if (type instanceof TypeEnum) {
+			return ((TypeEnum) type).getConstantByName(s).getIndex();
+		}
+		// Anything else
+		else {
+			throw new PrismLangException("Unknown type " + type + " for variable " + getName(i));
+		}
+	}
+
+	/**
 	 * Add variable indexing info recursively to an ASTElement.
 	 * In particular, set the variable index on ExpressionVar objects,
 	 * the array length and element size for ExpressionArrayAccess objects,
@@ -508,81 +609,6 @@ public class VarList
 	}
 	
 	/**
-	 * Get the value (as an Object) of a variable, from the value encoded as an integer. 
-	 */
-	public Object decodeFromInt(int var, int val)
-	{
-		Type type = getType(var);
-		// Integer type
-		if (type instanceof TypeInt) {
-			return val + getLow(var);
-		}
-		// Boolean type
-		else if (type instanceof TypeBool) {
-			return val != 0;
-		}
-		// Anything else
-		return null;
-	}
-
-	/**
-	 * Get the integer encoding of a value for a variable, specified as an Object.
-	 * The Object is assumed to be of correct type (e.g. Integer, Boolean).
-	 * Throws an exception if Object is of the wrong type.
-	 */
-	public int encodeToInt(int var, Object val) throws PrismLangException
-	{
-		Type type = getType(var);
-		try {
-			// Integer type
-			if (type instanceof TypeInt) {
-				return ((Integer) val).intValue() - getLow(var);
-			}
-			// Boolean type
-			else if (type instanceof TypeBool) {
-				return ((Boolean) val).booleanValue() ? 1 : 0;
-			}
-			// Anything else
-			else {
-				throw new PrismLangException("Unknown type " + type + " for variable " + getName(var));
-			}
-		} catch (ClassCastException e) {
-			throw new PrismLangException("Value " + val + " is wrong type for variable " + getName(var));
-		}
-	}
-
-	/**
-	 * Get the integer encoding of a value for a variable, specified as a string.
-	 */
-	public int encodeToIntFromString(int var, String s) throws PrismLangException
-	{
-		Type type = getType(var);
-		// Integer type
-		if (type instanceof TypeInt) {
-			try {
-				int i = Integer.parseInt(s);
-				return i - getLow(var);
-			} catch (NumberFormatException e) {
-				throw new PrismLangException("\"" + s + "\" is not a valid integer value");
-			}
-		}
-		// Boolean type
-		else if (type instanceof TypeBool) {
-			if (s.equals("true"))
-				return 1;
-			else if (s.equals("false"))
-				return 0;
-			else
-				throw new PrismLangException("\"" + s + "\" is not a valid Boolean value");
-
-		}
-		// Anything else
-		else {
-			throw new PrismLangException("Unknown type " + type + " for variable " + getName(var));
-		}
-	}
-
-	/**
 	 * Create a State object representing the default initial state using these variables.
 	 */
 	public State getDefaultInitialState() throws PrismLangException
@@ -632,6 +658,18 @@ public class VarList
 					}
 					vals.addValue(var, lo);
 				}
+			} else if (getType(i) instanceof TypeEnum) {
+				TypeEnum te = (TypeEnum) getType(i);
+				n = te.getNumConstants();
+				for (j = 0; j < n; j++) {
+					vals = allValues.get(j);
+					for (k = 1; k < n; k++) {
+						valsNew = new Values(vals);
+						valsNew.setValue(var, te.getConstant(k));
+						allValues.add(valsNew);
+					}
+					vals.addValue(var, te.getConstant(0));
+				}
 			} else {
 				throw new PrismLangException("Cannot determine all values for a variable of type " + getType(i));
 			}
@@ -673,6 +711,18 @@ public class VarList
 						allStates.add(stateNew);
 					}
 					state.setValue(i, lo);
+				}
+			} else if (getType(i) instanceof TypeEnum) {
+				TypeEnum te = (TypeEnum) getType(i);
+				int n = te.getNumConstants();
+				for (int j = 0; j < n; j++) {
+					state = allStates.get(j);
+					for (int k = 1; k < n; k++) {
+						stateNew = new State(state);
+						stateNew.setValue(i, te.getConstant(k));
+						allStates.add(stateNew);
+					}
+					state.setValue(i, te.getConstant(0));
 				}
 			} else {
 				throw new PrismLangException("Cannot determine all values for a variable of type " + getType(i));

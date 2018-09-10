@@ -28,8 +28,11 @@ package parser.ast;
 
 import param.BigRational;
 import parser.EvaluateContext;
+import parser.type.TypeBool;
+import parser.type.TypeDouble;
 import parser.type.TypeInt;
 import parser.visitor.ASTVisitor;
+import prism.EnumConstant;
 import prism.PrismLangException;
 
 public class ExpressionBinaryOp extends Expression
@@ -155,17 +158,18 @@ public class ExpressionBinaryOp extends Expression
 		case AND:
 			return new Boolean(operand1.evaluateBoolean(ec) && operand2.evaluateBoolean(ec));
 		case EQ:
-			if (operand1.getType() == TypeInt.getInstance() && operand2.getType() == TypeInt.getInstance()) {
-				return new Boolean(operand1.evaluateInt(ec) == operand2.evaluateInt(ec));
-			} else {
-				return new Boolean(operand1.evaluateDouble(ec) == operand2.evaluateDouble(ec));
-			}
 		case NE:
-			if (operand1.getType() == TypeInt.getInstance() && operand2.getType() == TypeInt.getInstance()) {
-				return new Boolean(operand1.evaluateInt(ec) != operand2.evaluateInt(ec));
+			boolean b;
+			if (operand1.getType() == TypeBool.getInstance()) {
+				b = operand1.evaluateBoolean(ec) == operand2.evaluateBoolean(ec);
+			} else if (operand1.getType() == TypeInt.getInstance() && operand2.getType() == TypeInt.getInstance()) {
+				b = operand1.evaluateInt(ec) == operand2.evaluateInt(ec);
+			} else if (operand1.getType() == TypeDouble.getInstance() || operand2.getType() == TypeDouble.getInstance()) {
+				b = operand1.evaluateDouble(ec) == operand2.evaluateDouble(ec);
 			} else {
-				return new Boolean(operand1.evaluateDouble(ec) != operand2.evaluateDouble(ec));
+				b = operand1.evaluate(ec).equals(operand2.evaluate(ec));
 			}
+			return op == EQ ? new Boolean(b) : new Boolean (!b);
 		case GT:
 			if (operand1.getType() == TypeInt.getInstance() && operand2.getType() == TypeInt.getInstance()) {
 				return new Boolean(operand1.evaluateInt(ec) > operand2.evaluateInt(ec));

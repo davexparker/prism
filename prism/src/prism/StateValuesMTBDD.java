@@ -35,7 +35,6 @@ import jdd.*;
 import odd.*;
 import parser.VarList;
 import parser.ast.RelOp;
-import parser.type.*;
 
 /**
  * Class for state-indexed vectors of (integer or double) values, represented by an MTBDD
@@ -656,14 +655,7 @@ public class StateValuesMTBDD implements StateValues
 			outputLog.print(n + ":(");
 			j = varList.getNumVars();
 			for (i = 0; i < j; i++) {
-				// integer variable
-				if (varList.getType(i) instanceof TypeInt) {
-					outputLog.print(varValues[i]+varList.getLow(i));
-				}
-				// boolean variable
-				else {
-					outputLog.print(varValues[i] == 1);
-				}
+				outputLog.print(varList.decodeFromInt(i, varValues[i]).toString());
 				if (i < j-1) outputLog.print(",");
 			}
 			outputLog.print(")=" + dd.getValue());

@@ -41,6 +41,7 @@ public interface ASTVisitor
 	public Object visit(Declaration e) throws PrismLangException;
 	public Object visit(DeclarationInt e) throws PrismLangException;
 	public Object visit(DeclarationBool e) throws PrismLangException;
+	public Object visit(DeclarationEnum e) throws PrismLangException;
 	public Object visit(DeclarationArray e) throws PrismLangException;
 	public Object visit(DeclarationStruct e) throws PrismLangException;
 	public Object visit(DeclarationClock e) throws PrismLangException;

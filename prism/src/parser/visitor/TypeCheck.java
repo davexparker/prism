@@ -234,12 +234,13 @@ public class TypeCheck extends ASTTraverse
 			throw new PrismLangException("Type error: types for then/else operands of ? operator must match", e);
 		}
 
-		if (t2 instanceof TypeBool)
-			e.setType(TypeBool.getInstance());
-		else if (t2 instanceof TypeInt && t3 instanceof TypeInt)
-			e.setType(TypeInt.getInstance());
-		else
+		// Need to be careful of doubles/ints, which might get cast;
+		// otherwise the type should be the same as either operand
+		if (t2 instanceof TypeInt && t3 instanceof TypeDouble) {
 			e.setType(TypeDouble.getInstance());
+		} else {
+			e.setType(t2);
+		}
 	}
 
 	public void visitPost(ExpressionBinaryOp e) throws PrismLangException
@@ -272,6 +273,10 @@ public class TypeCheck extends ASTTraverse
 			}
 			// equality of ints/doubles
 			else if ((t1 instanceof TypeInt || t1 instanceof TypeDouble) && (t2 instanceof TypeInt || t2 instanceof TypeDouble)) {
+				ok = true;
+			}
+			// equality of enums
+			else if (t1 instanceof TypeEnum && t2 instanceof TypeEnum && t1.equals(t2)) {
 				ok = true;
 			}
 			// equality of clocks against clocks/integers

@@ -41,7 +41,9 @@ import parser.ast.RelOp;
 import parser.type.Type;
 import parser.type.TypeBool;
 import parser.type.TypeDouble;
+import parser.type.TypeEnum;
 import parser.type.TypeInt;
+import prism.EnumConstant;
 import prism.PrismException;
 import prism.PrismLangException;
 import prism.PrismLog;
@@ -152,6 +154,12 @@ public class StateValues implements StateVector
 			} else {
 				valuesB = new BitSet();
 			}
+		} else if (type instanceof TypeEnum) {
+			valuesI = new int[size];
+			EnumConstant objE = ((TypeEnum) type).castValueTo(init);
+			int initI = objE.getIndex();
+			for (i = 0; i < size; i++)
+				valuesI[i] = initI;
 		} else {
 			throw new PrismLangException("Cannot create a vector of type " + type);
 		}
@@ -328,6 +336,8 @@ public class StateValues implements StateVector
 			setIntValue(i, ((TypeInt) type).castValueTo(val));
 		} else if (type instanceof TypeDouble) {
 			setDoubleValue(i, ((TypeDouble) type).castValueTo(val).doubleValue());
+		} else if (type instanceof TypeEnum) {
+			setEnumValue(i, ((TypeEnum) type).castValueTo(val));
 		}
 	}
 
@@ -344,6 +354,11 @@ public class StateValues implements StateVector
 	public void setBooleanValue(int i, boolean val)
 	{
 		valuesB.set(i, val);
+	}
+
+	public void setEnumValue(int i, EnumConstant val)
+	{
+		valuesI[i] = val.getIndex();
 	}
 
 	/**
@@ -388,6 +403,10 @@ public class StateValues implements StateVector
 				}
 			} else {
 				throw new PrismException("Type error in ? operator");
+			}
+		} else if (type instanceof TypeEnum) {
+			for (int i = 0; i < size; i++) {
+				valuesI[i] = svIf.valuesB.get(i) ? svThen.valuesI[i] : valuesI[i];
 			}
 		} else {
 			throw new PrismException("Type error in ? operator");
@@ -538,6 +557,11 @@ public class StateValues implements StateVector
 				valuesB.xor(sv.valuesB);
 				valuesB.flip(0, size);
 			}
+		} else if (type instanceof TypeEnum) {
+			valuesB = new BitSet();
+			for (int i = 0; i < size; i++) {
+				valuesB.set(i, valuesI[i] == sv.valuesI[i]);
+			}
 		}
 		type = TypeBool.getInstance();
 		valuesI = null;
@@ -574,6 +598,11 @@ public class StateValues implements StateVector
 		} else if (type instanceof TypeBool) {
 			if (sv.type instanceof TypeBool) {
 				valuesB.xor(sv.valuesB);
+			}
+		} else if (type instanceof TypeEnum) {
+			valuesB = new BitSet();
+			for (int i = 0; i < size; i++) {
+				valuesB.set(i, valuesI[i] != sv.valuesI[i]);
 			}
 		}
 		type = TypeBool.getInstance();
@@ -1364,6 +1393,8 @@ public class StateValues implements StateVector
 			return valuesD[i];
 		} else if (type instanceof TypeBool) {
 			return valuesB.get(i);
+		} else if (type instanceof TypeEnum) {
+			return ((TypeEnum) type).getConstant(valuesI[i]);
 		} else {
 			return null;
 		}
@@ -1380,6 +1411,8 @@ public class StateValues implements StateVector
 			return valuesD[i] != 0.0;
 		} else if (type instanceof TypeBool) {
 			return valuesB.get(i);
+		} else if (type instanceof TypeEnum) {
+			return true;
 		} else {
 			return false;
 		}

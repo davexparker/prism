@@ -439,6 +439,7 @@ TOKEN :
 |	< ENDMODULE:		"endmodule" >
 |	< ENDREWARDS:		"endrewards" >
 |	< ENDSYSTEM:		"endsystem" >
+|	< ENUM:				"enum" >
 |	< FALSE:			"false" >
 |	< FORMULA:			"formula" >
 |	< FILTER:			"filter" >
@@ -770,7 +771,9 @@ DeclarationType DeclarationVarType() :
 	Expression low = null, high = null, length = null;
 	DeclarationType declType, subtype;
 	DeclarationStruct structType;
+	DeclarationEnum enumType;
 	String fieldName = null;
+	List<ExpressionIdent> identList;
 	Token begin = null;
 }
 {
@@ -782,6 +785,10 @@ DeclarationType DeclarationVarType() :
 	| ( <INT> { declType = new DeclarationIntUnbounded(); } )
 	// Boolean variable declaration
 	| ( <BOOL> { declType = new DeclarationBool(); } )
+	// Enumerated type declaration
+	| ( <ENUM> <LPARENTH>  { declType = enumType = new DeclarationEnum(); }
+		identList = IdentifierList() { for (ExpressionIdent ident : identList) enumType.addConstant(ident); }
+	  <RPARENTH> )
 	// Clock (for timed automata)
 	| ( <CLOCK> { declType = new DeclarationClock(); } )
 	// Array variable declaration
@@ -2005,6 +2012,19 @@ ExpressionIdent IdentifierExpressionMinMax() :
 {
 	( ident = Identifier() | <MIN> { ident="min"; } | <MAX> { ident="max"; } )
 	{ ret = new ExpressionIdent(ident); ret.setPosition(getToken(0)); return ret; }
+}
+
+// Non-empty list of identifiers (returns list of ExpressionIdents, storing position info)
+
+List<ExpressionIdent> IdentifierList() :
+{
+	ExpressionIdent ident;
+	List<ExpressionIdent> identList = new ArrayList<ExpressionIdent>();
+}
+{
+	ident = IdentifierExpression() { identList.add(ident); }
+	( <COMMA> ident = IdentifierExpression() { identList.add(ident); })*
+	{ return identList; }
 }
 
 // Equality operators: =, !=

@@ -64,9 +64,11 @@ import parser.ast.PropertiesFile;
 import parser.ast.Property;
 import parser.type.TypeBool;
 import parser.type.TypeDouble;
+import parser.type.TypeEnum;
 import parser.type.TypeInt;
 import parser.visitor.ASTTraverseModify;
 import parser.visitor.ReplaceLabels;
+import prism.EnumConstant;
 import prism.Filter;
 import prism.ModelGenerator;
 import prism.ModelInfo;
@@ -922,6 +924,10 @@ public class StateModelChecker extends PrismComponent
 		} else if (expr.getType() instanceof TypeDouble) {
 			for (int i = 0; i < numStates; i++) {
 				res.setDoubleValue(i, expr.evaluateDouble(statesList.get(i)));
+			}
+		} else if (expr.getType() instanceof TypeEnum) {
+			for (int i = 0; i < numStates; i++) {
+				res.setEnumValue(i, (EnumConstant) expr.evaluate(statesList.get(i)));
 			}
 		}
 		return res;

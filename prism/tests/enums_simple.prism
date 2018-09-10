@@ -1,0 +1,19 @@
+// Simple test of enums
+
+dtmc
+
+const int N;
+
+module M
+
+	i : [0..3] init 0;
+	e : enum(x,y) init y;
+	f : enum(x,y);
+	g : enum(a,b,c) init N>1?a:b;
+	
+	[] i=0 -> (e'=f) & (i'=i+1);
+	[] i=1 & e=x -> (e'=y) & (f'=y) & (i'=i+1);
+	[] i=2 & e=f -> (g'=c) & (e'=(e!=f?y:x)) & (i'=i+1);
+	[] i>2 -> true;
+	
+endmodule
