@@ -20,51 +20,87 @@ import prism.PrismException;
 import prism.PrismLangException;
 import prism.RewardGenerator;
 
-public class ModulesFileModelGenerator implements ModelGenerator<Double>, RewardGenerator<Double>
+public class ModulesFileModelGenerator<Value> implements ModelGenerator<Value>, RewardGenerator<Value>
 {
 	// Parent PrismComponent (logs, settings etc.)
 	protected PrismComponent parent;
 	
+	// Evaluator for values/states
+	protected Evaluator<Value> eval;
+	
 	// PRISM model info
 	/** The original modules file (might have unresolved constants) */
-	private ModulesFile originalModulesFile;
+	protected ModulesFile originalModulesFile;
 	/** The modules file used for generating (has no unresolved constants after {@code initialise}) */
-	private ModulesFile modulesFile;
-	private ModelType modelType;
-	private Values mfConstants;
-	private VarList varList;
-	private LabelList labelList;
-	private List<String> labelNames;
+	protected ModulesFile modulesFile;
+	protected ModelType modelType;
+	protected Values mfConstants;
+	protected VarList varList;
+	protected LabelList labelList;
+	protected List<String> labelNames;
 	
 	// Model exploration info
 	
 	// State currently being explored
-	private State exploreState;
+	protected State exploreState;
 	// Updater object for model
-	protected Updater updater;
+	protected Updater<Value> updater;
 	// List of currently available transitions
-	protected TransitionList transitionList;
+	protected TransitionList<Value> transitionList;
 	// Has the transition list been built? 
 	protected boolean transitionListBuilt;
 	
 	/**
-	 * Build a ModulesFileModelGenerator for a particular PRISM model, represented by a ModuleFile instance.
+	 * Build a ModulesFileModelGenerator for a particular PRISM model, represented by a {@link ModulesFile} instance.
+	 * An {@link Evaluator} of the appropriate type is created.
+	 * So, this static creator method should generally be preferred to calling the constructors directly.
+	 * Throw an explanatory exception if this is not possible.
+	 * @param modulesFile The PRISM model
+	 * @param parent Parent, used e.g. for settings (can be null)
+	 */
+	public static ModulesFileModelGenerator<?> create(ModulesFile modulesFile, PrismComponent parent) throws PrismException
+	{
+		// For now, we just create an Evaluator<Double>
+		Evaluator<Double> evalDbl = Evaluator.createForDoubles();
+		return new ModulesFileModelGenerator<Double>(modulesFile, evalDbl, parent);
+	}
+	
+	/**
+	 * Build a ModulesFileModelGenerator for a particular PRISM model, represented by a {@link ModulesFile} instance.
+	 * Creates a default {@link Evaluator}{@code <Double>} so only works for {@code ModulesFileModelGenerator<Double>}.
 	 * Throw an explanatory exception if this is not possible.
 	 * @param modulesFile The PRISM model
 	 */
 	public ModulesFileModelGenerator(ModulesFile modulesFile) throws PrismException
 	{
-		this(modulesFile, null);
+		this(modulesFile, (PrismComponent) null);
 	}
 	
 	/**
-	 * Build a ModulesFileModelGenerator for a particular PRISM model, represented by a ModuleFile instance.
+	 * Build a ModulesFileModelGenerator for a particular PRISM model, represented by a {@link ModulesFile} instance.
 	 * Throw an explanatory exception if this is not possible.
+	 * Creates a default {@link Evaluator}{@code <Double>} so only works for {@code ModulesFileModelGenerator<Double>}.
 	 * @param modulesFile The PRISM model
+	 * @param parent Parent, used e.g. for settings (can be null)
 	 */
+	@SuppressWarnings("unchecked")
 	public ModulesFileModelGenerator(ModulesFile modulesFile, PrismComponent parent) throws PrismException
 	{
+		this(modulesFile, (Evaluator<Value>) Evaluator.createForDoubles(), parent);
+	}
+	
+	/**
+	 * Build a ModulesFileModelGenerator for a particular PRISM model, represented by a {@link ModulesFile} instance.
+	 * Takes in an {@link Evaluator}{@code <Value>} to match the type parameter {@code Value} of this class.
+	 * Throw an explanatory exception if this is not possible.
+	 * @param modulesFile The PRISM model
+	 * @param eval Evaluator matching the type parameter {@code Value} of this class
+	 * @param parent Parent, used e.g. for settings (can be null)
+	 */
+	public ModulesFileModelGenerator(ModulesFile modulesFile, Evaluator<Value> eval, PrismComponent parent) throws PrismException
+	{
 		this.parent = parent;
+		this.eval = eval;
 		
 		// No support for PTAs yet
 		if (modulesFile.getModelType() == ModelType.PTA) {
@@ -94,17 +130,20 @@ public class ModulesFileModelGenerator implements ModelGenerator<Double>, Reward
 	 */
 	private void initialise() throws PrismException
 	{
-		// Evaluate constants on (a copy) of the modules file, insert constant values and optimize arithmetic expressions
-		modulesFile = (ModulesFile) modulesFile.deepCopy().replaceConstants(mfConstants).simplify();
-
+		// Evaluate constants on (a copy) of the modules file, insert constant values
+		modulesFile = (ModulesFile) modulesFile.deepCopy().replaceConstants(mfConstants);
+		// Optimise arithmetic expressions (not in exact mode: can create some round-off issues)
+		if (!eval.exact()) {
+			modulesFile = (ModulesFile) modulesFile.simplify();
+		}
 		// Get info
 		varList = modulesFile.createVarList();
 		labelList = modulesFile.getLabelList();
 		labelNames = labelList.getLabelNames();
 		
 		// Create data structures for exploring model
-		updater = new Updater(modulesFile, varList, parent);
-		transitionList = new TransitionList();
+		updater = new Updater<Value>(modulesFile, varList, eval, parent);
+		transitionList = new TransitionList<Value>(eval);
 		transitionListBuilt = false;
 	}
 	
@@ -224,10 +263,9 @@ public class ModulesFileModelGenerator implements ModelGenerator<Double>, Reward
 	// Methods for ModelGenerator interface
 	
 	@Override
-	public Evaluator<Double> getEvaluator()
+	public Evaluator<Value> getEvaluator()
 	{
-		// Resolve ambiguity between ModelGenerator and RewardGenerator
-		return ModelGenerator.super.getEvaluator();
+		return eval;
 	}
 	
 	@Override
@@ -240,7 +278,7 @@ public class ModulesFileModelGenerator implements ModelGenerator<Double>, Reward
 	public State getInitialState() throws PrismException
 	{
 		if (modulesFile.getInitialStates() == null) {
-			return modulesFile.getDefaultInitialState();
+			return modulesFile.getDefaultInitialState(eval.exact());
 		} else {
 			// Inefficient but probably won't be called
 			return getInitialStates().get(0);
@@ -253,7 +291,7 @@ public class ModulesFileModelGenerator implements ModelGenerator<Double>, Reward
 		List<State> initStates = new ArrayList<State>();
 		// Easy (normal) case: just one initial state
 		if (modulesFile.getInitialStates() == null) {
-			State state = modulesFile.getDefaultInitialState();
+			State state = modulesFile.getDefaultInitialState(eval.exact());
 			initStates.add(state);
 		}
 		// Otherwise, there may be multiple initial states
@@ -262,7 +300,10 @@ public class ModulesFileModelGenerator implements ModelGenerator<Double>, Reward
 			Expression init = modulesFile.getInitialStates();
 			List<State> allPossStates = varList.getAllStates();
 			for (State possState : allPossStates) {
-				if (init.evaluateBoolean(modulesFile.getConstantValues(), possState)) {
+				if (!eval.exact() && init.evaluateBoolean(modulesFile.getConstantValues(), possState)) {
+					initStates.add(possState);
+				}
+				if (eval.exact() && init.evaluateExact(modulesFile.getConstantValues(), possState).toBoolean()) {
 					initStates.add(possState);
 				}
 			}
@@ -316,7 +357,7 @@ public class ModulesFileModelGenerator implements ModelGenerator<Double>, Reward
 	@Override
 	public Object getTransitionAction(int i, int offset) throws PrismException
 	{
-		TransitionList transitions = getTransitionList();
+		TransitionList<Value> transitions = getTransitionList();
 		int a = transitions.getTransitionModuleOrActionIndex(transitions.getTotalIndexOfTransition(i, offset));
 		return a < 0 ? null : modulesFile.getSynch(a - 1);
 	}
@@ -324,7 +365,7 @@ public class ModulesFileModelGenerator implements ModelGenerator<Double>, Reward
 	@Override
 	public String getTransitionActionString(int i, int offset) throws PrismException
 	{
-		TransitionList transitions = getTransitionList();
+		TransitionList<Value> transitions = getTransitionList();
 		int a = transitions.getTransitionModuleOrActionIndex(transitions.getTotalIndexOfTransition(i, offset));
 		return getDescriptionForModuleOrActionIndex(a);
 	}
@@ -332,7 +373,7 @@ public class ModulesFileModelGenerator implements ModelGenerator<Double>, Reward
 	@Override
 	public Object getChoiceAction(int index) throws PrismException
 	{
-		TransitionList transitions = getTransitionList();
+		TransitionList<Value> transitions = getTransitionList();
 		int a = transitions.getChoiceModuleOrActionIndex(index);
 		return a < 0 ? null : modulesFile.getSynch(a - 1);
 	}
@@ -340,7 +381,7 @@ public class ModulesFileModelGenerator implements ModelGenerator<Double>, Reward
 	@Override
 	public String getChoiceActionString(int index) throws PrismException
 	{
-		TransitionList transitions = getTransitionList();
+		TransitionList<Value> transitions = getTransitionList();
 		int a = transitions.getChoiceModuleOrActionIndex(index);
 		return getDescriptionForModuleOrActionIndex(a);
 	}
@@ -364,37 +405,44 @@ public class ModulesFileModelGenerator implements ModelGenerator<Double>, Reward
 	}
 	
 	@Override
-	public Double getTransitionProbability(int i, int offset) throws PrismException
+	public Value getTransitionProbability(int i, int offset) throws PrismException
 	{
-		TransitionList transitions = getTransitionList();
+		TransitionList<Value> transitions = getTransitionList();
 		return transitions.getChoice(i).getProbability(offset);
 	}
 
 	@Override
-	public Double getChoiceProbabilitySum(int i) throws PrismException
+	public Value getChoiceProbabilitySum(int i) throws PrismException
 	{
-		TransitionList transitions = getTransitionList();
+		TransitionList<Value> transitions = getTransitionList();
 		return transitions.getChoice(i).getProbabilitySum();
 	}
 	
 	@Override
-	public Double getProbabilitySum() throws PrismException
+	public Value getProbabilitySum() throws PrismException
 	{
-		TransitionList transitions = getTransitionList();
+		TransitionList<Value> transitions = getTransitionList();
 		return transitions.getProbabilitySum();
+	}
+	
+	@Override
+	public boolean isDeterministic() throws PrismException
+	{
+		TransitionList<Value> transitions = getTransitionList();
+		return transitions.isDeterministic();
 	}
 	
 	@Override
 	public String getTransitionUpdateString(int i, int offset) throws PrismException
 	{
-		TransitionList transitions = getTransitionList();
+		TransitionList<Value> transitions = getTransitionList();
 		return transitions.getTransitionUpdateString(transitions.getTotalIndexOfTransition(i, offset), exploreState);
 	}
 	
 	@Override
 	public String getTransitionUpdateStringFull(int i, int offset) throws PrismException
 	{
-		TransitionList transitions = getTransitionList();
+		TransitionList<Value> transitions = getTransitionList();
 		return transitions.getTransitionUpdateStringFull(transitions.getTotalIndexOfTransition(i, offset));
 	}
 	
@@ -408,7 +456,7 @@ public class ModulesFileModelGenerator implements ModelGenerator<Double>, Reward
 	public boolean isLabelTrue(int i) throws PrismException
 	{
 		Expression expr = labelList.getLabel(i);
-		return expr.evaluateBoolean(exploreState);
+		return eval.exact() ? expr.evaluateExact(exploreState).toBoolean() : expr.evaluateBoolean(exploreState);
 	}
 	
 	// Methods for RewardGenerator interface
@@ -432,19 +480,26 @@ public class ModulesFileModelGenerator implements ModelGenerator<Double>, Reward
 	}
 	
 	@Override
-	public Double getStateReward(int r, State state) throws PrismException
+	public Value getStateReward(int r, State state) throws PrismException
 	{
 		RewardStruct rewStr = modulesFile.getRewardStruct(r);
 		int n = rewStr.getNumItems();
-		double d = 0;
+		Value d = eval.zero();
 		for (int i = 0; i < n; i++) {
 			if (!rewStr.getRewardStructItem(i).isTransitionReward()) {
 				Expression guard = rewStr.getStates(i);
-				if (guard.evaluateBoolean(modulesFile.getConstantValues(), state)) {
-					double rew = rewStr.getReward(i).evaluateDouble(modulesFile.getConstantValues(), state);
-					if (Double.isNaN(rew))
-						throw new PrismLangException("Reward structure evaluates to NaN at state " + state, rewStr.getReward(i));
-					d += rew;
+				boolean guardSat;
+				if (eval.exact()) {
+					guardSat = guard.evaluateExact(modulesFile.getConstantValues(), state).toBoolean();
+				} else {
+					guardSat = guard.evaluateBoolean(modulesFile.getConstantValues(), state);
+				}
+				if (guardSat) {
+					Value rew = eval.evaluate(rewStr.getReward(i), modulesFile.getConstantValues(), state);
+					if (!eval.isFinite(rew)) {
+						throw new PrismLangException("Reward structure is not finite at state " + state, rewStr.getReward(i));
+					}
+					d = eval.add(d, rew);
 				}
 			}
 		}
@@ -452,21 +507,28 @@ public class ModulesFileModelGenerator implements ModelGenerator<Double>, Reward
 	}
 
 	@Override
-	public Double getStateActionReward(int r, State state, Object action) throws PrismException
+	public Value getStateActionReward(int r, State state, Object action) throws PrismException
 	{
 		RewardStruct rewStr = modulesFile.getRewardStruct(r);
 		int n = rewStr.getNumItems();
-		double d = 0;
+		Value d = eval.zero();
 		for (int i = 0; i < n; i++) {
 			if (rewStr.getRewardStructItem(i).isTransitionReward()) {
 				Expression guard = rewStr.getStates(i);
 				String cmdAction = rewStr.getSynch(i);
 				if (action == null ? (cmdAction.isEmpty()) : action.equals(cmdAction)) {
-					if (guard.evaluateBoolean(modulesFile.getConstantValues(), state)) {
-						double rew = rewStr.getReward(i).evaluateDouble(modulesFile.getConstantValues(), state);
-						if (Double.isNaN(rew))
-							throw new PrismLangException("Reward structure evaluates to NaN at state " + state, rewStr.getReward(i));
-						d += rew;
+					boolean guardSat;
+					if (eval.exact()) {
+						guardSat = guard.evaluateExact(modulesFile.getConstantValues(), state).toBoolean();
+					} else {
+						guardSat = guard.evaluateBoolean(modulesFile.getConstantValues(), state);
+					}
+					if (guardSat) {
+						Value rew = eval.evaluate(rewStr.getReward(i), modulesFile.getConstantValues(), state);
+						if (!eval.isFinite(rew)) {
+							throw new PrismLangException("Reward structure is not finite at state " + state, rewStr.getReward(i));
+						}
+						d = eval.add(d, rew);
 					}
 				}
 			}
@@ -479,7 +541,7 @@ public class ModulesFileModelGenerator implements ModelGenerator<Double>, Reward
 	/**
 	 * Returns the current list of available transitions, generating it first if this has not yet been done.
 	 */
-	private TransitionList getTransitionList() throws PrismException
+	private TransitionList<Value> getTransitionList() throws PrismException
 	{
 		// Compute the current transition list, if required
 		if (!transitionListBuilt) {
