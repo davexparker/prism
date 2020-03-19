@@ -50,6 +50,7 @@ import jdd.JDDVars;
 import mtbdd.PrismMTBDD;
 import odd.ODDUtils;
 import param.BigRational;
+import param.Function;
 import param.ModelBuilder;
 import param.ParamModel;
 import param.ParamModelChecker;
@@ -68,7 +69,6 @@ import pta.DigitalClocks;
 import pta.PTAModelChecker;
 import simulator.GenerateSimulationPath;
 import simulator.ModulesFileModelGenerator;
-import simulator.ModulesFileModelGeneratorSymbolic;
 import simulator.SimulatorEngine;
 import simulator.method.SimulationMethod;
 import sparse.PrismSparse;
@@ -3385,7 +3385,9 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 		String[] paramUpperBounds = new String[] { "1" };
 		// And execute parameteric model checking
 		param.ModelBuilder builder = new ModelBuilder(this, param.ParamMode.EXACT);
-		ParamModel modelExpl = builder.constructModel(new ModulesFileModelGeneratorSymbolic(currentModulesFile, this), paramNames, paramLowerBounds, paramUpperBounds);
+		Evaluator<Function> eval = Evaluator.createForRationalFunctions(builder.getFunctionFactory(paramNames, paramLowerBounds, paramUpperBounds));
+		ModelGenerator<Function> modelGenSym = new ModulesFileModelGenerator<Function>(currentModulesFile, eval, this);
+		ParamModel modelExpl = builder.constructModel(modelGenSym);
 		ParamModelChecker mc = new ParamModelChecker(this, param.ParamMode.EXACT);
 		mc.setModelBuilder(builder);
 		mc.setParameters(paramNames, paramLowerBounds, paramUpperBounds);
@@ -3457,7 +3459,9 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 			mainLog.println("Property constants: " + definedPFConstants);
 
 		param.ModelBuilder builder = new ModelBuilder(this, param.ParamMode.PARAMETRIC);
-		ParamModel modelExpl = builder.constructModel(new ModulesFileModelGeneratorSymbolic(currentModulesFile, this), paramNames, paramLowerBounds, paramUpperBounds);
+		Evaluator<Function> eval = Evaluator.createForRationalFunctions(builder.getFunctionFactory(paramNames, paramLowerBounds, paramUpperBounds));
+		ModelGenerator<Function> modelGenSym = new ModulesFileModelGenerator<Function>(currentModulesFile, eval, this);
+		ParamModel modelExpl = builder.constructModel(modelGenSym);
 		ParamModelChecker mc = new ParamModelChecker(this, param.ParamMode.PARAMETRIC);
 		mc.setModelBuilder(builder);
 		mc.setParameters(paramNames, paramLowerBounds, paramUpperBounds);
