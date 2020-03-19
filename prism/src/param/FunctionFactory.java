@@ -3,6 +3,7 @@
 //	Copyright (c) 2013-
 //	Authors:
 //	* Ernst Moritz Hahn <emhahn@cs.ox.ac.uk> (University of Oxford)
+//	* Dave Parker <d.a.parker@cs.bham.ac.uk> (University of Birmingham)
 //	
 //------------------------------------------------------------------------------
 //	
@@ -28,8 +29,10 @@ package param;
 
 import java.util.HashMap;
 
+import parser.Values;
 import parser.ast.Expression;
 import parser.ast.ExpressionBinaryOp;
+import parser.ast.ExpressionConstant;
 import parser.ast.ExpressionFunc;
 import parser.ast.ExpressionITE;
 import parser.ast.ExpressionLiteral;
@@ -39,11 +42,9 @@ import prism.PrismLangException;
 
 /**
  * Generates new functions, stores valid ranges of parameters, etc.
- * 
- * @see Function
- * @author Ernst Moritz Hahn <emhahn@cs.ox.ac.uk> (University of Oxford)
  */
-public abstract class FunctionFactory {
+public abstract class FunctionFactory
+{
 	/** names of parameters */
 	protected String[] parameterNames;
 	/** lower bounds of parameters */
@@ -197,24 +198,37 @@ public abstract class FunctionFactory {
 	 */
 	public Function expr2function(Expression expr) throws PrismLangException
 	{
+		return expr2function(expr, null);
+	}
+	
+	/**
+	 * Transform PRISM expression to rational function.
+	 * If successful, a function representing the given expression will be
+	 * constructed. This is however not always possible, as not each PRISM
+	 * expression can be represented as a rational function. In this case
+	 * a {@code PrismException} will be thrown.
+	 * 
+	 * @param factory function factory used to construct function
+	 * @param expr PRISM expression to transform to rational function
+	 * @return rational function representing the given PRISM expression
+	 * @throws PrismException thrown if {@code expr} cannot be represented as rational function
+	 */
+	public Function expr2function(Expression expr, Values constantValues) throws PrismLangException
+	{
 		if (expr instanceof ExpressionLiteral) {
 			String exprString = ((ExpressionLiteral) expr).getString();
 			if (exprString == null || exprString.equals("")) {
 				throw new PrismLangException("Cannot convert from literal for which no string is set", expr);
 			}
 			return fromBigRational(new BigRational(exprString));
-//		} else if (expr instanceof ExpressionConstant) {
-//			String exprString = ((ExpressionConstant) expr).getName();
-//			if (modelGenSym.getConstantValues().contains(exprString)) {
-//				Object val = modelGenSym.getConstantValues().getValueOf(exprString);
-//				return fromBigRational(new BigRational(val.toString()));
-//			}
-//			Expression constExpr = modelGenSym.getUnknownConstantDefinition(exprString);
-//			if (constExpr == null) {
-//				return getVar(exprString);
-//			} else {
-//				return expr2function(constExpr);
-//			}
+		} else if (expr instanceof ExpressionConstant) {
+			String exprString = ((ExpressionConstant) expr).getName();
+			if (constantValues != null && constantValues.contains(exprString)) {
+				Object val = constantValues.getValueOf(exprString);
+				return fromBigRational(new BigRational(val.toString()));
+			} else {
+				return getVar(exprString);
+			}
 		} else if (expr instanceof ExpressionBinaryOp) {
 			ExpressionBinaryOp binExpr = ((ExpressionBinaryOp) expr);
 			Function f1 = expr2function(binExpr.getOperand1());
