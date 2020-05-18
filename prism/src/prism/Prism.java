@@ -1803,6 +1803,8 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 
 		// For some models, automatically switch engine
 		switch (currentModelType) {
+		case IDTMC:
+		case IMDP:
 		case LTS:
 		case POMDP:
 			if (!getExplicit()) {
@@ -3065,7 +3067,6 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 			lastEngine = getEngine();
 			setEngine(Prism.SPARSE);
 			settings.set(PrismSettings.PRISM_LIN_EQ_METHOD, "Backwards Gauss-Seidel");
-
 		}
 		// Auto-switch engine if required
 		if (currentModelType == ModelType.MDP && !Expression.containsMultiObjective(prop.getExpression())) {
@@ -3089,6 +3090,12 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 				lastEngine = getEngine();
 				setEngine(Prism.EXPLICIT);
 			}
+		}
+		if (currentModelType == ModelType.IDTMC || currentModelType == ModelType.IMDP) {
+			mainLog.printWarning("Switching to explicit engine to allow model checking of interval model.");
+			engineSwitch = true;
+			lastEngine = getEngine();
+			setEngine(Prism.EXPLICIT);
 		}
 		try {
 			// Build model, if necessary

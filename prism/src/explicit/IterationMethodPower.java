@@ -166,4 +166,27 @@ public class IterationMethodPower extends IterationMethod {
 		};
 	}
 
+	@Override
+	public IterationValIter forMvMultMinMaxUnc(IDTMC<Double> idtmc, MinMax minMax)
+	{
+		return new TwoVectorIteration(idtmc, null) {
+			@Override
+			public void doIterate(IntSet states)
+			{
+				idtmc.mvMult(soln, minMax, soln2, states.iterator());
+			}
+		};
+	}
+
+	@Override
+	public IterationValIter forMvMultMinMaxUnc(IMDP<Double> imdp, MinMax minMax)
+	{
+		return new TwoVectorIteration(imdp, null) {
+			@Override
+			public void doIterate(IntSet states)
+			{
+				imdp.mvMult(soln, minMax, soln2, states.iterator());
+			}
+		};
+	}
 }

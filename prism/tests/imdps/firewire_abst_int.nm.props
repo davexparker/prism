@@ -1,0 +1,11 @@
+// Maximum expected rounds to elect a leader
+//RESULT (err=0.2,delay=10) : 1.0
+"rounds": R{"rounds"}minmin=? [ F (s=9) ];
+
+// Maximum expected time to elect a leader
+//RESULT (err=0.2,delay=10) : 393.3
+"time_max": R{"time"}maxmax=? [ F (s=9) ];
+
+// Minimum expected time to elect a leader
+//RESULT (err=0.2,delay=10) : 119.12
+"time_min": R{"time"}minmin=? [ F (s=9) ];

@@ -90,7 +90,11 @@ public class ModulesFileModelGenerator<Value> implements ModelGenerator<Value>, 
 	private static Evaluator<?> createEvaluator(ModulesFile modulesFile, boolean exact) throws PrismException
 	{
 		if (!exact) {
-			return Evaluator.createForDoubles();
+			if (modulesFile.getModelType() == ModelType.IDTMC || modulesFile.getModelType() == ModelType.IMDP) {
+				return Evaluator.createForDoubleIntervals();
+			} else {
+				return Evaluator.createForDoubles();
+			}
 		} else {
 			return Evaluator.createForBigRationals();
 		}

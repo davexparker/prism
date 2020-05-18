@@ -166,12 +166,14 @@ public class ConstructModel extends PrismComponent
 		LinkedList<State> explore;
 		State state, stateNew;
 		// Explicit model storage
-		ModelSimple<Value> modelSimple = null;
+		ModelSimple<?> modelSimple = null;
 		DTMCSimple<Value> dtmc = null;
 		CTMCSimple<Value> ctmc = null;
 		MDPSimple<Value> mdp = null;
 		POMDPSimple<Value> pomdp = null;
 		CTMDPSimple<Value> ctmdp = null;
+		IDTMCSimple<Value> idtmc = null;
+		IMDPSimple<Value> imdp = null;
 		LTSSimple<Value> lts = null;
 		Distribution<Value> distr = null;
 		// Misc
@@ -211,6 +213,12 @@ public class ConstructModel extends PrismComponent
 				break;
 			case CTMDP:
 				modelSimple = ctmdp = new CTMDPSimple<>();
+				break;
+			case IDTMC:
+				modelSimple = idtmc = new IDTMCSimple<>();
+				break;
+			case IMDP:
+				modelSimple = imdp = new IMDPSimple<>();
 				break;
 			case LTS:
 				modelSimple = lts = new LTSSimple<>();
@@ -287,9 +295,13 @@ public class ConstructModel extends PrismComponent
 						case CTMC:
 							ctmc.addToProbability(src, dest, modelGen.getTransitionProbability(i, j));
 							break;
+						case IDTMC:
+							((DTMCSimple<Value>) idtmc).addToProbability(src, dest, modelGen.getTransitionProbability(i, j));
+							break;
 						case MDP:
 						case POMDP:
 						case CTMDP:
+						case IMDP:
 							distr.add(dest, modelGen.getTransitionProbability(i, j));
 							break;
 						case LTS:
@@ -326,6 +338,12 @@ public class ConstructModel extends PrismComponent
 							ctmdp.addActionLabelledChoice(src, distr, modelGen.getChoiceAction(i));
 						} else {
 							ctmdp.addChoice(src, distr);
+						}
+					} else if (modelType == ModelType.IMDP) {
+						if (distinguishActions) {
+							((MDPSimple<Value>) imdp).addActionLabelledChoice(src, distr, modelGen.getChoiceAction(i));
+						} else {
+							((MDPSimple<Value>) imdp).addChoice(src, distr);
 						}
 					}
 				}
@@ -395,6 +413,12 @@ public class ConstructModel extends PrismComponent
 				break;
 			case CTMDP:
 				model = sortStates ? new CTMDPSimple<>(ctmdp, permut) : ctmdp;
+				break;
+			case IDTMC:
+				model = sortStates ? new IDTMCSimple(idtmc, permut) : (IDTMCSimple) modelSimple;
+				break;
+			case IMDP:
+				model = sortStates ? new IMDPSimple(imdp, permut) : (IMDPSimple) modelSimple;
 				break;
 			case LTS:
 				model = sortStates ? new LTSSimple<>(lts, permut) : lts;

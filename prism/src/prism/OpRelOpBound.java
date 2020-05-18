@@ -113,20 +113,36 @@ public class OpRelOpBound
 	public MinMax getMinMax(ModelType modelType, boolean forAll) throws PrismLangException
 	{
 		MinMax minMax = MinMax.blank();
-		if (modelType.nondeterministic()) {
-			if (!(modelType == ModelType.MDP || modelType == ModelType.POMDP || modelType == ModelType.CTMDP)) {
-				throw new PrismLangException("Don't know how to model check " + getTypeOfOperator() + " properties for " + modelType + "s");
-			}
+		if (modelType.nondeterministic() || modelType.uncertain()) {
 			if (isNumeric()) {
 				if (relOp == RelOp.EQ) {
 					throw new PrismLangException("Can't use \"" + op + "=?\" for nondeterministic models; use e.g. \"" + op + "min=?\" or \"" + op + "max=?\"");
 				}
-				minMax = relOp.isMin() ? MinMax.min() : MinMax.max();
-			} else {
-				if (forAll) {
-					minMax = (relOp.isLowerBound() ) ? MinMax.min() : MinMax.max();
+				if (!modelType.uncertain()) {
+					minMax = relOp.isMin() ? MinMax.min() : MinMax.max();
 				} else {
-					minMax = (relOp.isLowerBound() ) ? MinMax.max() : MinMax.min();
+					if (!modelType.nondeterministic()) {
+						// IDTMC
+						minMax = MinMax.blank().setMinUnc(relOp.isMin());
+					} else {
+						// IMDP
+						if (relOp == RelOp.MIN || relOp == RelOp.MINMIN || relOp == RelOp.MINMAX) {
+							minMax = MinMax.min();
+						} else {
+							minMax = MinMax.max();
+						}
+						minMax.setMinUnc(relOp == RelOp.MIN || relOp == RelOp.MINMIN || relOp == RelOp.MAXMIN);
+					}
+				}
+			} else {
+				boolean min = forAll ? relOp.isLowerBound() : relOp.isUpperBound();
+				if (!modelType.nondeterministic()) {
+					minMax = MinMax.blank();
+				} else {
+					minMax = min ? MinMax.min() : MinMax.max(); 
+				}
+				if (modelType.uncertain()) {
+					minMax.setMinUnc(min);
 				}
 			}
 		}

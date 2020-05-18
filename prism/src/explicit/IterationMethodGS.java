@@ -27,6 +27,8 @@
 package explicit;
 
 import common.IntSet;
+import explicit.IterationMethod.IterationValIter;
+import explicit.IterationMethod.TwoVectorIteration;
 import explicit.rewards.MCRewards;
 import explicit.rewards.MDPRewards;
 import prism.PrismException;
@@ -206,6 +208,36 @@ public class IterationMethodGS extends IterationMethod {
 		};
 	}
 
+	@Override
+	public IterationValIter forMvMultMinMaxUnc(IDTMC<Double> idtmc, MinMax minMax)
+	{
+		return new SingleVectorIterationValIter(idtmc) {
+			@Override
+			public boolean iterateAndCheckConvergence(IntSet states)
+			{
+				// Matrix-vector multiply
+				error = idtmc.mvMultGS(soln, minMax, states.iterator(), absolute);
+				// Check termination
+				return (error < termCritParam);
+			}
+		};
+	}
+	
+	@Override
+	public IterationValIter forMvMultMinMaxUnc(IMDP<Double> imdp, MinMax minMax)
+	{
+		return new SingleVectorIterationValIter(imdp) {
+			@Override
+			public boolean iterateAndCheckConvergence(IntSet states)
+			{
+				// Matrix-vector multiply
+				error = imdp.mvMultGS(soln, minMax, states.iterator(), absolute);
+				// Check termination
+				return (error < termCritParam);
+			}
+		};
+	}
+	
 	@Override
 	public String getDescriptionShort()
 	{
