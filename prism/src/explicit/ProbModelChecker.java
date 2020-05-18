@@ -777,6 +777,9 @@ public class ProbModelChecker extends NonProbModelChecker
 			case STPG:
 				res = ((STPGModelChecker) this).computeBoundedUntilProbs((STPG) model, remain, target, windowSize, minMax.isMin1(), minMax.isMin2());
 				break;
+			case IDTMC:
+				res = ((IDTMCModelChecker) this).computeBoundedUntilProbs((IDTMC) model, remain, target, windowSize, minMax);
+				break;
 			default:
 				throw new PrismNotSupportedException("Cannot model check " + expr + " for " + model.getModelType() + "s");
 			}
@@ -834,6 +837,9 @@ public class ProbModelChecker extends NonProbModelChecker
 			break;
 		case STPG:
 			res = ((STPGModelChecker) this).computeUntilProbs((STPG) model, remain, target, minMax.isMin1(), minMax.isMin2());
+			break;
+		case IDTMC:
+			res = ((IDTMCModelChecker) this).computeUntilProbs((IDTMC) model, remain, target, minMax);
 			break;
 		default:
 			throw new PrismNotSupportedException("Cannot model check " + expr + " for " + model.getModelType() + "s");

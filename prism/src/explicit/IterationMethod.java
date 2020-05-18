@@ -31,6 +31,8 @@ import java.util.PrimitiveIterator;
 
 import common.IntSet;
 import common.PeriodicTimer;
+import explicit.IterationMethod.IterationValIter;
+import explicit.IterationMethod.TwoVectorIteration;
 import explicit.rewards.MCRewards;
 import explicit.rewards.MDPRewards;
 import prism.OptionsIntervalIteration;
@@ -377,7 +379,14 @@ public abstract class IterationMethod {
 	 */
 	public abstract IterationIntervalIter forMvMultRewMinMaxInterval(MDP mdp, MDPRewards rewards, boolean min, int[] strat, boolean fromBelow, boolean enforceMonotonicity, boolean checkMonotonicity) throws PrismException;
 
-
+	/**
+	 * Obtain an Iteration object using mvMult (matrix-vector multiplication, followed by min/max)
+	 * in an IDTMC.
+	 * @param idtmc the IDTMC
+	 * @param minMax min/max info
+	 */
+	public abstract IterationValIter forMvMultMinMaxUnc(IDTMC idtmc, MinMax minMax);
+	
 	// ------------ Abstract generic methods ----------------------------
 
 	/**

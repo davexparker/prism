@@ -1,0 +1,27 @@
+// RESULT (err=0.02,err2=0.01,N=2,K=1): 0.733716
+// RESULT (err=0.02,err2=0.01,N=2,K=2): 0.735698
+// RESULT (err=0.02,err2=0.01,N=2,K=3): 0.717727
+// RESULT (err=0.02,err2=0.01,N=2,K=4): 0.696962
+// RESULT (err=0.02,err2=0.01,N=4,K=1): 0.625216
+// RESULT (err=0.02,err2=0.01,N=4,K=2): 0.634103
+// RESULT (err=0.02,err2=0.01,N=4,K=3): 0.629867
+// RESULT (err=0.02,err2=0.01,N=4,K=4): 0.620255
+// RESULT (err=0.02,err2=0.01,N=8,K=1): 0.45773
+// RESULT (err=0.02,err2=0.01,N=8,K=2): 0.51369
+// RESULT (err=0.02,err2=0.01,N=8,K=3): 0.534043
+// RESULT (err=0.02,err2=0.01,N=8,K=4): 0.541157
+"reliable_min": Pmin=? [ F s=4 & z/N<0.1 ];
+
+// RESULT (err=0.02,err2=0.01,N=2,K=1): 0.747483
+// RESULT (err=0.02,err2=0.01,N=2,K=2): 0.751036
+// RESULT (err=0.02,err2=0.01,N=2,K=3): 0.734434
+// RESULT (err=0.02,err2=0.01,N=2,K=4): 0.714915
+// RESULT (err=0.02,err2=0.01,N=4,K=1): 0.641666
+// RESULT (err=0.02,err2=0.01,N=4,K=2): 0.653
+// RESULT (err=0.02,err2=0.01,N=4,K=3): 0.650769
+// RESULT (err=0.02,err2=0.01,N=4,K=4): 0.643033
+// RESULT (err=0.02,err2=0.01,N=8,K=1): 0.478579
+// RESULT (err=0.02,err2=0.01,N=8,K=2): 0.535487
+// RESULT (err=0.02,err2=0.01,N=8,K=3): 0.556383
+// RESULT (err=0.02,err2=0.01,N=8,K=4): 0.564161
+"reliable_max": Pmax=? [ F s=4 & z/N<0.1 ];

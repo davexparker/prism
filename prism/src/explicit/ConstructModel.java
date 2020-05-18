@@ -33,6 +33,7 @@ import java.util.BitSet;
 import java.util.LinkedList;
 import java.util.List;
 
+import common.Interval;
 import parser.State;
 import parser.Values;
 import parser.VarList;
@@ -166,11 +167,13 @@ public class ConstructModel extends PrismComponent
 		LinkedList<State> explore;
 		State state, stateNew;
 		// Explicit model storage
-		ModelSimple<Value> modelSimple = null;
+		ModelSimple<?> modelSimple = null;
 		DTMCSimple<Value> dtmc = null;
 		CTMCSimple<Value> ctmc = null;
 		MDPSimple<Value> mdp = null;
 		CTMDPSimple<Value> ctmdp = null;
+//		DTMCSimple<Interval<Value>> idtmc = null;
+		IDTMCSimple<Value> idtmc = null;
 		Distribution<Value> distr = null;
 		// Misc
 		int i, j, nc, nt, src, dest;
@@ -206,6 +209,9 @@ public class ConstructModel extends PrismComponent
 				break;
 			case CTMDP:
 				modelSimple = ctmdp = new CTMDPSimple<>();
+				break;
+			case IDTMC:
+				modelSimple = idtmc = new IDTMCSimple<>();
 				break;
 			case STPG:
 			case SMG:
@@ -274,6 +280,9 @@ public class ConstructModel extends PrismComponent
 						case MDP:
 						case CTMDP:
 							distr.add(dest, modelGen.getTransitionProbability(i, j));
+							break;
+						case IDTMC:
+							((DTMCSimple<Value>) idtmc).addToProbability(src, dest, modelGen.getTransitionProbability(i, j));
 							break;
 						case STPG:
 						case SMG:
@@ -357,6 +366,9 @@ public class ConstructModel extends PrismComponent
 				break;
 			case CTMDP:
 				model = sortStates ? new CTMDPSimple<>(ctmdp, permut) : ctmdp;
+				break;
+			case IDTMC:
+				model = sortStates ? new IDTMCSimple(idtmc, permut) : (IDTMCSimple) modelSimple;
 				break;
 			case STPG:
 			case SMG:

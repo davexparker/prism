@@ -144,6 +144,13 @@ public enum ModelType
 		{
 			return DTMC;
 		}
+	},
+	IDTMC("interval discrete-time Markov chain") {
+		@Override
+		public ModelType removeNondeterminism()
+		{
+			return DTMC;
+		}
 	};
 
 	private static final String PROBABILITY = "Probability";

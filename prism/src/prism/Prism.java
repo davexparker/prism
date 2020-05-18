@@ -3020,7 +3020,6 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 			lastEngine = getEngine();
 			setEngine(Prism.SPARSE);
 			settings.set(PrismSettings.PRISM_LIN_EQ_METHOD, "Backwards Gauss-Seidel");
-
 		}
 		// Auto-switch engine if required
 		if (currentModelType == ModelType.MDP && !Expression.containsMultiObjective(prop.getExpression())) {
@@ -3044,6 +3043,12 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 				lastEngine = getEngine();
 				setEngine(Prism.EXPLICIT);
 			}
+		}
+		if (currentModelType == ModelType.IDTMC) {
+			mainLog.printWarning("Switching to explicit engine to allow IDTMC model checking.");
+			engineSwitch = true;
+			lastEngine = getEngine();
+			setEngine(Prism.EXPLICIT);
 		}
 		try {
 			// Build model, if necessary

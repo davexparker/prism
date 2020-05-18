@@ -2,7 +2,8 @@
 //	
 //	Copyright (c) 2002-
 //	Authors:
-//	* Dave Parker <david.parker@comlab.ox.ac.uk> (University of Oxford)
+//	* Joachim Klein <klein@tcs.inf.tu-dresden.de> (TU Dresden)
+//	* Dave Parker <d.a.parker@cs.bham.ac.uk> (University of Birmingham)
 //	
 //------------------------------------------------------------------------------
 //	

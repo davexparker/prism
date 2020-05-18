@@ -37,6 +37,8 @@ import parser.State;
 import parser.Values;
 import parser.VarList;
 import parser.type.Type;
+import parser.type.TypeInterval;
+import parser.visitor.ASTTraverse;
 import parser.visitor.ASTVisitor;
 import parser.visitor.ModulesFileSemanticCheck;
 import parser.visitor.ModulesFileSemanticCheckAfterConstants;
@@ -1285,7 +1287,7 @@ public class ModulesFile extends ASTElement implements ModelInfo, RewardGenerato
 	/**
 	 * Determine the actual model type
 	 */
-	private void finaliseModelType()
+	private void finaliseModelType() throws PrismLangException
 	{
 		// Default (if unspecified) is MDP
 		if (modelTypeInFile == null) {
@@ -1295,6 +1297,49 @@ public class ModulesFile extends ASTElement implements ModelInfo, RewardGenerato
 		else {
 			modelType = modelTypeInFile;
 		}
+		// Interval models
+		ASTElement ival = findIntervalInProbabilities();
+		if (ival != null) {
+			if (modelType == ModelType.DTMC) {
+				modelType = ModelType.IDTMC;
+			} else {
+				throw new PrismLangException("Intervals only allowed in DTMCS currently");
+			}
+		}
+	}
+	
+	/**
+	 * Returns true if one or more of the probabilities in a guarded command contains an interval.
+	 */
+	public boolean probabilitiesContainIntervals()
+	{
+		return findIntervalInProbabilities() != null;
+	}
+	
+	/**
+	 * If one or more of the probabilities in a guarded command contains an interval,
+	 * return it; otherwise return null.
+	 */
+	public ASTElement findIntervalInProbabilities()
+	{
+		try {
+			ASTTraverse astt = new ASTTraverse()
+			{
+				public void visitPost(Updates e) throws PrismLangException
+				{
+					int n = e.getNumUpdates();
+					for (int i = 0; i < n; i++) {
+						if (e.getProbability(i) != null && e.getProbability(i).getType() instanceof TypeInterval) {
+							throw new PrismLangException("Found one", e);
+						}
+					}
+				}
+			};
+			accept(astt);
+		} catch (PrismLangException e) {
+			return e.getASTElement();
+		}
+		return null;
 	}
 	
 	// Methods required for ASTElement:
