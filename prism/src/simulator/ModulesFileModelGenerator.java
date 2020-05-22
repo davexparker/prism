@@ -12,6 +12,7 @@ import parser.ast.LabelList;
 import parser.ast.ModulesFile;
 import parser.ast.RewardStruct;
 import parser.type.Type;
+import prism.Evaluator;
 import prism.ModelGenerator;
 import prism.ModelType;
 import prism.PrismComponent;
@@ -19,7 +20,7 @@ import prism.PrismException;
 import prism.PrismLangException;
 import prism.RewardGenerator;
 
-public class ModulesFileModelGenerator implements ModelGenerator<Double>, RewardGenerator
+public class ModulesFileModelGenerator implements ModelGenerator<Double>, RewardGenerator<Double>
 {
 	// Parent PrismComponent (logs, settings etc.)
 	protected PrismComponent parent;
@@ -223,6 +224,13 @@ public class ModulesFileModelGenerator implements ModelGenerator<Double>, Reward
 	// Methods for ModelGenerator interface
 	
 	@Override
+	public Evaluator<Double> getEvaluator()
+	{
+		// Resolve ambiguity between ModelGenerator and RewardGenerator
+		return ModelGenerator.super.getEvaluator();
+	}
+	
+	@Override
 	public boolean hasSingleInitialState() throws PrismException
 	{
 		return modulesFile.getInitialStates() == null;
@@ -424,7 +432,7 @@ public class ModulesFileModelGenerator implements ModelGenerator<Double>, Reward
 	}
 	
 	@Override
-	public double getStateReward(int r, State state) throws PrismException
+	public Double getStateReward(int r, State state) throws PrismException
 	{
 		RewardStruct rewStr = modulesFile.getRewardStruct(r);
 		int n = rewStr.getNumItems();
@@ -444,7 +452,7 @@ public class ModulesFileModelGenerator implements ModelGenerator<Double>, Reward
 	}
 
 	@Override
-	public double getStateActionReward(int r, State state, Object action) throws PrismException
+	public Double getStateActionReward(int r, State state, Object action) throws PrismException
 	{
 		RewardStruct rewStr = modulesFile.getRewardStruct(r);
 		int n = rewStr.getNumItems();
