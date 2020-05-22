@@ -35,7 +35,7 @@ import java.util.List;
 
 import parser.State;
 
-public class ExplicitFilesRewardGenerator extends PrismComponent implements RewardGenerator
+public class ExplicitFilesRewardGenerator extends PrismComponent implements RewardGenerator<Double>
 {
 	// File(s) to read in rewards from
 	private File stateRewardsFile;
@@ -138,7 +138,7 @@ public class ExplicitFilesRewardGenerator extends PrismComponent implements Rewa
 	}
 	
 	@Override
-	public double getStateReward(int r, State state) throws PrismException
+	public Double getStateReward(int r, State state) throws PrismException
 	{
 		if (statesList == null) {
 			throw new PrismException("Reward lookup by State not possible since state list is missing");
@@ -151,7 +151,7 @@ public class ExplicitFilesRewardGenerator extends PrismComponent implements Rewa
 	}
 	
 	@Override
-	public double getStateReward(int r, int s) throws PrismException
+	public Double getStateReward(int r, int s) throws PrismException
 	{
 		if (r != 0) {
 			throw new PrismException("Only one reward structure has been imported");

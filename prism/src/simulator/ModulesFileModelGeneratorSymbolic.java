@@ -17,6 +17,7 @@ import parser.ast.LabelList;
 import parser.ast.ModulesFile;
 import parser.ast.RewardStruct;
 import parser.type.Type;
+import prism.Evaluator;
 import prism.ModelGeneratorSymbolic;
 import prism.ModelType;
 import prism.PrismComponent;
@@ -33,7 +34,7 @@ import prism.RewardGenerator;
  * <br>
  * Uses exact arithmetic to evaluate the various expressions in a model description.
  */
-public class ModulesFileModelGeneratorSymbolic implements ModelGeneratorSymbolic, RewardGenerator
+public class ModulesFileModelGeneratorSymbolic implements ModelGeneratorSymbolic, RewardGenerator<Double>
 {
 	// Parent PrismComponent (logs, settings etc.)
 	protected PrismComponent parent;
@@ -256,6 +257,13 @@ public class ModulesFileModelGeneratorSymbolic implements ModelGeneratorSymbolic
 	// Methods for ModelGenerator interface
 	
 	@Override
+	public Evaluator<Double> getEvaluator()
+	{
+		// Resolve ambiguity between ModelGenerator and RewardGenerator
+		return ModelGeneratorSymbolic.super.getEvaluator();
+	}
+	
+	@Override
 	public boolean hasSingleInitialState() throws PrismException
 	{
 		return modulesFile.getInitialStates() == null;
@@ -469,7 +477,7 @@ public class ModulesFileModelGeneratorSymbolic implements ModelGeneratorSymbolic
 	}
 	
 	@Override
-	public double getStateReward(int r, State state) throws PrismException
+	public Double getStateReward(int r, State state) throws PrismException
 	{
 		RewardStruct rewStr = modulesFile.getRewardStruct(r);
 		int n = rewStr.getNumItems();
@@ -489,7 +497,7 @@ public class ModulesFileModelGeneratorSymbolic implements ModelGeneratorSymbolic
 	}
 
 	@Override
-	public double getStateActionReward(int r, State state, Object action) throws PrismException
+	public Double getStateActionReward(int r, State state, Object action) throws PrismException
 	{
 		RewardStruct rewStr = modulesFile.getRewardStruct(r);
 		int n = rewStr.getNumItems();
