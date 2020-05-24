@@ -155,7 +155,7 @@ public class ConstructRewards extends PrismComponent
 			if (rewardGen.rewardStructHasStateRewards(r)) {
 				Value rew = getAndCheckStateReward(s, rewardGen, r, statesList);
 				if (dbl) {
-					rewSA.addToStateReward(s, (double) rew);
+					rewSA.addToStateReward(s, (Double) rew);
 				} else {
 					rewSimple.addToStateReward(s, rew);
 				}
