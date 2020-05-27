@@ -45,7 +45,7 @@ import prism.PrismNotSupportedException;
  *
  * @param <M> The type of the product model, e.g, DTMC, MDP, ...
  */
-public abstract class Product<M extends Model> implements ModelTransformation<M, M>
+public abstract class Product<M extends Model<?>> implements ModelTransformation<M, M>
 {
 	protected M originalModel = null;
 	protected M productModel = null;

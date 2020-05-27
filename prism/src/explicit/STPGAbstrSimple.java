@@ -47,7 +47,7 @@ import strat.MDStrategy;
  * states, i.e. they don't count for statistics and player 1 states are treated
  * as successors of each other.
  */
-public class STPGAbstrSimple extends ModelExplicit implements STPG, NondetModelSimple
+public class STPGAbstrSimple extends ModelExplicit<Double> implements STPG<Double>, NondetModelSimple<Double>
 {
 	// Transition function (Steps)
 	protected List<ArrayList<DistributionSet>> trans;
@@ -371,7 +371,7 @@ public class STPGAbstrSimple extends ModelExplicit implements STPG, NondetModelS
 			out.print(i + " -> " + nij + " [ arrowhead=none,label=\"" + j + "\" ];\n");
 			out.print(nij + " [ shape=circle,width=0.1,height=0.1,label=\"\" ];\n");
 			k = -1;
-			for (Distribution distr : distrs) {
+			for (Distribution<Double> distr : distrs) {
 				k++;
 				nijk = "n" + i + "_" + j + "_" + k;
 				out.print(nij + " -> " + nijk + " [ arrowhead=none,label=\"" + k + "\" ];\n");
@@ -644,7 +644,7 @@ public class STPGAbstrSimple extends ModelExplicit implements STPG, NondetModelS
 		for (DistributionSet distrs : step) {
 			minmax2 = 0;
 			first2 = true;
-			for (Distribution distr : distrs) {
+			for (Distribution<Double> distr : distrs) {
 				// Compute sum for this distribution
 				d = 0.0;
 				for (Map.Entry<Integer, Double> e : distr) {
@@ -684,7 +684,7 @@ public class STPGAbstrSimple extends ModelExplicit implements STPG, NondetModelS
 			j++;
 			minmax2 = 0;
 			first2 = true;
-			for (Distribution distr : distrs) {
+			for (Distribution<Double> distr : distrs) {
 				// Compute sum for this distribution
 				d = 0.0;
 				for (Map.Entry<Integer, Double> e : distr) {
@@ -735,7 +735,7 @@ public class STPGAbstrSimple extends ModelExplicit implements STPG, NondetModelS
 		for (DistributionSet distrs : step) {
 			minmax2 = 0;
 			first2 = true;
-			for (Distribution distr : distrs) {
+			for (Distribution<Double> distr : distrs) {
 				diag = 1.0;
 				// Compute sum for this distribution
 				d = 0.0;
@@ -765,7 +765,7 @@ public class STPGAbstrSimple extends ModelExplicit implements STPG, NondetModelS
 	}
 
 	@Override
-	public void mvMultRewMinMax(double vect[], STPGRewards rewards, boolean min1, boolean min2, double result[], BitSet subset, boolean complement, int adv[])
+	public void mvMultRewMinMax(double vect[], STPGRewards<Double> rewards, boolean min1, boolean min2, double result[], BitSet subset, boolean complement, int adv[])
 	{
 		for (int s : new IterableStateSet(subset, numStates, complement)) {
 			result[s] = mvMultRewMinMaxSingle(s, vect, rewards, min1, min2, adv);
@@ -773,7 +773,7 @@ public class STPGAbstrSimple extends ModelExplicit implements STPG, NondetModelS
 	}
 
 	@Override
-	public double mvMultRewMinMaxSingle(int s, double vect[], STPGRewards rewards, boolean min1, boolean min2, int adv[])
+	public double mvMultRewMinMaxSingle(int s, double vect[], STPGRewards<Double> rewards, boolean min1, boolean min2, int adv[])
 	{
 		int dsIter, dIter, k;
 		double d, prob, minmax1, minmax2;
@@ -789,7 +789,7 @@ public class STPGAbstrSimple extends ModelExplicit implements STPG, NondetModelS
 			minmax2 = 0;
 			first2 = true;
 			dIter = -1;
-			for (Distribution distr : distrs) {
+			for (Distribution<Double> distr : distrs) {
 				dIter++;
 				// Compute sum for this distribution
 				d = rewards.getNestedTransitionReward(s, dsIter, dIter);
@@ -814,7 +814,7 @@ public class STPGAbstrSimple extends ModelExplicit implements STPG, NondetModelS
 	}
 
 	@Override
-	public List<Integer> mvMultRewMinMaxSingleChoices(int s, double vect[], STPGRewards rewards, boolean min1, boolean min2, double val)
+	public List<Integer> mvMultRewMinMaxSingleChoices(int s, double vect[], STPGRewards<Double> rewards, boolean min1, boolean min2, double val)
 	{
 		int dsIter, dIter, k;
 		double d, prob, minmax2;
@@ -832,7 +832,7 @@ public class STPGAbstrSimple extends ModelExplicit implements STPG, NondetModelS
 			minmax2 = 0;
 			first2 = true;
 			dIter = -1;
-			for (Distribution distr : distrs) {
+			for (Distribution<Double> distr : distrs) {
 				dIter++;
 				// Compute sum for this distribution
 				d = rewards.getNestedTransitionReward(s, dsIter, dIter);

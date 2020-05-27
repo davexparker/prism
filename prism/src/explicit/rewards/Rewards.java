@@ -29,18 +29,25 @@ package explicit.rewards;
 
 import explicit.Model;
 import explicit.Product;
+import prism.Evaluator;
 
 /**
  * Interface implemented by all reward classes.
  */
-public interface Rewards
+public interface Rewards<Value>
 {
 	/**
 	 * Create a new reward structure that lifts this one such that it is defined over states of a
 	 * model that is a product of the one that this reward structure is defined over. 
 	 */
-	public Rewards liftFromModel(Product<? extends Model> product);
+	public Rewards<Value> liftFromModel(Product<? extends Model<Value>> product);
 
 	/** Returns true if this reward structure has transition rewards */
 	public boolean hasTransitionRewards();
+
+	@SuppressWarnings("unchecked")
+	public default Evaluator<Value> getEvaluator()
+	{
+		return (Evaluator<Value>) Evaluator.createForDoubles();
+	}
 }

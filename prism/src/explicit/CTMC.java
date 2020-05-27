@@ -33,7 +33,7 @@ import prism.ModelType;
 /**
  * Interface for classes that provide (read) access to an explicit-state CTMC.
  */
-public interface CTMC extends DTMC
+public interface CTMC<Value> extends DTMC<Value>
 {
 	// Accessors (for Model) - default implementations
 	
@@ -78,7 +78,7 @@ public interface CTMC extends DTMC
 	 * Build the embedded DTMC for this CTMC, in implicit form
 	 * (i.e. where the details are computed on the fly from this one).
 	 */
-	public DTMC buildImplicitEmbeddedDTMC();
+	public DTMC<Double> buildImplicitEmbeddedDTMC();
 
 	/**
 	 * Get the embedded DTMC for this CTMC, in implicit form
@@ -91,12 +91,12 @@ public interface CTMC extends DTMC
 	 * buildImplicitEmbeddedDTMC, which will update the cached embedded
 	 * DTMC.
 	 */
-	public DTMC getImplicitEmbeddedDTMC();
+	public DTMC<Double> getImplicitEmbeddedDTMC();
 
 	/**
 	 * Build (a new) embedded DTMC for this CTMC.
 	 */
-	public DTMCSimple buildEmbeddedDTMC();
+	public DTMCSimple<Double> buildEmbeddedDTMC();
 
 	/**
 	 * Convert this CTMC into a uniformised CTMC.
@@ -109,12 +109,12 @@ public interface CTMC extends DTMC
 	 * (i.e. where the details are computed on the fly from this one).
 	 * @param q Uniformisation rate
 	 */
-	public DTMC buildImplicitUniformisedDTMC(double q);
+	public DTMC<Double> buildImplicitUniformisedDTMC(double q);
 
 	/**
 	 * Build (a new) uniformised DTMC for this CTMC.
 	 * @param q Uniformisation rate
 	 */
-	public DTMCSimple buildUniformisedDTMC(double q);
+	public DTMCSimple<Double> buildUniformisedDTMC(double q);
 
 }

@@ -79,11 +79,11 @@ public class DTMCModelChecker extends ProbModelChecker
 	// Model checking functions
 
 	@Override
-	protected StateValues checkProbPathFormulaLTL(Model model, Expression expr, boolean qual, MinMax minMax, BitSet statesOfInterest) throws PrismException
+	protected StateValues checkProbPathFormulaLTL(Model<?> model, Expression expr, boolean qual, MinMax minMax, BitSet statesOfInterest) throws PrismException
 	{
 		LTLModelChecker mcLtl;
 		StateValues probsProduct, probs;
-		LTLModelChecker.LTLProduct<DTMC> product;
+		LTLProduct<DTMC<?>> product;
 		DTMCModelChecker mcProduct;
 
 		// For LTL model checking routines
@@ -97,7 +97,7 @@ public class DTMCModelChecker extends ProbModelChecker
 				AcceptanceType.STREETT,
 				AcceptanceType.GENERIC
 		};
-		product = mcLtl.constructProductMC(this, (DTMC)model, expr, statesOfInterest, allowedAcceptance);
+		product = mcLtl.constructProductMC(this, (DTMC) model, expr, statesOfInterest, allowedAcceptance);
 
 		// Output product, if required
 		if (getExportProductTrans()) {
@@ -150,13 +150,13 @@ public class DTMCModelChecker extends ProbModelChecker
 	/**
 	 * Compute rewards for a co-safe LTL reward operator.
 	 */
-	protected StateValues checkRewardCoSafeLTL(Model model, Rewards modelRewards, Expression expr, MinMax minMax, BitSet statesOfInterest) throws PrismException
+	protected StateValues checkRewardCoSafeLTL(Model<?> model, Rewards modelRewards, Expression expr, MinMax minMax, BitSet statesOfInterest) throws PrismException
 	{
 		LTLModelChecker mcLtl;
 		MCRewards productRewards;
 		StateValues rewardsProduct, rewards;
 		DTMCModelChecker mcProduct;
-		LTLProduct<DTMC> product;
+		LTLProduct<DTMC<Double>> product;
 
 		// For LTL model checking routines
 		mcLtl = new LTLModelChecker(this);
@@ -169,7 +169,7 @@ public class DTMCModelChecker extends ProbModelChecker
 		StopWatch timer = new StopWatch(mainLog);
 		mainLog.println("\nConstructing " + model.getModelType() + "-" + da.getAutomataType() + " product...");
 		timer.start(model.getModelType() + "-" + da.getAutomataType() + " product");
-		product = mcLtl.constructProductModel(da, (DTMC)model, labelBS, statesOfInterest);
+		product = mcLtl.constructProductModel(da, (DTMC<Double>)model, labelBS, statesOfInterest);
 		timer.stop("product has " + product.getProductModel().infoString());
 
 		// Adapt reward info to product model
@@ -217,7 +217,7 @@ public class DTMCModelChecker extends ProbModelChecker
 		return rewards;
 	}
 	
-	public ModelCheckerResult computeInstantaneousRewards(DTMC dtmc, MCRewards mcRewards, int k, BitSet statesOfInterest) throws PrismException
+	public ModelCheckerResult computeInstantaneousRewards(DTMC dtmc, MCRewards<Double> mcRewards, int k, BitSet statesOfInterest) throws PrismException
 	{
 		if (statesOfInterest.cardinality() == 1) {
 			return computeInstantaneousRewardsForwards(dtmc, mcRewards, k, statesOfInterest.nextSetBit(0));
@@ -226,7 +226,7 @@ public class DTMCModelChecker extends ProbModelChecker
 		}
 	}
 	
-	public ModelCheckerResult computeInstantaneousRewardsBackwards(DTMC dtmc, MCRewards mcRewards, int k) throws PrismException
+	public ModelCheckerResult computeInstantaneousRewardsBackwards(DTMC dtmc, MCRewards<Double> mcRewards, int k) throws PrismException
 	{
 		ModelCheckerResult res = null;
 		int i, n, iters;
@@ -273,7 +273,7 @@ public class DTMCModelChecker extends ProbModelChecker
 		return res;
 	}
 
-	public ModelCheckerResult computeInstantaneousRewardsForwards(DTMC dtmc, MCRewards mcRewards, int k, int stateOfInterest) throws PrismException
+	public ModelCheckerResult computeInstantaneousRewardsForwards(DTMC dtmc, MCRewards<Double> mcRewards, int k, int stateOfInterest) throws PrismException
 	{
 		// Build a point probability distribution for the required state  
 		double[] initDist = new double[dtmc.getNumStates()];
@@ -298,7 +298,7 @@ public class DTMCModelChecker extends ProbModelChecker
 		return res;
 	}
 	
-	public ModelCheckerResult computeCumulativeRewards(DTMC dtmc, MCRewards mcRewards, double t) throws PrismException
+	public ModelCheckerResult computeCumulativeRewards(DTMC dtmc, MCRewards<Double> mcRewards, double t) throws PrismException
 	{
 		ModelCheckerResult res = null;
 		int i, n, iters;
@@ -345,7 +345,7 @@ public class DTMCModelChecker extends ProbModelChecker
 		return res;
 	}
 
-	public ModelCheckerResult computeTotalRewards(DTMC dtmc, MCRewards mcRewards) throws PrismException
+	public ModelCheckerResult computeTotalRewards(DTMC dtmc, MCRewards<Double> mcRewards) throws PrismException
 	{
 		ModelCheckerResult res = null;
 		int n, numBSCCs = 0;
@@ -1349,7 +1349,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param inf the infinity states
 	 * @return upper bound on R=?[ F target ] for all states
 	 */
-	double computeReachRewardsUpperBound(DTMC dtmc, MCRewards mcRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
+	double computeReachRewardsUpperBound(DTMC dtmc, MCRewards<Double> mcRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
 	{
 		if (unknown.isEmpty()) {
 			mainLog.println("Skipping upper bound computation, no unknown states...");
@@ -1382,22 +1382,22 @@ public class DTMCModelChecker extends ProbModelChecker
 		case DSMPI:
 		{
 			MDP mdp = new MDPFromDTMC(cleanedDTMC);
-			MDPRewards mdpRewards = new MDPRewards() {
+			MDPRewards<Double> mdpRewards = new MDPRewards<Double>() {
 
 				@Override
-				public double getStateReward(int s)
+				public Double getStateReward(int s)
 				{
 					return mcRewards.getStateReward(s);
 				}
 
 				@Override
-				public double getTransitionReward(int s, int i)
+				public Double getTransitionReward(int s, int i)
 				{
-					return 0;
+					return 0.0;
 				}
 
 				@Override
-				public MDPRewards liftFromModel(Product<? extends Model> product)
+				public MDPRewards<Double> liftFromModel(Product<? extends Model<Double>> product)
 				{
 					throw new RuntimeException("Unsupported");
 				}
@@ -1434,7 +1434,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param inf the infinity states
 	 * @return upper bound on R=?[ F target ] for all states
 	 */
-	double computeReachRewardsUpperBoundVariant1Coarse(DTMC dtmc, MCRewards mcRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
+	double computeReachRewardsUpperBoundVariant1Coarse(DTMC dtmc, MCRewards<Double> mcRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
 	{
 		double[] boundsOnExpectedVisits = new double[dtmc.getNumStates()];
 		int[] Ct = new int[dtmc.getNumStates()];
@@ -1538,7 +1538,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param inf the infinity states
 	 * @return upper bound on R=?[ F target ] for all states
 	 */
-	double computeReachRewardsUpperBoundVariant1Fine(DTMC dtmc, MCRewards mcRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
+	double computeReachRewardsUpperBoundVariant1Fine(DTMC dtmc, MCRewards<Double> mcRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
 	{
 		double[] boundsOnExpectedVisits = new double[dtmc.getNumStates()];
 		double[] qt = new double[dtmc.getNumStates()];
@@ -1643,7 +1643,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param inf the infinity states
 	 * @return upper bound on R=?[ F target ] for all states
 	 */
-	double computeReachRewardsUpperBoundVariant2(DTMC dtmc, MCRewards mcRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
+	double computeReachRewardsUpperBoundVariant2(DTMC<Double> dtmc, MCRewards<Double> mcRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
 	{
 		double[] dt = new double[dtmc.getNumStates()];
 		double[] boundsOnExpectedVisits = new double[dtmc.getNumStates()];
@@ -1680,7 +1680,7 @@ public class DTMCModelChecker extends ProbModelChecker
 			for (PrimitiveIterator.OfInt it = IterableBitSet.getSetBits(Si).iterator(); it.hasNext(); ) {
 				final int t = it.nextInt();
 				final int sccIndexForT = sccs.getSCCIndex(t);
-				double d = dtmc.sumOverTransitions(t, (int __, int u, double prob) -> {
+				double d = dtmc.sumOverTransitions(t, (int __, int u, Double prob) -> {
 					// mainLog.println("t = " + t + ", u = " + u + ", prob = " + prob);
 					if (!T.get(u))
 						return 0.0;
@@ -2413,7 +2413,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param dtmc the DTMC
 	 * @param modelRewards the (state) rewards
 	 */
-	public ModelCheckerResult computeSteadyStateRewards(DTMC dtmc, MCRewards modelRewards) throws PrismException
+	public ModelCheckerResult computeSteadyStateRewards(DTMC dtmc, MCRewards<Double> modelRewards) throws PrismException
 	{
 		int n = dtmc.getNumStates();
 		double multRewards[] = new double[n];
@@ -2454,7 +2454,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param bsccPostProcessor Post-processor for the values of each BSCC (optional: null means no post-processing)
 	 * @param result Storage for result (ignored if null)
 	 */
-	public ModelCheckerResult computeSteadyStateProbsForBSCC(DTMC dtmc, BitSet states, double result[], BSCCPostProcessor bsccPostProcessor) throws PrismException
+	public ModelCheckerResult computeSteadyStateProbsForBSCC(DTMC<Double> dtmc, BitSet states, double result[], BSCCPostProcessor bsccPostProcessor) throws PrismException
 	{
 		if (dtmc.getModelType() != ModelType.DTMC) {
 			throw new PrismNotSupportedException("Explicit engine currently does not support steady-state computation for " + dtmc.getModelType());

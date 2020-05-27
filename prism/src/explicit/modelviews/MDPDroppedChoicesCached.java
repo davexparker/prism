@@ -226,15 +226,15 @@ public class MDPDroppedChoicesCached extends MDPView
 
 	//--- static methods
 
-	public static MDPDroppedChoicesCached dropDenormalizedDistributions(final MDP model)
+	public static <Value> MDPDroppedChoicesCached dropDenormalizedDistributions(final MDP<Value> model)
 	{
 		final PairPredicateInt denormalizedChoices = new PairPredicateInt()
 		{
 			@Override
 			public boolean test(int state, int choice)
 			{
-				final Distribution distribution = new Distribution(model.getTransitionsIterator(state, choice));
-				return distribution.sum() < 1;
+				final Distribution<Value> distribution = new Distribution<>(model.getTransitionsIterator(state, choice));
+				return !model.getEvaluator().geq(distribution.sum(), model.getEvaluator().one());
 			}
 		};
 		return new MDPDroppedChoicesCached(model, denormalizedChoices);

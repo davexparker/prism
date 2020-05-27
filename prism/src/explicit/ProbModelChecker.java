@@ -843,7 +843,7 @@ public class ProbModelChecker extends NonProbModelChecker
 	/**
 	 * Compute probabilities for an LTL path formula
 	 */
-	protected StateValues checkProbPathFormulaLTL(Model model, Expression expr, boolean qual, MinMax minMax, BitSet statesOfInterest) throws PrismException
+	protected StateValues checkProbPathFormulaLTL(Model<?> model, Expression expr, boolean qual, MinMax minMax, BitSet statesOfInterest) throws PrismException
 	{
 		// To be overridden by subclasses
 		throw new PrismNotSupportedException("Computation not implemented yet");
@@ -1142,7 +1142,7 @@ public class ProbModelChecker extends NonProbModelChecker
 	/**
 	 * Compute rewards for a co-safe LTL reward operator.
 	 */
-	protected StateValues checkRewardCoSafeLTL(Model model, Rewards modelRewards, Expression expr, MinMax minMax, BitSet statesOfInterest) throws PrismException
+	protected StateValues checkRewardCoSafeLTL(Model<?> model, Rewards modelRewards, Expression expr, MinMax minMax, BitSet statesOfInterest) throws PrismException
 	{
 		// To be overridden by subclasses
 		throw new PrismException("Computation not implemented yet");
@@ -1223,7 +1223,7 @@ public class ProbModelChecker extends NonProbModelChecker
 	 * from the initial states info of the current model: either probability 1 for
 	 * the (single) initial state or equiprobable over multiple initial states.
 	 */
-	public StateValues buildInitialDistribution(Model model) throws PrismException
+	public StateValues buildInitialDistribution(Model<?> model) throws PrismException
 	{
 		StateValues dist = null;
 
@@ -1258,7 +1258,7 @@ public class ProbModelChecker extends NonProbModelChecker
 		switch (model.getModelType()) {
 		case DTMC:
 		case CTMC:
-			MCRewards mcRewards = (MCRewards) modelRewards;
+			MCRewards<Double> mcRewards = (MCRewards) modelRewards;
 			for (int s = 0; s < numStates; s++) {
 				double d = mcRewards.getStateReward(s);
 				if (d != 0) {
@@ -1275,7 +1275,7 @@ public class ProbModelChecker extends NonProbModelChecker
 			break;
 		case MDP:
 		case STPG:
-			MDPRewards mdpRewards = (MDPRewards) modelRewards;
+			MDPRewards<Double> mdpRewards = (MDPRewards) modelRewards;
 			for (int s = 0; s < numStates; s++) {
 				double d = mdpRewards.getStateReward(s);
 				if (d != 0) {

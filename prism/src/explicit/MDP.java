@@ -55,7 +55,7 @@ import prism.PrismUtils;
  * For the generic methods, e.g., the prob0 / prob1 precomputations that do not
  * care about the concrete values, see {@link explicit.MDPGeneric}.
  */
-public interface MDP extends MDPGeneric<Double>
+public interface MDP<Value> extends MDPGeneric<Value>
 {
 	// Accessors (for Model) - default implementations
 	
@@ -71,20 +71,19 @@ public interface MDP extends MDPGeneric<Double>
 		// Output transitions to .tra file
 		int numStates = getNumStates();
 		out.print(numStates + " " + getNumChoices() + " " + getNumTransitions() + "\n");
-		TreeMap<Integer, Double> sorted = new TreeMap<Integer, Double>();
+		TreeMap<Integer, Value> sorted = new TreeMap<Integer, Value>();
 		for (int i = 0; i < numStates; i++) {
 			int numChoices = getNumChoices(i);
 			for (int j = 0; j < numChoices; j++) {
 				// Extract transitions and sort by destination state index (to match PRISM-exported files)
-				Iterator<Map.Entry<Integer, Double>> iter = getTransitionsIterator(i, j);
+				Iterator<Map.Entry<Integer, Value>> iter = getTransitionsIterator(i, j);
 				while (iter.hasNext()) {
-					Map.Entry<Integer, Double> e = iter.next();
+					Map.Entry<Integer, Value> e = iter.next();
 					sorted.put(e.getKey(), e.getValue());
 				}
 				// Print out (sorted) transitions
-				for (Map.Entry<Integer, Double> e : sorted.entrySet()) {
-					// Note use of PrismUtils.formatDouble to match PRISM-exported files
-					out.print(i + " " + j + " " + e.getKey() + " " + PrismUtils.formatDouble(e.getValue()));
+				for (Map.Entry<Integer, Value> e : sorted.entrySet()) {
+					out.print(i + " " + j + " " + e.getKey() + " " + getEvaluator().toStringExport(e.getValue()));
 					Object action = getAction(i, j);
 					out.print(action == null ? "\n" : (" " + action + "\n"));
 				}
@@ -119,9 +118,9 @@ public interface MDP extends MDPGeneric<Double>
 
 			out.print(nij + " [ shape=point,width=0.1,height=0.1,label=\"\" ];\n");
 
-			Iterator<Map.Entry<Integer, Double>> iter = getTransitionsIterator(i, j);
+			Iterator<Map.Entry<Integer, Value>> iter = getTransitionsIterator(i, j);
 			while (iter.hasNext()) {
-				Map.Entry<Integer, Double> e = iter.next();
+				Map.Entry<Integer, Value> e = iter.next();
 				out.print(nij + " -> " + e.getKey() + " ");
 
 				d = new explicit.graphviz.Decoration();
@@ -147,12 +146,12 @@ public interface MDP extends MDPGeneric<Double>
 			out.write(getModelType().keyword() + "\n");
 			final int numStates = getNumStates();
 			out.write("module M\nx : [0.." + (numStates - 1) + "];\n");
-			final TreeMap<Integer, Double> sorted = new TreeMap<Integer, Double>();
+			final TreeMap<Integer, Value> sorted = new TreeMap<Integer, Value>();
 			for (int state = 0; state < numStates; state++) {
 				for (int choice = 0, numChoices = getNumChoices(state); choice < numChoices; choice++) {
 					// Extract transitions and sort by destination state index (to match PRISM-exported files)
-					for (Iterator<Entry<Integer, Double>> transitions = getTransitionsIterator(state, choice); transitions.hasNext();) {
-						final Entry<Integer, Double> trans = transitions.next();
+					for (Iterator<Entry<Integer, Value>> transitions = getTransitionsIterator(state, choice); transitions.hasNext();) {
+						final Entry<Integer, Value> trans = transitions.next();
 						sorted.put(trans.getKey(), trans.getValue());
 					}
 					// Print out (sorted) transitions
@@ -160,13 +159,12 @@ public interface MDP extends MDPGeneric<Double>
 					out.write(action != null ? ("[" + action + "]") : "[]");
 					out.write("x=" + state + "->");
 					boolean first = true;
-					for (Entry<Integer, Double> e : sorted.entrySet()) {
+					for (Entry<Integer, Value> e : sorted.entrySet()) {
 						if (first)
 							first = false;
 						else
 							out.write("+");
-						// Note use of PrismUtils.formatDouble to match PRISM-exported files
-						out.write(PrismUtils.formatDouble(e.getValue()) + ":(x'=" + e.getKey() + ")");
+						out.write(getEvaluator().toStringPrism(e.getValue()) + ":(x'=" + e.getKey() + ")");
 					}
 					out.write(";\n");
 					sorted.clear();
@@ -228,9 +226,9 @@ public interface MDP extends MDPGeneric<Double>
 					out.print(":" + action);
 				out.print("\"" + style + " ];\n");
 				out.print(nij + " [ shape=point,height=0.1,label=\"\"" + style + " ];\n");
-				Iterator<Map.Entry<Integer, Double>> iter = getTransitionsIterator(i, j);
+				Iterator<Map.Entry<Integer, Value>> iter = getTransitionsIterator(i, j);
 				while (iter.hasNext()) {
-					Map.Entry<Integer, Double> e = iter.next();
+					Map.Entry<Integer, Value> e = iter.next();
 					out.print(nij + " -> " + e.getKey() + " [ label=\"" + e.getValue() + "\"" + style + " ];\n");
 				}
 			}
@@ -243,7 +241,7 @@ public interface MDP extends MDPGeneric<Double>
 	/**
 	 * Get an iterator over the transitions from choice {@code i} of state {@code s}.
 	 */
-	public Iterator<Entry<Integer, Double>> getTransitionsIterator(int s, int i);
+	public Iterator<Entry<Integer, Value>> getTransitionsIterator(int s, int i);
 
 	/**
 	 * Functional interface for a consumer,
@@ -251,7 +249,80 @@ public interface MDP extends MDPGeneric<Double>
 	 * from state s to state t with value d.
 	 */
 	@FunctionalInterface
-	public interface TransitionConsumer {
+	public interface TransitionConsumer<Value> {
+		void accept(int s, int t, Value d);
+	}
+
+	/**
+	 * Iterate over the outgoing transitions of state {@code s} and choice {@code i}
+	 * and call the accept method of the consumer for each of them:
+	 * <br>
+	 * Call {@code accept(s,t,d)} where t is the successor state d = P(s,i,t)
+	 * is the probability from s to t with choice i.
+	 * <p>
+	 * <i>Default implementation</i>: The default implementation relies on iterating over the
+	 * iterator returned by {@code getTransitionsIterator()}.
+	 * <p><i>Note</i>: This method is the base for the default implementation of the numerical
+	 * computation methods (mvMult, etc). In derived classes, it may thus be worthwhile to
+	 * provide a specialised implementation for this method that avoids using the Iterator mechanism.
+	 *
+	 * @param s the state s
+	 * @param i the choice i
+	 * @param c the consumer
+	 */
+	public default void forEachTransition(int s, int i, TransitionConsumer<Value> c)
+	{
+		for (Iterator<Entry<Integer, Value>> it = getTransitionsIterator(s, i); it.hasNext(); ) {
+			Entry<Integer, Value> e = it.next();
+			c.accept(s, e.getKey(), e.getValue());
+		}
+	}
+
+	/**
+	 * Functional interface for a function
+	 * mapping transitions (s,t,d), i.e.,
+	 * from state s to state t with value d,
+	 * to a numerical value.
+	 */
+	@FunctionalInterface
+	public interface TransitionToValueFunction<Value> {
+		Value apply(int s, int t, Value d);
+	}
+
+	/**
+	 * Iterate over the outgoing transitions of state {@code s} and choice {@code i},
+	 * call the function {@code f} and return the sum of the result values:
+	 * <br>
+	 * Return sum_t f(s, t, P(s,i,t)), where t ranges over the i-successors of s.
+	 *
+	 * @param s the state s
+	 * @param c the consumer
+	 */
+	public default Value sumOverTransitions(final int s, final int i, final TransitionToValueFunction<Value> f)
+	{
+		class Sum {
+			Value sum = getEvaluator().zero();
+			void accept(int s, int t, Value d)
+			{
+				sum = getEvaluator().add(sum, f.apply(s, t, d));
+			}
+		}
+
+		Sum sum = new Sum();
+		forEachTransition(s, i, sum::accept);
+
+		return sum.sum;
+	}
+
+	// Methods for case where Value is Double
+	
+	/**
+	 * Functional interface for a consumer,
+	 * accepting transitions (s,t,d), i.e.,
+	 * from state s to state t with value d.
+	 */
+	@FunctionalInterface
+	public interface DoubleTransitionConsumer {
 		void accept(int s, int t, double d);
 	}
 
@@ -272,11 +343,11 @@ public interface MDP extends MDPGeneric<Double>
 	 * @param i the choice i
 	 * @param c the consumer
 	 */
-	public default void forEachTransition(int s, int i, TransitionConsumer c)
+	public default void forEachDoubleTransition(int s, int i, DoubleTransitionConsumer c)
 	{
-		for (Iterator<Entry<Integer, Double>> it = getTransitionsIterator(s, i); it.hasNext(); ) {
-			Entry<Integer, Double> e = it.next();
-			c.accept(s, e.getKey(), e.getValue());
+		for (Iterator<Entry<Integer, Value>> it = getTransitionsIterator(s, i); it.hasNext(); ) {
+			Entry<Integer, Value> e = it.next();
+			c.accept(s, e.getKey(), getEvaluator().toDouble(e.getValue()));
 		}
 	}
 
@@ -287,7 +358,7 @@ public interface MDP extends MDPGeneric<Double>
 	 * to a double value.
 	 */
 	@FunctionalInterface
-	public interface TransitionToDoubleFunction {
+	public interface DoubleTransitionToDoubleFunction {
 		double apply(int s, int t, double d);
 	}
 
@@ -300,7 +371,7 @@ public interface MDP extends MDPGeneric<Double>
 	 * @param s the state s
 	 * @param c the consumer
 	 */
-	public default double sumOverTransitions(final int s, final int i, final TransitionToDoubleFunction f)
+	public default double sumOverDoubleTransitions(final int s, final int i, final DoubleTransitionToDoubleFunction f)
 	{
 		class Sum {
 			double sum = 0.0;
@@ -312,7 +383,7 @@ public interface MDP extends MDPGeneric<Double>
 		}
 
 		Sum sum = new Sum();
-		forEachTransition(s, i, sum::accept);
+		forEachDoubleTransition(s, i, sum::accept);
 
 		return sum.sum;
 	}
@@ -425,7 +496,7 @@ public interface MDP extends MDPGeneric<Double>
 	 */
 	public default double mvMultSingle(int s, int i, double vect[])
 	{
-		return sumOverTransitions(s, i, (int __, int t, double prob) -> {
+		return sumOverDoubleTransitions(s, i, (int __, int t, double prob) -> {
 			return prob * vect[t];
 		});
 	}
@@ -579,7 +650,7 @@ public interface MDP extends MDPGeneric<Double>
 		}
 
 		Jacobi jac = new Jacobi();
-		forEachTransition(s, i, jac::accept);
+		forEachDoubleTransition(s, i, jac::accept);
 
 		double d = jac.d;
 		double diag = jac.diag;
@@ -601,7 +672,7 @@ public interface MDP extends MDPGeneric<Double>
 	 * @param complement If true, {@code subset} is taken to be its complement (ignored if {@code subset} is null)
 	 * @param strat Storage for (memoryless) strategy choice indices (ignored if null)
 	 */
-	public default void mvMultRewMinMax(double vect[], MDPRewards mdpRewards, boolean min, double result[], BitSet subset, boolean complement, int strat[])
+	public default void mvMultRewMinMax(double vect[], MDPRewards<Double> mdpRewards, boolean min, double result[], BitSet subset, boolean complement, int strat[])
 	{
 		for (OfInt it = new IterableStateSet(subset, getNumStates(), complement).iterator(); it.hasNext();) {
 			final int s = it.nextInt();
@@ -620,7 +691,7 @@ public interface MDP extends MDPGeneric<Double>
 	 * @param states Perform computation for these rows, in the iteration order
 	 * @param strat Storage for (memoryless) strategy choice indices (ignored if null)
 	 */
-	public default void mvMultRewMinMax(double vect[], MDPRewards mdpRewards, boolean min, double result[], PrimitiveIterator.OfInt states, int strat[])
+	public default void mvMultRewMinMax(double vect[], MDPRewards<Double> mdpRewards, boolean min, double result[], PrimitiveIterator.OfInt states, int strat[])
 	{
 		while (states.hasNext()) {
 			final int s = states.nextInt();
@@ -638,7 +709,7 @@ public interface MDP extends MDPGeneric<Double>
 	 * @param min Min or max for (true=min, false=max)
 	 * @param strat Storage for (memoryless) strategy choice indices (ignored if null)
 	 */
-	public default double mvMultRewMinMaxSingle(int s, double vect[], MDPRewards mdpRewards, boolean min, int strat[])
+	public default double mvMultRewMinMaxSingle(int s, double vect[], MDPRewards<Double> mdpRewards, boolean min, int strat[])
 	{
 		int stratCh = -1;
 		double minmax = 0;
@@ -676,11 +747,11 @@ public interface MDP extends MDPGeneric<Double>
 	 * @param vect Vector to multiply by
 	 * @param mdpRewards The rewards (MDP rewards)
 	 */
-	public default double mvMultRewSingle(int s, int i, double vect[], MDPRewards mdpRewards)
+	public default double mvMultRewSingle(int s, int i, double vect[], MDPRewards<Double> mdpRewards)
 	{
 		double d = mdpRewards.getStateReward(s);
 		d += mdpRewards.getTransitionReward(s, i);
-		d += sumOverTransitions(s, i, (__, t, prob) -> {
+		d += sumOverDoubleTransitions(s, i, (__, t, prob) -> {
 			return prob * vect[t];
 		});
 		return d;
@@ -694,11 +765,11 @@ public interface MDP extends MDPGeneric<Double>
 	 * @param vect Vector to multiply by
 	 * @param mcRewards The rewards (DTMC rewards)
 	 */
-	public default double mvMultRewSingle(int s, int i, double vect[], MCRewards mcRewards)
+	public default double mvMultRewSingle(int s, int i, double vect[], MCRewards<Double> mcRewards)
 	{
 		double d = mcRewards.getStateReward(s);
 		// TODO: add transition rewards when added to MCRewards
-		d += sumOverTransitions(s, i, (__, t, prob) -> {
+		d += sumOverDoubleTransitions(s, i, (__, t, prob) -> {
 			return prob * vect[t];
 		});
 		return d;
@@ -720,7 +791,7 @@ public interface MDP extends MDPGeneric<Double>
 	 * @return The maximum difference between old/new elements of {@code vect}
 	 * @param strat Storage for (memoryless) strategy choice indices (ignored if null)
 	 */
-	public default double mvMultRewGSMinMax(double vect[], MDPRewards mdpRewards, boolean min, BitSet subset, boolean complement, boolean absolute, int strat[])
+	public default double mvMultRewGSMinMax(double vect[], MDPRewards<Double> mdpRewards, boolean min, BitSet subset, boolean complement, boolean absolute, int strat[])
 	{
 		return mvMultRewGSMinMax(vect, mdpRewards, min, new IterableStateSet(subset, getNumStates(), complement).iterator(), absolute, strat);
 	}
@@ -740,7 +811,7 @@ public interface MDP extends MDPGeneric<Double>
 	 * @return The maximum difference between old/new elements of {@code vect}
 	 * @param strat Storage for (memoryless) strategy choice indices (ignored if null)
 	 */
-	public default double mvMultRewGSMinMax(double vect[], MDPRewards mdpRewards, boolean min, PrimitiveIterator.OfInt states, boolean absolute, int strat[])
+	public default double mvMultRewGSMinMax(double vect[], MDPRewards<Double> mdpRewards, boolean min, PrimitiveIterator.OfInt states, boolean absolute, int strat[])
 	{
 		double d, diff, maxDiff = 0.0;
 		while (states.hasNext()) {
@@ -767,7 +838,7 @@ public interface MDP extends MDPGeneric<Double>
 	 * @param ensureMonotonic enforce monotonicity?
 	 * @param fromBelow interval iteration from below? (for ensureMonotonic)
 	 */
-	public default void mvMultRewGSMinMaxIntervalIter(double vect[], MDPRewards mdpRewards, boolean min, PrimitiveIterator.OfInt states, int strat[], boolean ensureMonotonic, boolean fromBelow)
+	public default void mvMultRewGSMinMaxIntervalIter(double vect[], MDPRewards<Double> mdpRewards, boolean min, PrimitiveIterator.OfInt states, int strat[], boolean ensureMonotonic, boolean fromBelow)
 	{
 		double d;
 		while (states.hasNext()) {
@@ -802,7 +873,7 @@ public interface MDP extends MDPGeneric<Double>
 	 * @param min Min or max for (true=min, false=max)
 	 * @param strat Storage for (memoryless) strategy choice indices (ignored if null)
 	 */
-	public default double mvMultRewJacMinMaxSingle(int s, double vect[], MDPRewards mdpRewards, boolean min, int strat[])
+	public default double mvMultRewJacMinMaxSingle(int s, double vect[], MDPRewards<Double> mdpRewards, boolean min, int strat[])
 	{
 		int stratCh = -1;
 		double minmax = 0;
@@ -843,7 +914,7 @@ public interface MDP extends MDPGeneric<Double>
 	 * @param vect Vector to multiply by
 	 * @param mdpRewards The rewards
 	 */
-	public default double mvMultRewJacSingle(int s, int i, double vect[], MDPRewards mdpRewards)
+	public default double mvMultRewJacSingle(int s, int i, double vect[], MDPRewards<Double> mdpRewards)
 	{
 		class Jacobi {
 			double diag = 1.0;
@@ -861,7 +932,7 @@ public interface MDP extends MDPGeneric<Double>
 		}
 
 		Jacobi jac = new Jacobi();
-		forEachTransition(s, i, jac::accept);
+		forEachDoubleTransition(s, i, jac::accept);
 
 		double d = jac.d;
 		double diag = jac.diag;
@@ -891,7 +962,7 @@ public interface MDP extends MDPGeneric<Double>
 	 * @param min Min or max (true=min, false=max)
 	 * @param val Min or max value to match
 	 */
-	public default List<Integer> mvMultRewMinMaxSingleChoices(int s, double vect[], MDPRewards mdpRewards, boolean min, double val)
+	public default List<Integer> mvMultRewMinMaxSingleChoices(int s, double vect[], MDPRewards<Double> mdpRewards, boolean min, double val)
 	{
 		// Create data structures to store strategy
 		final List<Integer> result = new ArrayList<Integer>();
@@ -924,7 +995,7 @@ public interface MDP extends MDPGeneric<Double>
 	public default void mvMultRight(int[] states, int[] strat, double[] source, double[] dest)
 	{
 		for (int state : states) {
-			forEachTransition(state, strat[state], (int s, int t, double prob) -> {
+			forEachDoubleTransition(state, strat[state], (int s, int t, double prob) -> {
 				dest[t] += prob * source[s];
 			});
 		}

@@ -37,6 +37,7 @@ import java.util.TreeSet;
 import parser.State;
 import parser.Values;
 import parser.VarList;
+import prism.Evaluator;
 import prism.Prism;
 import prism.PrismException;
 import prism.PrismLog;
@@ -44,8 +45,12 @@ import prism.PrismLog;
 /**
  * Base class for explicit-state model representations.
  */
-public abstract class ModelExplicit implements Model
+public abstract class ModelExplicit<Value> implements Model<Value>
 {
+	@SuppressWarnings("unchecked")
+	protected Evaluator<Value> eval = (Evaluator<Value>) Evaluator.createForDoubles();
+	
+	// Mutators
 	// Basic model information
 
 	/** Number of states */
@@ -76,11 +81,16 @@ public abstract class ModelExplicit implements Model
 
 	// Mutators
 
+	public void setEvaluator(Evaluator<Value> eval)
+	{
+		this.eval = eval;
+	}
+	
 	/**
 	 * Copy data from another Model (used by superclass copy constructors).
 	 * Assumes that this has already been initialise()ed.
 	 */
-	public void copyFrom(Model model)
+	public void copyFrom(Model<Value> model)
 	{
 		numStates = model.getNumStates();
 		for (int in : model.getInitialStates()) {
@@ -90,6 +100,7 @@ public abstract class ModelExplicit implements Model
 			addDeadlockState(dl);
 		}
 		// Shallow copy of read-only stuff
+		setEvaluator(model.getEvaluator());
 		statesList = model.getStatesList();
 		constantValues = model.getConstantValues();
 		labels = model.getLabelToStatesMap();
@@ -103,7 +114,7 @@ public abstract class ModelExplicit implements Model
 	 * Assumes that this has already been initialise()ed.
 	 * Pointer to states list is NOT copied (since now wrong).
 	 */
-	public void copyFrom(Model model, int permut[])
+	public void copyFrom(Model<Value> model, int permut[])
 	{
 		numStates = model.getNumStates();
 		for (int in : model.getInitialStates()) {
@@ -114,6 +125,7 @@ public abstract class ModelExplicit implements Model
 		}
 		// Shallow copy of (some) read-only stuff
 		// (i.e. info that is not broken by permute)
+		setEvaluator(model.getEvaluator());
 		statesList = null;
 		constantValues = model.getConstantValues();
 		labels.clear();
@@ -245,6 +257,12 @@ public abstract class ModelExplicit implements Model
 
 	// Accessors (for Model interface)
 
+	@Override
+	public Evaluator<Value> getEvaluator()
+	{
+		return eval;
+	}
+	
 	@Override
 	public int getNumStates()
 	{

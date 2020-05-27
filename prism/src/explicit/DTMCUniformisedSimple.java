@@ -47,10 +47,10 @@ import explicit.rewards.MCRewards;
 * all methods of a full DTMCExplicit model. See {@link CTMCSimple#buildUniformisedDTMC} for
 * a method to obtain an explicit uniformised DTMC.
 */
-public class DTMCUniformisedSimple extends DTMCExplicit
+public class DTMCUniformisedSimple extends DTMCExplicit<Double>
 {
 	// Parent CTMC
-	protected CTMCSimple ctmc;
+	protected CTMCSimple<Double> ctmc;
 	// Uniformisation rate
 	protected double q;
 	// Number of extra transitions added (just for stats)
@@ -59,7 +59,7 @@ public class DTMCUniformisedSimple extends DTMCExplicit
 	/**
 	 * Constructor: create from CTMC and uniformisation rate q.
 	 */
-	public DTMCUniformisedSimple(CTMCSimple ctmc, double q)
+	public DTMCUniformisedSimple(CTMCSimple<Double> ctmc, double q)
 	{
 		this.ctmc = ctmc;
 		this.numStates = ctmc.getNumStates();
@@ -75,7 +75,7 @@ public class DTMCUniformisedSimple extends DTMCExplicit
 	/**
 	 * Constructor: create from CTMC and its default uniformisation rate.
 	 */
-	public DTMCUniformisedSimple(CTMCSimple ctmc)
+	public DTMCUniformisedSimple(CTMCSimple<Double> ctmc)
 	{
 		this(ctmc, ctmc.getDefaultUniformisationRate());
 	}
@@ -222,7 +222,7 @@ public class DTMCUniformisedSimple extends DTMCExplicit
 	{
 		int k;
 		double sum, d, prob;
-		Distribution distr;
+		Distribution<Double> distr;
 
 		distr = ctmc.getTransitions(s);
 		sum = d = 0.0;
@@ -248,7 +248,7 @@ public class DTMCUniformisedSimple extends DTMCExplicit
 	{
 		int k;
 		double sum, d, prob;
-		Distribution distr;
+		Distribution<Double> distr;
 
 		distr = ctmc.getTransitions(s);
 		sum = d = 0.0;

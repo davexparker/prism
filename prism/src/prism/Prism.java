@@ -271,7 +271,7 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 	private boolean currentDefinedMFConstantsAreExact = false;
 	// Built model storage - symbolic or explicit - at most one is non-null
 	private Model currentModel = null;
-	private explicit.Model currentModelExpl = null;
+	private explicit.Model<?> currentModelExpl = null;
 	// Are we doing digital clocks translation for PTAs?
 	boolean digital = false;
 

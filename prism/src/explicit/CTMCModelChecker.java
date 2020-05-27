@@ -97,7 +97,7 @@ public class CTMCModelChecker extends ProbModelChecker
 		int n = model.getNumStates();
 		StateRewardsArray rewEmb = new StateRewardsArray(n);
 		for (int i = 0; i < n; i++) {
-			rewEmb.setStateReward(i, ((MCRewards) modelRewards).getStateReward(i) / ((CTMC)model).getExitRate(i));
+			rewEmb.setStateReward(i, ((MCRewards<Double>) modelRewards).getStateReward(i) / ((CTMC)model).getExitRate(i));
 		}
 		return createDTMCModelChecker().checkRewardCoSafeLTL(dtmcEmb, rewEmb, expr, minMax, statesOfInterest);
 	}
@@ -521,7 +521,7 @@ public class CTMCModelChecker extends ProbModelChecker
 	 * @param mcRewards The rewards
 	 * @param t Time bound
 	 */
-	public ModelCheckerResult computeCumulativeRewards(CTMC ctmc, MCRewards mcRewards, double t) throws PrismException
+	public ModelCheckerResult computeCumulativeRewards(CTMC ctmc, MCRewards<Double> mcRewards, double t) throws PrismException
 	{
 		ModelCheckerResult res = null;
 		int i, n, iters;
@@ -636,7 +636,7 @@ public class CTMCModelChecker extends ProbModelChecker
 	 * @param mcRewards The rewards
 	 * @param target Target states
 	 */
-	public ModelCheckerResult computeTotalRewards(CTMC ctmc, MCRewards mcRewards) throws PrismException
+	public ModelCheckerResult computeTotalRewards(CTMC ctmc, MCRewards<Double> mcRewards) throws PrismException
 	{
 		int i, n;
 		// Build embedded DTMC
@@ -660,7 +660,7 @@ public class CTMCModelChecker extends ProbModelChecker
 	 * @param mcRewards The rewards
 	 * @param t Time bound
 	 */
-	public ModelCheckerResult computeInstantaneousRewards(CTMC ctmc, MCRewards mcRewards, double t) throws PrismException
+	public ModelCheckerResult computeInstantaneousRewards(CTMC ctmc, MCRewards<Double> mcRewards, double t) throws PrismException
 	{
 		ModelCheckerResult res = null;
 		int i, n, iters;
@@ -761,7 +761,7 @@ public class CTMCModelChecker extends ProbModelChecker
 	 * @param mcRewards The rewards
 	 * @param target Target states
 	 */
-	public ModelCheckerResult computeReachRewards(CTMC ctmc, MCRewards mcRewards, BitSet target) throws PrismException
+	public ModelCheckerResult computeReachRewards(CTMC ctmc, MCRewards<Double> mcRewards, BitSet target) throws PrismException
 	{
 		int i, n;
 		// Build embedded DTMC
@@ -877,7 +877,7 @@ public class CTMCModelChecker extends ProbModelChecker
 	 * @param ctmc the CTMC
 	 * @param modelRewards the (state) rewards
 	 */
-	public ModelCheckerResult computeSteadyStateRewards(CTMC ctmc, MCRewards modelRewards) throws PrismException
+	public ModelCheckerResult computeSteadyStateRewards(CTMC ctmc, MCRewards<Double> modelRewards) throws PrismException
 	{
 		int n = ctmc.getNumStates();
 		double multRewards[] = new double[n];

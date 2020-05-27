@@ -49,7 +49,7 @@ import prism.PrismLog;
  * Base class for an DTMCView or MDPView,
  * handling common tasks.
  */
-public abstract class ModelView implements Model
+public abstract class ModelView<Value> implements Model<Value>
 {
 	protected BitSet deadlockStates = new BitSet();
 	protected boolean fixedDeadlocks = false;

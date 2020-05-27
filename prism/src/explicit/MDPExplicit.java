@@ -34,7 +34,7 @@ import strat.MDStrategy;
 /**
  * Base class for explicit-state representations of an MDP.
  */
-public abstract class MDPExplicit extends ModelExplicit implements MDP
+public abstract class MDPExplicit<Value> extends ModelExplicit<Value> implements MDP<Value>
 {
 	// Accessors (for NondetModel)
 	

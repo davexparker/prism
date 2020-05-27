@@ -36,35 +36,35 @@ import prism.Pair;
 /**
  * Base class for explicit-state representations of a DTMC.
  */
-public abstract class DTMCExplicit extends ModelExplicit implements DTMC
+public abstract class DTMCExplicit<Value> extends ModelExplicit<Value> implements DTMC<Value>
 {
 	// Accessors (for DTMC)
 	
 	@Override
-	public Iterator<Entry<Integer, Pair<Double, Object>>> getTransitionsAndActionsIterator(int s)
+	public Iterator<Entry<Integer, Pair<Value, Object>>> getTransitionsAndActionsIterator(int s)
 	{
 		// Default implementation: extend iterator, setting all actions to null
 		return new AddDefaultActionToTransitionsIterator(getTransitionsIterator(s), null);
 	}
 
-	public class AddDefaultActionToTransitionsIterator implements Iterator<Map.Entry<Integer, Pair<Double, Object>>>
+	public class AddDefaultActionToTransitionsIterator implements Iterator<Map.Entry<Integer, Pair<Value, Object>>>
 	{
-		private Iterator<Entry<Integer, Double>> transIter;
+		private Iterator<Entry<Integer, Value>> transIter;
 		private Object defaultAction;
-		private Entry<Integer, Double> next;
+		private Entry<Integer, Value> next;
 
-		public AddDefaultActionToTransitionsIterator(Iterator<Entry<Integer, Double>> transIter, Object defaultAction)
+		public AddDefaultActionToTransitionsIterator(Iterator<Entry<Integer, Value>> transIter, Object defaultAction)
 		{
 			this.transIter = transIter;
 			this.defaultAction = defaultAction;
 		}
 
 		@Override
-		public Entry<Integer, Pair<Double, Object>> next()
+		public Entry<Integer, Pair<Value, Object>> next()
 		{
 			next = transIter.next();
 			final Integer state = next.getKey();
-			final Double probability = next.getValue();
+			final Value probability = next.getValue();
 			return new AbstractMap.SimpleImmutableEntry<>(state, new Pair<>(probability, defaultAction));
 		}
 

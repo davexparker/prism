@@ -32,7 +32,7 @@ import java.util.Map;
 /**
  * Simple explicit-state representation of a CTMC.
  */
-public class CTMCSimple extends DTMCSimple implements CTMC
+public class CTMCSimple<Value> extends DTMCSimple<Value> implements CTMC<Value>
 {
 	/**
 	 * The cached embedded DTMC.
@@ -66,7 +66,7 @@ public class CTMCSimple extends DTMCSimple implements CTMC
 	/**
 	 * Copy constructor.
 	 */
-	public CTMCSimple(CTMCSimple ctmc)
+	public CTMCSimple(CTMCSimple<Value> ctmc)
 	{
 		super(ctmc);
 	}
@@ -77,7 +77,7 @@ public class CTMCSimple extends DTMCSimple implements CTMC
 	 * Note: have to build new Distributions from scratch anyway to do this,
 	 * so may as well provide this functionality as a constructor.
 	 */
-	public CTMCSimple(CTMCSimple ctmc, int permut[])
+	public CTMCSimple(CTMCSimple<Value> ctmc, int permut[])
 	{
 		super(ctmc, permut);
 	}
@@ -87,7 +87,7 @@ public class CTMCSimple extends DTMCSimple implements CTMC
 	@Override
 	public double getExitRate(int i)
 	{
-		return trans.get(i).sum();
+		return (Double) trans.get(i).sum();
 	}
 	
 	@Override
@@ -96,7 +96,7 @@ public class CTMCSimple extends DTMCSimple implements CTMC
 		int i;
 		double d, max = Double.NEGATIVE_INFINITY;
 		for (i = 0; i < numStates; i++) {
-			d = trans.get(i).sum();
+			d = (Double) trans.get(i).sum();
 			if (d > max)
 				max = d;
 		}
@@ -109,7 +109,7 @@ public class CTMCSimple extends DTMCSimple implements CTMC
 		int i;
 		double d, max = Double.NEGATIVE_INFINITY;
 		for (i = subset.nextSetBit(0); i >= 0; i = subset.nextSetBit(i + 1)) {
-			d = trans.get(i).sum();
+			d = (Double) trans.get(i).sum();
 			if (d > max)
 				max = d;
 		}
@@ -128,40 +128,42 @@ public class CTMCSimple extends DTMCSimple implements CTMC
 		return 1.02 * getMaxExitRate(nonAbs); 
 	}
 	
+	// TODO: only works with doubles (all below)
+	
 	@Override
-	public DTMC buildImplicitEmbeddedDTMC()
+	public DTMC<Double> buildImplicitEmbeddedDTMC()
 	{
-		DTMCEmbeddedSimple dtmc = new DTMCEmbeddedSimple(this);
+		DTMCEmbeddedSimple dtmc = new DTMCEmbeddedSimple((CTMCSimple<Double>) this);
 		if (cachedEmbeddedDTMC != null) {
 			// replace cached DTMC
 			cachedEmbeddedDTMC = dtmc;
 		}
-		return dtmc;
+		return (DTMC<Double>) dtmc;
 	}
 	
 	@Override
-	public DTMC getImplicitEmbeddedDTMC()
+	public DTMC<Double> getImplicitEmbeddedDTMC()
 	{
 		if (cachedEmbeddedDTMC == null) {
-			cachedEmbeddedDTMC = new DTMCEmbeddedSimple(this);
+			cachedEmbeddedDTMC = new DTMCEmbeddedSimple((CTMCSimple<Double>) this);
 		}
-		return cachedEmbeddedDTMC;
+		return (DTMC<Double>) cachedEmbeddedDTMC;
 	}
 
 	
 	@Override
-	public DTMCSimple buildEmbeddedDTMC()
+	public DTMCSimple<Double> buildEmbeddedDTMC()
 	{
-		DTMCSimple dtmc;
-		Distribution distr;
+		DTMCSimple<Double> dtmc;
+		Distribution<Double> distr;
 		int i;
 		double d;
-		dtmc = new DTMCSimple(numStates);
+		dtmc = new DTMCSimple<>(numStates);
 		for (int in : getInitialStates()) {
 			dtmc.addInitialState(in);
 		}
 		for (i = 0; i < numStates; i++) {
-			distr = trans.get(i);
+			distr = (Distribution<Double>) trans.get(i);
 			d = distr.sum();
 			if (d == 0) {
 				dtmc.setProbability(i, i, 1.0);
@@ -171,31 +173,31 @@ public class CTMCSimple extends DTMCSimple implements CTMC
 				}
 			}
 		}
-		return dtmc;
+		return (DTMCSimple<Double>) dtmc;
 	}
 
 	@Override
 	public void uniformise(double q)
 	{
-		Distribution distr;
+		Distribution<Double> distr;
 		int i;
 		for (i = 0; i < numStates; i++) {
-			distr = trans.get(i);
+			distr = (Distribution<Double>) trans.get(i);
 			distr.set(i, q - distr.sumAllBut(i));
 		}
 	}
 
 	@Override
-	public DTMC buildImplicitUniformisedDTMC(double q)
+	public DTMC<Double> buildImplicitUniformisedDTMC(double q)
 	{
-		return new DTMCUniformisedSimple(this, q);
+		return new DTMCUniformisedSimple((CTMCSimple<Double>) this, q);
 	}
 	
 	@Override
 	public DTMCSimple buildUniformisedDTMC(double q)
 	{
 		DTMCSimple dtmc;
-		Distribution distr;
+		Distribution<Double> distr;
 		int i;
 		double d;
 		dtmc = new DTMCSimple(numStates);
@@ -204,7 +206,7 @@ public class CTMCSimple extends DTMCSimple implements CTMC
 		}
 		for (i = 0; i < numStates; i++) {
 			// Add scaled off-diagonal entries
-			distr = trans.get(i);
+			distr = (Distribution<Double>) trans.get(i);
 			for (Map.Entry<Integer, Double> e : distr) {
 				dtmc.setProbability(i, e.getKey(), e.getValue() / q);
 			}

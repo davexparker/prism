@@ -49,7 +49,7 @@ import prism.PrismNotSupportedException;
  * This is much faster to access than e.g. DTMCSimple and should also be more compact.
  * The catch is that you have to create the model all in one go and then can't modify it.
  */
-public class DTMCSparse extends DTMCExplicit
+public class DTMCSparse extends DTMCExplicit<Double>
 {
 	// Sparse matrix storing transition function (Steps)
 	/** Indices into probabilities/columns giving the start of the transitions for each state (distribution);
@@ -60,7 +60,7 @@ public class DTMCSparse extends DTMCExplicit
 	/** Probabilities for each transition (array of size numTransitions) */
 	private double probabilities[];
 
-	public DTMCSparse(final DTMC dtmc) {
+	public DTMCSparse(final DTMC<Double> dtmc) {
 		initialise(dtmc.getNumStates());
 		for (Integer state : dtmc.getDeadlockStates()) {
 			deadlocks.add(state);
@@ -96,7 +96,7 @@ public class DTMCSparse extends DTMCExplicit
 		predecessorRelation = dtmc.hasStoredPredecessorRelation() ? dtmc.getPredecessorRelation(null, false) : null;
 	}
 
-	public DTMCSparse(final DTMC dtmc, int[] permut) {
+	public DTMCSparse(final DTMC<Double> dtmc, int[] permut) {
 		initialise(dtmc.getNumStates());
 		for (Integer state : dtmc.getDeadlockStates()) {
 			deadlocks.add(permut[state]);
@@ -331,7 +331,7 @@ public class DTMCSparse extends DTMCExplicit
 	}
 
 	@Override
-	public double mvMultRewSingle(final int state, final double[] vect, final MCRewards mcRewards)
+	public double mvMultRewSingle(final int state, final double[] vect, final MCRewards<Double> mcRewards)
 	{
 		double d = mcRewards.getStateReward(state);
 		for (int i=rows[state], stop=rows[state+1]; i < stop; i++) {

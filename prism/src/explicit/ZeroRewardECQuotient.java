@@ -94,7 +94,7 @@ public class ZeroRewardECQuotient
 		}
 	}
 
-	public static ZeroRewardECQuotient getQuotient(PrismComponent parent, MDP mdp, BitSet restrict, MDPRewards rewards) throws PrismException
+	public static ZeroRewardECQuotient getQuotient(PrismComponent parent, MDP mdp, BitSet restrict, MDPRewards<Double> rewards) throws PrismException
 	{
 		PairPredicateInt positiveRewardChoice = (int s, int i) -> {
 			if (rewards.getStateReward(s) > 0)
@@ -139,15 +139,15 @@ public class ZeroRewardECQuotient
 		BasicModelTransformation<MDP, MDPEquiv> transform = MDPEquiv.transform(droppedZeroRewardLoops, equiv);
 		final MDPEquiv quotient = transform.getTransformedModel();
 
-		MDPRewards quotientRewards = new MDPRewards() {
+		MDPRewards<Double> quotientRewards = new MDPRewards<Double>() {
 			@Override
-			public double getStateReward(int s)
+			public Double getStateReward(int s)
 			{
 				return rewards.getStateReward(s);
 			}
 
 			@Override
-			public double getTransitionReward(int s, int i)
+			public Double getTransitionReward(int s, int i)
 			{
 				StateChoicePair mapped = quotient.mapToOriginalModel(s, i);
 				int mappedChoiceInOriginal = droppedZeroRewardLoops.mapChoiceToOriginalModel(mapped.getState(), mapped.getChoice());
@@ -155,7 +155,7 @@ public class ZeroRewardECQuotient
 			}
 
 			@Override
-			public MDPRewards liftFromModel(Product<? extends Model> product)
+			public MDPRewards<Double> liftFromModel(Product<? extends Model<Double>> product)
 			{
 				throw new RuntimeException("Not implemented");
 			}

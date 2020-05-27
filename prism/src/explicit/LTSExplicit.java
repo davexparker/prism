@@ -38,7 +38,7 @@ import strat.MDStrategy;
  * Each target state of an edge is modeled as a choice, with a single transition for
  * this choice.
  */
-public class LTSExplicit extends ModelExplicit implements LTS
+public class LTSExplicit<Value> extends ModelExplicit<Value> implements LTS<Value>
 {
 	protected ArrayList<ArrayList<Integer>> successors = new ArrayList<ArrayList<Integer>>();
 	protected int numTransitions = 0;

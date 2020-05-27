@@ -114,7 +114,7 @@ public abstract class QuantAbstractRefine extends PrismComponent
 	
 	// Abstract model info (updated by subclasses)
 	/** Abstract model */
-	protected NondetModelSimple abstraction;
+	protected NondetModelSimple<Double> abstraction;
 	/** BitSet of (abstract) target states for property to drive refinement */
 	protected BitSet target;
 	
@@ -1281,7 +1281,7 @@ public abstract class QuantAbstractRefine extends PrismComponent
 					out.write(i + " -> " + nij + " [ arrowhead=none,label=\"" + j + "\" ];\n");
 					out.write(nij + " [ shape=circle,width=0.1,height=0.1,label=\"\" ];\n");
 					k = -1;
-					for (Distribution distr : distrs) {
+					for (Distribution<Double> distr : distrs) {
 						k++;
 						nijk = "n" + i + "_" + j + "_" + k;
 						out.write(nij + " -> " + nijk + " [ arrowhead=none,label=\"" + k + "\" ];\n");

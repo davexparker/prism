@@ -45,7 +45,7 @@ public class ExplicitModel2MTBDD
 	private PrismLog mainLog; // main log
 
 	// Explicit-state model
-	private explicit.Model modelExpl;
+	private explicit.Model<Double> modelExpl;
 
 	// ModulesFile object, essentially just to store variable info
 	private ModulesFile modulesFile;

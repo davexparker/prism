@@ -40,7 +40,7 @@ import common.IterableStateSet;
  * <br>
  * This allows use of these methods e.g. in the explicit and parametric engines.
  */
-public interface MDPGeneric<Value> extends NondetModel
+public interface MDPGeneric<Value> extends NondetModel<Value>
 {
 	/**
 	 * Get an iterator over the transitions from choice {@code i} of state {@code s}.

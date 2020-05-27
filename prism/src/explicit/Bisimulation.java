@@ -46,7 +46,7 @@ public class Bisimulation extends PrismComponent
 	protected int numStates;
 	protected int[] partition;
 	protected int numBlocks;
-	protected MDPSimple mdp;
+	protected MDPSimple<Double> mdp;
 
 	/**
 	 * Construct a new Bisimulation object.
@@ -62,13 +62,13 @@ public class Bisimulation extends PrismComponent
 	 * @param propNames Names of the propositions in {@code propBSs}
 	 * @param propBSs Propositions (satisfying sets of states) to be preserved by bisimulation.
 	 */
-	public Model minimise(Model model, List<String> propNames, List<BitSet> propBSs) throws PrismException
+	public Model<Double> minimise(Model<Double> model, List<String> propNames, List<BitSet> propBSs) throws PrismException
 	{
 		switch (model.getModelType()) {
 		case DTMC:
-			return minimiseDTMC((DTMC) model, propNames, propBSs);
+			return minimiseDTMC((DTMC<Double>) model, propNames, propBSs);
 		case CTMC:
-			return minimiseCTMC((CTMC) model, propNames, propBSs);
+			return minimiseCTMC((CTMC<Double>) model, propNames, propBSs);
 		default:
 			throw new PrismNotSupportedException("Bisimulation minimisation not yet supported for " + model.getModelType() + "s");
 		}
@@ -80,7 +80,7 @@ public class Bisimulation extends PrismComponent
 	 * @param propNames Names of the propositions in {@code propBSs}
 	 * @param propBSs Propositions (satisfying sets of states) to be preserved by bisimulation.
 	 */
-	private DTMC minimiseDTMC(DTMC dtmc, List<String> propNames, List<BitSet> propBSs)
+	private DTMC<Double> minimiseDTMC(DTMC<Double> dtmc, List<String> propNames, List<BitSet> propBSs)
 	{
 		// Create initial partition based on propositions
 		initialisePartitionInfo(dtmc, propBSs);
@@ -94,7 +94,7 @@ public class Bisimulation extends PrismComponent
 		//printPartition(dtmc);
 
 		// Build reduced model
-		DTMCSimple dtmcNew = new DTMCSimple(numBlocks);
+		DTMCSimple<Double> dtmcNew = new DTMCSimple<>(numBlocks);
 		for (int i = 0; i < numBlocks; i++) {
 			for (Map.Entry<Integer, Double> e : mdp.getChoice(i, 0)) {
 				dtmcNew.setProbability((Integer) mdp.getAction(i, 0), e.getKey(), e.getValue());

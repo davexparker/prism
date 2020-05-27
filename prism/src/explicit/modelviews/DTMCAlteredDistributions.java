@@ -190,7 +190,7 @@ public class DTMCAlteredDistributions extends DTMCView
 
 	//--- static methods ---
 
-	public static DTMCAlteredDistributions fixDeadlocks(final DTMC model)
+	public static <Value> DTMCAlteredDistributions fixDeadlocks(final DTMC<Value> model)
 	{
 		final BitSet deadlockStates = new BitSet();
 		model.getDeadlockStates().forEach(deadlockStates::set);

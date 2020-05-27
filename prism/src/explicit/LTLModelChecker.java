@@ -77,7 +77,7 @@ import common.StopWatch;
 public class LTLModelChecker extends PrismComponent
 {
 	/** Make LTL product accessible as a Product */
-	public class LTLProduct<M extends Model> extends Product<M>
+	public class LTLProduct<M extends Model<?>> extends Product<M>
 	{
 		private int daSize;
 		private int invMap[];
@@ -319,7 +319,7 @@ public class LTLModelChecker extends PrismComponent
  	 * @param allowedAcceptance the allowed acceptance types
 	 * @return the product with the DA
 	 */
-	public LTLProduct<DTMC> constructProductMC(ProbModelChecker mc, DTMC model, Expression expr, BitSet statesOfInterest, AcceptanceType... allowedAcceptance) throws PrismException
+	public <Value> LTLProduct<DTMC<Value>> constructProductMC(ProbModelChecker mc, DTMC<Value> model, Expression expr, BitSet statesOfInterest, AcceptanceType... allowedAcceptance) throws PrismException
 	{
 		// Convert LTL formula to automaton
 		Vector<BitSet> labelBS = new Vector<BitSet>();
@@ -330,7 +330,7 @@ public class LTLModelChecker extends PrismComponent
 		mainLog.println("\nConstructing MC-"+da.getAutomataType()+" product...");
 		StopWatch timer = new StopWatch(getLog());
 		timer.start("product construction");
-		LTLProduct<DTMC> product = constructProductModel(da, model, labelBS, statesOfInterest);
+		LTLProduct<DTMC<Value>> product = constructProductModel(da, model, labelBS, statesOfInterest);
 		timer.stop("product has " + product.getProductModel().infoString());
 
 		return product;
@@ -348,7 +348,7 @@ public class LTLModelChecker extends PrismComponent
 	 * @return the product with the DA
 	 * @throws PrismException
 	 */
-	public LTLProduct<MDP> constructProductMDP(ProbModelChecker mc, MDP model, Expression expr, BitSet statesOfInterest, AcceptanceType... allowedAcceptance) throws PrismException
+	public <Value> LTLProduct<MDP<Value>> constructProductMDP(ProbModelChecker mc, MDP<Value> model, Expression expr, BitSet statesOfInterest, AcceptanceType... allowedAcceptance) throws PrismException
 	{
 		// Convert LTL formula to automaton
 		Vector<BitSet> labelBS = new Vector<BitSet>();
@@ -359,7 +359,7 @@ public class LTLModelChecker extends PrismComponent
 		mainLog.println("\nConstructing MDP-"+da.getAutomataType()+" product...");
 		StopWatch timer = new StopWatch(getLog());
 		timer.start("product construction");
-		LTLProduct<MDP> product = constructProductModel(da, model, labelBS, statesOfInterest);
+		LTLProduct<MDP<Value>> product = constructProductModel(da, model, labelBS, statesOfInterest);
 		timer.stop("product has " + product.getProductModel().infoString());
 
 		return product;
@@ -377,7 +377,7 @@ public class LTLModelChecker extends PrismComponent
 	 * @return the product with the DA
 	 * @throws PrismException
 	 */
-	public LTLProduct<STPG> constructProductSTPG(ProbModelChecker mc, STPG model, Expression expr, BitSet statesOfInterest, AcceptanceType... allowedAcceptance) throws PrismException
+	public <Value> LTLProduct<STPG<Value>> constructProductSTPG(ProbModelChecker mc, STPG<Value> model, Expression expr, BitSet statesOfInterest, AcceptanceType... allowedAcceptance) throws PrismException
 	{
 		// Convert LTL formula to automaton
 		Vector<BitSet> labelBS = new Vector<BitSet>();
@@ -386,7 +386,7 @@ public class LTLModelChecker extends PrismComponent
 
 		// Build product of model and automaton
 		mainLog.println("\nConstructing STPG-"+da.getAutomataType()+" product...");
-		LTLProduct<STPG> product = constructProductModel(da, model, labelBS, statesOfInterest);
+		LTLProduct<STPG<Value>> product = constructProductModel(da, model, labelBS, statesOfInterest);
 		mainLog.print("\n" + product.getProductModel().infoStringTable());
 
 		return product;
@@ -404,7 +404,7 @@ public class LTLModelChecker extends PrismComponent
 	 * @return the product with the DA
 	 * @throws PrismException
 	 */
-	public <M extends Model> LTLProduct<M> constructProductModel(ProbModelChecker mc, M model, Expression expr, BitSet statesOfInterest, AcceptanceType... allowedAcceptance) throws PrismException
+	public <Value,M extends Model<Value>> LTLProduct<M> constructProductModel(ProbModelChecker mc, M model, Expression expr, BitSet statesOfInterest, AcceptanceType... allowedAcceptance) throws PrismException
 	{
 		// Convert LTL formula to automaton
 		Vector<BitSet> labelBS = new Vector<BitSet>();
@@ -427,7 +427,7 @@ public class LTLModelChecker extends PrismComponent
 	 * @param statesOfInterest the set of states for which values should be calculated (null = all states)
 	 * @return The product model
 	 */
-	 public <M extends Model> LTLProduct<M> constructProductModel(DA<BitSet,? extends AcceptanceOmega> da, M model, Vector<BitSet> labelBS, BitSet statesOfInterest) throws PrismException
+	 public <M extends Model<?>> LTLProduct<M> constructProductModel(DA<BitSet,? extends AcceptanceOmega> da, M model, Vector<BitSet> labelBS, BitSet statesOfInterest) throws PrismException
 	{
 		ModelType modelType = model.getModelType();
 		int daSize = da.size();
@@ -532,7 +532,7 @@ public class LTLModelChecker extends PrismComponent
 			map[s_0 * daSize + q_0] = prodModel.getNumStates() - 1;
 			if (prodStatesList != null) {
 				// Store state information for the product
-				prodStatesList.add(new State(daStatesList.get(q_0), model.getStatesList().get(s_0)));
+				prodStatesList.add(new State(daStatesList.get(q_0), (State) model.getStatesList().get(s_0)));
 			}
 		}
 

@@ -57,6 +57,7 @@ import acceptance.AcceptanceType;
 import automata.DA;
 import common.IntSet;
 import common.IterableBitSet;
+import explicit.LTLModelChecker.LTLProduct;
 import explicit.modelviews.EquivalenceRelationInteger;
 import explicit.modelviews.MDPDroppedAllChoices;
 import explicit.modelviews.MDPEquiv;
@@ -81,12 +82,12 @@ public class MDPModelChecker extends ProbModelChecker
 	// Model checking functions
 
 	@Override
-	protected StateValues checkProbPathFormulaLTL(Model model, Expression expr, boolean qual, MinMax minMax, BitSet statesOfInterest) throws PrismException
+	protected StateValues checkProbPathFormulaLTL(Model<?> model, Expression expr, boolean qual, MinMax minMax, BitSet statesOfInterest) throws PrismException
 	{
 		LTLModelChecker mcLtl;
 		StateValues probsProduct, probs;
 		MDPModelChecker mcProduct;
-		LTLModelChecker.LTLProduct<MDP> product;
+		LTLProduct<MDP<?>> product;
 
 		// For min probabilities, need to negate the formula
 		// (add parentheses to allow re-parsing if required)
@@ -104,7 +105,7 @@ public class MDPModelChecker extends ProbModelChecker
 				AcceptanceType.GENERALIZED_RABIN,
 				AcceptanceType.REACH
 		};
-		product = mcLtl.constructProductMDP(this, (MDP)model, expr, statesOfInterest, allowedAcceptance);
+		product = mcLtl.constructProductMDP(this, (MDP) model, expr, statesOfInterest, allowedAcceptance);
 		
 		// Output product, if required
 		if (getExportProductTrans()) {
@@ -169,7 +170,7 @@ public class MDPModelChecker extends ProbModelChecker
 		MDPRewards productRewards;
 		StateValues rewardsProduct, rewards;
 		MDPModelChecker mcProduct;
-		LTLModelChecker.LTLProduct<MDP> product;
+		LTLModelChecker.LTLProduct<MDP<?>> product;
 
 		// For LTL model checking routines
 		mcLtl = new LTLModelChecker(this);
@@ -1533,7 +1534,7 @@ public class MDPModelChecker extends ProbModelChecker
 	 * @param unknown the states that are not target or infinity states
 	 * @return upper bound on Rmax=?[ F target ] for all states
 	 */
-	double computeReachRewardsMaxUpperBoundVariant1Coarse(MDP mdp, MDPRewards mdpRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
+	double computeReachRewardsMaxUpperBoundVariant1Coarse(MDP<Double> mdp, MDPRewards<Double> mdpRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
 	{
 		double[] boundsOnExpectedVisits = new double[mdp.getNumStates()];
 		double[] maxRews = new double[mdp.getNumStates()];
@@ -1641,7 +1642,7 @@ public class MDPModelChecker extends ProbModelChecker
 	 * @param unknown the states that are not target or infinity states
 	 * @return upper bound on Rmax=?[ F target ] for all states
 	 */
-	double computeReachRewardsMaxUpperBoundVariant1Fine(MDP mdp, MDPRewards mdpRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
+	double computeReachRewardsMaxUpperBoundVariant1Fine(MDP<Double> mdp, MDPRewards<Double> mdpRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
 	{
 		double[] boundsOnExpectedVisits = new double[mdp.getNumStates()];
 		double[] qt = new double[mdp.getNumStates()];
@@ -1756,7 +1757,7 @@ public class MDPModelChecker extends ProbModelChecker
 	 * @param inf the infinity states
 	 * @return upper bound on R=?[ F target ] for all states
 	 */
-	double computeReachRewardsMaxUpperBoundVariant2(MDP mdp, MDPRewards mdpRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
+	double computeReachRewardsMaxUpperBoundVariant2(MDP<Double> mdp, MDPRewards<Double> mdpRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
 	{
 		double[] dt = new double[mdp.getNumStates()];
 		double[] boundsOnExpectedVisits = new double[mdp.getNumStates()];
@@ -1805,7 +1806,7 @@ public class MDPModelChecker extends ProbModelChecker
 				double min = Double.POSITIVE_INFINITY;
 				for (int choice = 0, choices = mdp.getNumChoices(t); choice < choices; choice++) {
 					// mainLog.println("State " + t + ", choice = " + choice);
-					double d = mdp.sumOverTransitions(t, choice, (int __, int u, double prob) -> {
+					double d = mdp.sumOverDoubleTransitions(t, choice, (int __, int u, double prob) -> {
 						// mainLog.println("t = " + t + ", u = " + u + ", prob = " + prob);
 						if (!T.get(u))
 							return 0.0;
@@ -1867,7 +1868,7 @@ public class MDPModelChecker extends ProbModelChecker
 	 * @param k the number of steps
 	 * @param min Min or max rewards (true=min, false=max)
 	 */
-	public ModelCheckerResult computeInstantaneousRewards(MDP mdp, MDPRewards mdpRewards, final int k, boolean min)
+	public ModelCheckerResult computeInstantaneousRewards(MDP<Double> mdp, MDPRewards<Double> mdpRewards, final int k, boolean min)
 	{
 		ModelCheckerResult res = null;
 		int i, n, iters;
@@ -1936,7 +1937,7 @@ public class MDPModelChecker extends ProbModelChecker
 	 * @param mdpRewards The rewards
 	 * @param noPositiveECs if true, there are no positive ECs, i.e., all states have finite values (skip precomputation)
 	 */
-	public ModelCheckerResult computeTotalRewardsMax(MDP mdp, MDPRewards mdpRewards, boolean noPositiveECs) throws PrismException
+	public ModelCheckerResult computeTotalRewardsMax(MDP<Double> mdp, MDPRewards<Double> mdpRewards, boolean noPositiveECs) throws PrismException
 	{
 		ModelCheckerResult res = null;
 		int n;
@@ -2656,7 +2657,7 @@ public class MDPModelChecker extends ProbModelChecker
 	 * @param mdp The MDP
 	 * @param strat The strategy
 	 */
-	public void restrictStrategyToReachableStates(MDP mdp, int strat[])
+	public <Value> void restrictStrategyToReachableStates(MDP<Value> mdp, int strat[])
 	{
 		BitSet restrict = new BitSet();
 		BitSet explore = new BitSet();
@@ -2672,9 +2673,9 @@ public class MDPModelChecker extends ProbModelChecker
 			for (int s = explore.nextSetBit(0); s >= 0; s = explore.nextSetBit(s + 1)) {
 				explore.set(s, false);
 				if (strat[s] >= 0) {
-					Iterator<Map.Entry<Integer, Double>> iter = mdp.getTransitionsIterator(s, strat[s]);
+					Iterator<Map.Entry<Integer, Value>> iter = mdp.getTransitionsIterator(s, strat[s]);
 					while (iter.hasNext()) {
-						Map.Entry<Integer, Double> e = iter.next();
+						Map.Entry<Integer, Value> e = iter.next();
 						int dest = e.getKey();
 						if (!restrict.get(dest)) {
 							foundMore = true;

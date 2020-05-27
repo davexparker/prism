@@ -41,10 +41,10 @@ import prism.PrismNotSupportedException;
  * where E(i) is the exit rate for state i: sum_j R(i,j).
  * This class is read-only: most of data is pointers to other model info.
  */
-public class DTMCEmbeddedSimple extends DTMCExplicit
+public class DTMCEmbeddedSimple extends DTMCExplicit<Double>
 {
 	// Parent CTMC
-	protected CTMCSimple ctmc;
+	protected CTMCSimple<Double> ctmc;
 	// Exit rates vector
 	protected double exitRates[];
 	// Number of extra transitions added (just for stats)
@@ -53,7 +53,7 @@ public class DTMCEmbeddedSimple extends DTMCExplicit
 	/**
 	 * Constructor: create from CTMC.
 	 */
-	public DTMCEmbeddedSimple(CTMCSimple ctmc)
+	public DTMCEmbeddedSimple(CTMCSimple<Double> ctmc)
 	{
 		this.ctmc = ctmc;
 		this.numStates = ctmc.getNumStates();
@@ -251,7 +251,7 @@ public class DTMCEmbeddedSimple extends DTMCExplicit
 	}
 
 	@Override
-	public void forEachTransition(int s, TransitionConsumer c)
+	public void forEachTransition(int s, TransitionConsumer<Double> c)
 	{
 		final double er = exitRates[s];
 		if (er == 0) {
@@ -268,7 +268,7 @@ public class DTMCEmbeddedSimple extends DTMCExplicit
 	{
 		int k;
 		double d, er, prob;
-		Distribution distr;
+		Distribution<Double> distr;
 
 		distr = ctmc.getTransitions(s);
 		d = 0.0;
@@ -295,7 +295,7 @@ public class DTMCEmbeddedSimple extends DTMCExplicit
 	{
 		int k;
 		double diag, d, er, prob;
-		Distribution distr;
+		Distribution<Double> distr;
 
 		distr = ctmc.getTransitions(s);
 		diag = d = 0.0;
@@ -325,11 +325,11 @@ public class DTMCEmbeddedSimple extends DTMCExplicit
 		return d;
 	}
 
-	public double mvMultRewSingle(int s, double vect[], MCRewards mcRewards)
+	public double mvMultRewSingle(int s, double vect[], MCRewards<Double> mcRewards)
 	{
 		int k;
 		double d, er, prob;
-		Distribution distr;
+		Distribution<Double> distr;
 
 		distr = ctmc.getTransitions(s);
 		er = exitRates[s];
@@ -353,11 +353,11 @@ public class DTMCEmbeddedSimple extends DTMCExplicit
 	}
 
 	//@Override
-	public double mvMultRewJacSingle(int s, double vect[], MCRewards mcRewards)
+	public double mvMultRewJacSingle(int s, double vect[], MCRewards<Double> mcRewards)
 	{
 		int k;
 		double diag, d, er, prob;
-		Distribution distr;
+		Distribution<Double> distr;
 
 		distr = ctmc.getTransitions(s);
 		diag = d = 0.0;

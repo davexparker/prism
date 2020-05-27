@@ -36,7 +36,7 @@ import strat.MDStrategy;
 /**
  * Interface for (abstract) classes that provide (read-only) access to an explicit-state model with nondeterminism.
  */
-public interface NondetModel extends Model
+public interface NondetModel<Value> extends Model<Value>
 {
 	// Accessors
 
