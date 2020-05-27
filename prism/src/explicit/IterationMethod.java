@@ -78,7 +78,7 @@ public abstract class IterationMethod {
 		public void solveSingletonSCC(int state, SingletonSCCSolver solver);
 
 		/** Return the underlying model */
-		public Model getModel();
+		public Model<?> getModel();
 	}
 
 	/**
@@ -112,15 +112,15 @@ public abstract class IterationMethod {
 		public void solveSingletonSCC(int s, SingletonSCCSolver solver);
 
 		/** Return the underlying model */
-		public Model getModel();
+		public Model<?> getModel();
 	}
 
 	/** Storage for a single solution vector */
 	public class IterationBasic {
-		protected final Model model;
+		protected final Model<?> model;
 		protected double[] soln;
 
-		public IterationBasic(Model model)
+		public IterationBasic(Model<?> model)
 		{
 			this.model = model;
 		}
@@ -147,7 +147,7 @@ public abstract class IterationMethod {
 			// single vector, nothing to do
 		}
 
-		public Model getModel()
+		public Model<?> getModel()
 		{
 			return model;
 		}
@@ -165,7 +165,7 @@ public abstract class IterationMethod {
 			return error;
 		}
 
-		public SingleVectorIterationValIter(Model model)
+		public SingleVectorIterationValIter(Model<?> model)
 		{
 			super(model);
 		}
@@ -174,7 +174,7 @@ public abstract class IterationMethod {
 	/** Abstract base class for an IterationIntervalIter with a single solution vector */
 	protected abstract class SingleVectorIterationIntervalIter extends IterationBasic implements IterationIntervalIter
 	{
-		public SingleVectorIterationIntervalIter(Model model)
+		public SingleVectorIterationIntervalIter(Model<?> model)
 		{
 			super(model);
 		}
@@ -207,7 +207,7 @@ public abstract class IterationMethod {
 		protected final IterationPostProcessor postProcessor;
 
 		/** Constructor */
-		protected TwoVectorIteration(Model model, IterationMethod.IterationPostProcessor postProcessor)
+		protected TwoVectorIteration(Model<?> model, IterationMethod.IterationPostProcessor postProcessor)
 		{
 			super(model);
 			this.postProcessor = postProcessor;
@@ -327,7 +327,7 @@ public abstract class IterationMethod {
 	// ------------ Abstract DTMC methods ----------------------------
 
 	/** Obtain an Iteration object using mvMult (matrix-vector multiplication) in a DTMC */
-	public abstract IterationValIter forMvMult(DTMC dtmc) throws PrismException;
+	public abstract IterationValIter forMvMult(DTMC<Double> dtmc) throws PrismException;
 
 	/**
 	 * Obtain an Iteration object (for interval iteration) using mvMult
@@ -336,10 +336,10 @@ public abstract class IterationMethod {
 	 * @param enforceMonotonic enforce element-wise monotonicity of the solution vector
 	 * @param checkMonotonic check the element-wise monotonicity of the solution vector, throw exception if violated
 	 */
-	public abstract IterationIntervalIter forMvMultInterval(DTMC dtmc, boolean fromBelow, boolean enforceMonotonicity, boolean checkMonotonicity) throws PrismException;
+	public abstract IterationIntervalIter forMvMultInterval(DTMC<Double> dtmc, boolean fromBelow, boolean enforceMonotonicity, boolean checkMonotonicity) throws PrismException;
 
 	/** Obtain an Iteration object using mvMultRew (matrix-vector multiplication with rewards) in a DTMC */
-	public abstract IterationValIter forMvMultRew(DTMC dtmc, MCRewards rew) throws PrismException;
+	public abstract IterationValIter forMvMultRew(DTMC<Double> dtmc, MCRewards<Double> rew) throws PrismException;
 
 	/**
 	 * Obtain an Iteration object (for interval iteration) using mvMultRew
@@ -348,7 +348,7 @@ public abstract class IterationMethod {
 	 * @param enforceMonotonic enforce element-wise monotonicity of the solution vector
 	 * @param checkMonotonic check the element-wise monotonicity of the solution vector, throw exception if violated
 	 */
-	public abstract IterationIntervalIter forMvMultRewInterval(DTMC dtmc, MCRewards rew, boolean fromBelow, boolean enforceMonotonicity, boolean checkMonotonicity) throws PrismException;
+	public abstract IterationIntervalIter forMvMultRewInterval(DTMC<Double> dtmc, MCRewards<Double> rew, boolean fromBelow, boolean enforceMonotonicity, boolean checkMonotonicity) throws PrismException;
 
 	// ------------ Abstract MDP methods ----------------------------
 
@@ -359,7 +359,7 @@ public abstract class IterationMethod {
 	 * @param min do min?
 	 * @param strat optional, storage for strategy, ignored if null
 	 */
-	public abstract IterationValIter forMvMultMinMax(MDP mdp, boolean min, int[] strat) throws PrismException;
+	public abstract IterationValIter forMvMultMinMax(MDP<Double> mdp, boolean min, int[] strat) throws PrismException;
 
 	/**
 	 * Obtain an Iteration object using mvMultMinMax (matrix-vector multiplication, followed by min/max)
@@ -371,7 +371,7 @@ public abstract class IterationMethod {
 	 * @param enforceMonotonic enforce element-wise monotonicity of the solution vector
 	 * @param checkMonotonic check the element-wise monotonicity of the solution vector, throw exception if violated
 	 */
-	public abstract IterationIntervalIter forMvMultMinMaxInterval(MDP mdp, boolean min, int[] strat, boolean fromBelow, boolean enforceMonotonicity, boolean checkMonotonicity) throws PrismException;
+	public abstract IterationIntervalIter forMvMultMinMaxInterval(MDP<Double> mdp, boolean min, int[] strat, boolean fromBelow, boolean enforceMonotonicity, boolean checkMonotonicity) throws PrismException;
 
 	/**
 	 * Obtain an Iteration object using mvMultRewMinMax (matrix-vector multiplication with rewards, followed by min/max)
@@ -381,7 +381,7 @@ public abstract class IterationMethod {
 	 * @param min do min?
 	 * @param strat optional, storage for strategy, ignored if null
 	 */
-	public abstract IterationValIter forMvMultRewMinMax(MDP mdp, MDPRewards rewards, boolean min, int[] strat) throws PrismException;
+	public abstract IterationValIter forMvMultRewMinMax(MDP<Double> mdp, MDPRewards<Double> rewards, boolean min, int[] strat) throws PrismException;
 
 	/**
 	 * Obtain an Iteration object using mvMultRewMinMax (matrix-vector multiplication with rewards, followed by min/max)
@@ -394,7 +394,7 @@ public abstract class IterationMethod {
 	 * @param enforceMonotonic enforce element-wise monotonicity of the solution vector
 	 * @param checkMonotonic check the element-wise monotonicity of the solution vector, throw exception if violated
 	 */
-	public abstract IterationIntervalIter forMvMultRewMinMaxInterval(MDP mdp, MDPRewards rewards, boolean min, int[] strat, boolean fromBelow, boolean enforceMonotonicity, boolean checkMonotonicity) throws PrismException;
+	public abstract IterationIntervalIter forMvMultRewMinMaxInterval(MDP<Double> mdp, MDPRewards<Double> rewards, boolean min, int[] strat, boolean fromBelow, boolean enforceMonotonicity, boolean checkMonotonicity) throws PrismException;
 
 
 	// ------------ Abstract generic methods ----------------------------

@@ -79,12 +79,13 @@ public class DTMCModelChecker extends ProbModelChecker
 
 	// Model checking functions
 
+	@SuppressWarnings("unchecked")
 	@Override
-	protected StateValues checkProbPathFormulaLTL(Model model, Expression expr, boolean qual, MinMax minMax, BitSet statesOfInterest) throws PrismException
+	protected StateValues checkProbPathFormulaLTL(Model<?> model, Expression expr, boolean qual, MinMax minMax, BitSet statesOfInterest) throws PrismException
 	{
 		LTLModelChecker mcLtl;
 		StateValues probsProduct, probs;
-		LTLModelChecker.LTLProduct<DTMC> product;
+		LTLProduct<DTMC<Double>> product;
 		DTMCModelChecker mcProduct;
 
 		// For LTL model checking routines
@@ -98,7 +99,7 @@ public class DTMCModelChecker extends ProbModelChecker
 				AcceptanceType.STREETT,
 				AcceptanceType.GENERIC
 		};
-		product = mcLtl.constructProductMC(this, (DTMC)model, expr, statesOfInterest, allowedAcceptance);
+		product = mcLtl.constructProductMC(this, (DTMC<Double>) model, expr, statesOfInterest, allowedAcceptance);
 
 		// Output product, if required
 		if (getExportProductTrans()) {
@@ -151,13 +152,14 @@ public class DTMCModelChecker extends ProbModelChecker
 	/**
 	 * Compute rewards for a co-safe LTL reward operator.
 	 */
-	protected StateValues checkRewardCoSafeLTL(Model model, Rewards modelRewards, Expression expr, MinMax minMax, BitSet statesOfInterest) throws PrismException
+	@SuppressWarnings("unchecked")
+	protected StateValues checkRewardCoSafeLTL(Model<?> model, Rewards<?> modelRewards, Expression expr, MinMax minMax, BitSet statesOfInterest) throws PrismException
 	{
 		LTLModelChecker mcLtl;
-		MCRewards productRewards;
+		MCRewards<Double> productRewards;
 		StateValues rewardsProduct, rewards;
 		DTMCModelChecker mcProduct;
-		LTLProduct<DTMC> product;
+		LTLProduct<DTMC<Double>> product;
 
 		// For LTL model checking routines
 		mcLtl = new LTLModelChecker(this);
@@ -170,11 +172,11 @@ public class DTMCModelChecker extends ProbModelChecker
 		StopWatch timer = new StopWatch(mainLog);
 		mainLog.println("\nConstructing " + model.getModelType() + "-" + da.getAutomataType() + " product...");
 		timer.start(model.getModelType() + "-" + da.getAutomataType() + " product");
-		product = mcLtl.constructProductModel(da, (DTMC)model, labelBS, statesOfInterest);
+		product = mcLtl.constructProductModel(da, (DTMC<Double>)model, labelBS, statesOfInterest);
 		timer.stop("product has " + product.getProductModel().infoString());
 
 		// Adapt reward info to product model
-		productRewards = ((MCRewards) modelRewards).liftFromModel(product);
+		productRewards = ((MCRewards<Double>) modelRewards).liftFromModel(product);
 
 		// Output product, if required
 		if (getExportProductTrans()) {
@@ -200,7 +202,7 @@ public class DTMCModelChecker extends ProbModelChecker
 		mainLog.println("\nComputing reachability rewards...");
 		mcProduct = new DTMCModelChecker(this);
 		mcProduct.inheritSettings(this);
-		ModelCheckerResult res = mcProduct.computeReachRewards((DTMC)product.getProductModel(), productRewards, acc);
+		ModelCheckerResult res = mcProduct.computeReachRewards((DTMC<Double>)product.getProductModel(), productRewards, acc);
 		rewardsProduct = StateValues.createFromDoubleArrayResult(res, product.getProductModel());
 
 		// Output vector over product, if required
@@ -218,7 +220,7 @@ public class DTMCModelChecker extends ProbModelChecker
 		return rewards;
 	}
 	
-	public ModelCheckerResult computeInstantaneousRewards(DTMC dtmc, MCRewards mcRewards, int k, BitSet statesOfInterest) throws PrismException
+	public ModelCheckerResult computeInstantaneousRewards(DTMC<Double> dtmc, MCRewards<Double> mcRewards, int k, BitSet statesOfInterest) throws PrismException
 	{
 		if (statesOfInterest.cardinality() == 1) {
 			return computeInstantaneousRewardsForwards(dtmc, mcRewards, k, statesOfInterest.nextSetBit(0));
@@ -227,7 +229,7 @@ public class DTMCModelChecker extends ProbModelChecker
 		}
 	}
 	
-	public ModelCheckerResult computeInstantaneousRewardsBackwards(DTMC dtmc, MCRewards mcRewards, int k) throws PrismException
+	public ModelCheckerResult computeInstantaneousRewardsBackwards(DTMC<Double> dtmc, MCRewards<Double> mcRewards, int k) throws PrismException
 	{
 		ModelCheckerResult res = null;
 		int i, n, iters;
@@ -275,7 +277,7 @@ public class DTMCModelChecker extends ProbModelChecker
 		return res;
 	}
 
-	public ModelCheckerResult computeInstantaneousRewardsForwards(DTMC dtmc, MCRewards mcRewards, int k, int stateOfInterest) throws PrismException
+	public ModelCheckerResult computeInstantaneousRewardsForwards(DTMC<Double> dtmc, MCRewards<Double> mcRewards, int k, int stateOfInterest) throws PrismException
 	{
 		// Build a point probability distribution for the required state  
 		double[] initDist = new double[dtmc.getNumStates()];
@@ -300,7 +302,7 @@ public class DTMCModelChecker extends ProbModelChecker
 		return res;
 	}
 	
-	public ModelCheckerResult computeCumulativeRewards(DTMC dtmc, MCRewards mcRewards, double t) throws PrismException
+	public ModelCheckerResult computeCumulativeRewards(DTMC<Double> dtmc, MCRewards<Double> mcRewards, double t) throws PrismException
 	{
 		ModelCheckerResult res = null;
 		int i, n, iters;
@@ -348,7 +350,7 @@ public class DTMCModelChecker extends ProbModelChecker
 		return res;
 	}
 
-	public ModelCheckerResult computeTotalRewards(DTMC dtmc, MCRewards mcRewards) throws PrismException
+	public ModelCheckerResult computeTotalRewards(DTMC<Double> dtmc, MCRewards<Double> mcRewards) throws PrismException
 	{
 		ModelCheckerResult res = null;
 		int n, numBSCCs = 0;
@@ -430,7 +432,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * Compute steady-state probability distribution (forwards).
 	 * Start from initial state (or uniform distribution over multiple initial states).
 	 */
-	public StateValues doSteadyState(DTMC dtmc) throws PrismException
+	public StateValues doSteadyState(DTMC<Double> dtmc) throws PrismException
 	{
 		return doSteadyState(dtmc, (StateValues) null);
 	}
@@ -440,7 +442,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * Optionally, use the passed in file initDistFile to give the initial probability distribution (time 0).
 	 * If null, start from initial state (or uniform distribution over multiple initial states).
 	 */
-	public StateValues doSteadyState(DTMC dtmc, File initDistFile) throws PrismException
+	public StateValues doSteadyState(DTMC<Double> dtmc, File initDistFile) throws PrismException
 	{
 		StateValues initDist = readDistributionFromFile(initDistFile, dtmc);
 		return doSteadyState(dtmc, initDist);
@@ -455,7 +457,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param dtmc The DTMC
 	 * @param initDist Initial distribution (will be overwritten)
 	 */
-	public StateValues doSteadyState(DTMC dtmc, StateValues initDist) throws PrismException
+	public StateValues doSteadyState(DTMC<Double> dtmc, StateValues initDist) throws PrismException
 	{
 		StateValues initDistNew = (initDist == null) ? buildInitialDistribution(dtmc) : initDist;
 		ModelCheckerResult res = computeSteadyStateProbs(dtmc, initDistNew.getDoubleArray());
@@ -466,7 +468,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * Compute transient probability distribution (forwards).
 	 * Start from initial state (or uniform distribution over multiple initial states).
 	 */
-	public StateValues doTransient(DTMC dtmc, int k) throws PrismException
+	public StateValues doTransient(DTMC<Double> dtmc, int k) throws PrismException
 	{
 		return doTransient(dtmc, k, (StateValues) null);
 	}
@@ -479,7 +481,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param k Time step
 	 * @param initDistFile File containing initial distribution
 	 */
-	public StateValues doTransient(DTMC dtmc, int k, File initDistFile) throws PrismException
+	public StateValues doTransient(DTMC<Double> dtmc, int k, File initDistFile) throws PrismException
 	{
 		StateValues initDist = readDistributionFromFile(initDistFile, dtmc);
 		return doTransient(dtmc, k, initDist);
@@ -495,7 +497,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param k Time step
 	 * @param initDist Initial distribution (will be overwritten)
 	 */
-	public StateValues doTransient(DTMC dtmc, int k, StateValues initDist) throws PrismException
+	public StateValues doTransient(DTMC<Double> dtmc, int k, StateValues initDist) throws PrismException
 	{
 		StateValues initDistNew = (initDist == null) ? buildInitialDistribution(dtmc) : initDist;
 		ModelCheckerResult res = computeTransientProbs(dtmc, k, initDistNew.getDoubleArray());
@@ -510,7 +512,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param dtmc The DTMC
 	 * @param target Target states
 	 */
-	public ModelCheckerResult computeNextProbs(DTMC dtmc, BitSet target) throws PrismException
+	public ModelCheckerResult computeNextProbs(DTMC<Double> dtmc, BitSet target) throws PrismException
 	{
 		ModelCheckerResult res = null;
 		int n;
@@ -547,7 +549,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param a the set of states labeled with a
 	 * @param x the value vector
 	 */
-	protected double[] computeRestrictedNext(DTMC dtmc, BitSet a, double[] x)
+	protected double[] computeRestrictedNext(DTMC<Double> dtmc, BitSet a, double[] x)
 	{
 		double[] soln;
 		int n;
@@ -571,7 +573,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param dtmc The DTMC
 	 * @param target Target states
 	 */
-	public ModelCheckerResult computeReachProbs(DTMC dtmc, BitSet target) throws PrismException
+	public ModelCheckerResult computeReachProbs(DTMC<Double> dtmc, BitSet target) throws PrismException
 	{
 		return computeReachProbs(dtmc, null, target, null, null);
 	}
@@ -584,7 +586,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param remain Remain in these states (optional: null means "all")
 	 * @param target Target states
 	 */
-	public ModelCheckerResult computeUntilProbs(DTMC dtmc, BitSet remain, BitSet target) throws PrismException
+	public ModelCheckerResult computeUntilProbs(DTMC<Double> dtmc, BitSet remain, BitSet target) throws PrismException
 	{
 		return computeReachProbs(dtmc, remain, target, null, null);
 	}
@@ -600,7 +602,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param known Optionally, a set of states for which the exact answer is known
 	 * Note: if 'known' is specified (i.e. is non-null, 'init' must also be given and is used for the exact values.  
 	 */
-	public ModelCheckerResult computeReachProbs(DTMC dtmc, BitSet remain, BitSet target, double init[], BitSet known) throws PrismException
+	public ModelCheckerResult computeReachProbs(DTMC<Double> dtmc, BitSet remain, BitSet target, double init[], BitSet known) throws PrismException
 	{
 		ModelCheckerResult res = null;
 		BitSet no, yes;
@@ -746,7 +748,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param target Target states
 	 * @param pre The predecessor relation
 	 */
-	public BitSet prob0(DTMC dtmc, BitSet remain, BitSet target, PredecessorRelation pre)
+	public BitSet prob0(DTMC<?> dtmc, BitSet remain, BitSet target, PredecessorRelation pre)
 	{
 		BitSet canReachTarget, result;
 		long timer;
@@ -791,7 +793,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param remain Remain in these states (optional: {@code null} means "all")
 	 * @param target Target states
 	 */
-	public BitSet prob0(DTMC dtmc, BitSet remain, BitSet target)
+	public BitSet prob0(DTMC<?> dtmc, BitSet remain, BitSet target)
 	{
 		int n, iters;
 		BitSet u, soln, unknown;
@@ -862,7 +864,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param target Target states
 	 * @param pre The predecessor relation of the DTMC
 	 */
-	public BitSet prob1(DTMC dtmc, BitSet remain, BitSet target, PredecessorRelation pre) {
+	public BitSet prob1(DTMC<?> dtmc, BitSet remain, BitSet target, PredecessorRelation pre) {
 		// Implements the constrained reachability algorithm from
 		// Baier, Katoen: Principles of Model Checking (Corollary 10.31 Qualitative Constrained Reachability)
 		long timer;
@@ -931,7 +933,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param remain Remain in these states (optional: {@code null} means "all")
 	 * @param target Target states
 	 */
-	public BitSet prob1(DTMC dtmc, BitSet remain, BitSet target)
+	public BitSet prob1(DTMC<?> dtmc, BitSet remain, BitSet target)
 	{
 		int n, iters;
 		BitSet u, v, soln, unknown;
@@ -1011,7 +1013,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * Note: if 'known' is specified (i.e. is non-null), 'init' must also be given and is used for the exact values.
 	 * @param topological do topological value iteration?
 	 */
-	protected ModelCheckerResult doValueIterationReachProbs(DTMC dtmc, BitSet no, BitSet yes, double init[], BitSet known, IterationMethod iterationMethod, boolean topological) throws PrismException
+	protected ModelCheckerResult doValueIterationReachProbs(DTMC<Double> dtmc, BitSet no, BitSet yes, double init[], BitSet known, IterationMethod iterationMethod, boolean topological) throws PrismException
 	{
 		BitSet unknown;
 		int i, n;
@@ -1093,7 +1095,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param known Optionally, a set of states for which the exact answer is known
 	 * Note: if 'known' is specified (i.e. is non-null), 'init' must also be given and is used for the exact values.
 	 */
-	protected ModelCheckerResult computeReachProbsValIter(DTMC dtmc, BitSet no, BitSet yes, double init[], BitSet known) throws PrismException
+	protected ModelCheckerResult computeReachProbsValIter(DTMC<Double> dtmc, BitSet no, BitSet yes, double init[], BitSet known) throws PrismException
 	{
 		IterationMethodPower iterationMethod = new IterationMethodPower(termCrit == TermCrit.ABSOLUTE, termCritParam);
 		return doValueIterationReachProbs(dtmc, no, yes, init, known, iterationMethod, false);
@@ -1108,7 +1110,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param known Optionally, a set of states for which the exact answer is known
 	 * Note: if 'known' is specified (i.e. is non-null), 'init' must also be given and is used for the exact values.
 	 */
-	protected ModelCheckerResult computeReachProbsGaussSeidel(DTMC dtmc, BitSet no, BitSet yes, double init[], BitSet known) throws PrismException
+	protected ModelCheckerResult computeReachProbsGaussSeidel(DTMC<Double> dtmc, BitSet no, BitSet yes, double init[], BitSet known) throws PrismException
 	{
 		return computeReachProbsGaussSeidel(dtmc, no, yes, init, known, false);
 	}
@@ -1123,7 +1125,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * Note: if 'known' is specified (i.e. is non-null, 'init' must also be given and is used for the exact values.
 	 * @param backwards do backward Gauss-Seidel?
 	 */
-	protected ModelCheckerResult computeReachProbsGaussSeidel(DTMC dtmc, BitSet no, BitSet yes, double init[], BitSet known, boolean backwards) throws PrismException
+	protected ModelCheckerResult computeReachProbsGaussSeidel(DTMC<Double> dtmc, BitSet no, BitSet yes, double init[], BitSet known, boolean backwards) throws PrismException
 	{
 		IterationMethodGS iterationMethod = new IterationMethodGS(termCrit == TermCrit.ABSOLUTE, termCritParam, backwards);
 		return doValueIterationReachProbs(dtmc, no, yes, init, known, iterationMethod, false);
@@ -1139,7 +1141,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * Note: if 'known' is specified (i.e. is non-null, 'init' must also be given and is used for the exact values.
 	 * @param topological do topological interval iteration?
 	 */
-	protected ModelCheckerResult doIntervalIterationReachProbs(DTMC dtmc, BitSet no, BitSet yes, double init[], BitSet known, IterationMethod iterationMethod, boolean topological) throws PrismException
+	protected ModelCheckerResult doIntervalIterationReachProbs(DTMC<Double> dtmc, BitSet no, BitSet yes, double init[], BitSet known, IterationMethod iterationMethod, boolean topological) throws PrismException
 	{
 		BitSet unknown;
 		int i, n;
@@ -1231,8 +1233,6 @@ public class DTMCModelChecker extends ProbModelChecker
 
 	}
 
-
-
 	/**
 	 * Compute bounded reachability probabilities.
 	 * i.e. compute the probability of reaching a state in {@code target} within k steps.
@@ -1240,7 +1240,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param target Target states
 	 * @param k Bound
 	 */
-	public ModelCheckerResult computeBoundedReachProbs(DTMC dtmc, BitSet target, int k) throws PrismException
+	public ModelCheckerResult computeBoundedReachProbs(DTMC<Double> dtmc, BitSet target, int k) throws PrismException
 	{
 		return computeBoundedReachProbs(dtmc, null, target, k, null, null);
 	}
@@ -1254,7 +1254,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param target Target states
 	 * @param k Bound
 	 */
-	public ModelCheckerResult computeBoundedUntilProbs(DTMC dtmc, BitSet remain, BitSet target, int k) throws PrismException
+	public ModelCheckerResult computeBoundedUntilProbs(DTMC<Double> dtmc, BitSet remain, BitSet target, int k) throws PrismException
 	{
 		return computeBoundedReachProbs(dtmc, remain, target, k, null, null);
 	}
@@ -1270,7 +1270,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param init Initial solution vector - pass null for default
 	 * @param results Optional array of size b+1 to store (init state) results for each step (null if unused)
 	 */
-	public ModelCheckerResult computeBoundedReachProbs(DTMC dtmc, BitSet remain, BitSet target, int k, double init[], double results[]) throws PrismException
+	public ModelCheckerResult computeBoundedReachProbs(DTMC<Double> dtmc, BitSet remain, BitSet target, int k, double init[], double results[]) throws PrismException
 	{
 		ModelCheckerResult res = null;
 		BitSet unknown;
@@ -1355,7 +1355,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param inf the infinity states
 	 * @return upper bound on R=?[ F target ] for all states
 	 */
-	double computeReachRewardsUpperBound(DTMC dtmc, MCRewards mcRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
+	double computeReachRewardsUpperBound(DTMC<Double> dtmc, MCRewards<Double> mcRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
 	{
 		if (unknown.isEmpty()) {
 			mainLog.println("Skipping upper bound computation, no unknown states...");
@@ -1365,7 +1365,7 @@ public class DTMCModelChecker extends ProbModelChecker
 		// inf and target states become trap states (with self-loops)
 		BitSet trapStates = (BitSet) target.clone();
 		trapStates.or(inf);
-		DTMCAlteredDistributions cleanedDTMC = DTMCAlteredDistributions.addSelfLoops(dtmc, trapStates);
+		DTMCAlteredDistributions<Double> cleanedDTMC = DTMCAlteredDistributions.addSelfLoops(dtmc, trapStates);
 
 		OptionsIntervalIteration iiOptions = OptionsIntervalIteration.from(this);
 
@@ -1387,23 +1387,23 @@ public class DTMCModelChecker extends ProbModelChecker
 		case DEFAULT:
 		case DSMPI:
 		{
-			MDP mdp = new MDPFromDTMC(cleanedDTMC);
-			MDPRewards mdpRewards = new MDPRewards() {
+			MDP<Double> mdp = new MDPFromDTMC<>(cleanedDTMC);
+			MDPRewards<Double> mdpRewards = new MDPRewards<Double>() {
 
 				@Override
-				public double getStateReward(int s)
+				public Double getStateReward(int s)
 				{
 					return mcRewards.getStateReward(s);
 				}
 
 				@Override
-				public double getTransitionReward(int s, int i)
+				public Double getTransitionReward(int s, int i)
 				{
-					return 0;
+					return 0.0;
 				}
 
 				@Override
-				public MDPRewards liftFromModel(Product<? extends Model> product)
+				public MDPRewards<Double> liftFromModel(Product<? extends Model<Double>> product)
 				{
 					throw new RuntimeException("Unsupported");
 				}
@@ -1440,7 +1440,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param inf the infinity states
 	 * @return upper bound on R=?[ F target ] for all states
 	 */
-	double computeReachRewardsUpperBoundVariant1Coarse(DTMC dtmc, MCRewards mcRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
+	double computeReachRewardsUpperBoundVariant1Coarse(DTMC<Double> dtmc, MCRewards<Double> mcRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
 	{
 		double[] boundsOnExpectedVisits = new double[dtmc.getNumStates()];
 		int[] Ct = new int[dtmc.getNumStates()];
@@ -1544,7 +1544,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param inf the infinity states
 	 * @return upper bound on R=?[ F target ] for all states
 	 */
-	double computeReachRewardsUpperBoundVariant1Fine(DTMC dtmc, MCRewards mcRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
+	double computeReachRewardsUpperBoundVariant1Fine(DTMC<Double> dtmc, MCRewards<Double> mcRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
 	{
 		double[] boundsOnExpectedVisits = new double[dtmc.getNumStates()];
 		double[] qt = new double[dtmc.getNumStates()];
@@ -1649,7 +1649,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param inf the infinity states
 	 * @return upper bound on R=?[ F target ] for all states
 	 */
-	double computeReachRewardsUpperBoundVariant2(DTMC dtmc, MCRewards mcRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
+	double computeReachRewardsUpperBoundVariant2(DTMC<Double> dtmc, MCRewards<Double> mcRewards, BitSet target, BitSet unknown, BitSet inf) throws PrismException
 	{
 		double[] dt = new double[dtmc.getNumStates()];
 		double[] boundsOnExpectedVisits = new double[dtmc.getNumStates()];
@@ -1686,7 +1686,7 @@ public class DTMCModelChecker extends ProbModelChecker
 			for (PrimitiveIterator.OfInt it = IterableBitSet.getSetBits(Si).iterator(); it.hasNext(); ) {
 				final int t = it.nextInt();
 				final int sccIndexForT = sccs.getSCCIndex(t);
-				double d = dtmc.sumOverTransitions(t, (int __, int u, double prob) -> {
+				double d = dtmc.sumOverDoubleTransitions(t, (int __, int u, double prob) -> {
 					// mainLog.println("t = " + t + ", u = " + u + ", prob = " + prob);
 					if (!T.get(u))
 						return 0.0;
@@ -1732,7 +1732,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param mcRewards The rewards
 	 * @param target Target states
 	 */
-	public ModelCheckerResult computeReachRewards(DTMC dtmc, MCRewards mcRewards, BitSet target) throws PrismException
+	public ModelCheckerResult computeReachRewards(DTMC<Double> dtmc, MCRewards<Double> mcRewards, BitSet target) throws PrismException
 	{
 		return computeReachRewards(dtmc, mcRewards, target, null, null);
 	}
@@ -1746,7 +1746,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param known Optionally, a set of states for which the exact answer is known
 	 * Note: if 'known' is specified (i.e. is non-null, 'init' must also be given and is used for the exact values.  
 	 */
-	public ModelCheckerResult computeReachRewards(DTMC dtmc, MCRewards mcRewards, BitSet target, double init[], BitSet known) throws PrismException
+	public ModelCheckerResult computeReachRewards(DTMC<Double> dtmc, MCRewards<Double> mcRewards, BitSet target, double init[], BitSet known) throws PrismException
 	{
 		ModelCheckerResult res = null;
 		BitSet inf;
@@ -1859,7 +1859,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param known Optionally, a set of states for which the exact answer is known
 	 * Note: if 'known' is specified (i.e. is non-null, 'init' must also be given and is used for the exact values.
 	 */
-	protected ModelCheckerResult computeReachRewardsValIter(DTMC dtmc, MCRewards mcRewards, BitSet target, BitSet inf, double init[], BitSet known)
+	protected ModelCheckerResult computeReachRewardsValIter(DTMC<Double> dtmc, MCRewards<Double> mcRewards, BitSet target, BitSet inf, double init[], BitSet known)
 			throws PrismException
 	{
 		ModelCheckerResult res;
@@ -1968,7 +1968,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * Note: if 'known' is specified (i.e. is non-null, 'init' must also be given and is used for the exact values.
 	 * @param topological do topological value iteration?
 	 */
-	protected ModelCheckerResult doValueIterationReachRewards(DTMC dtmc, final MCRewards mcRewards, BitSet target, BitSet inf, double init[], BitSet known, IterationMethod iterationMethod, boolean topological) throws PrismException
+	protected ModelCheckerResult doValueIterationReachRewards(DTMC<Double> dtmc, final MCRewards<Double> mcRewards, BitSet target, BitSet inf, double init[], BitSet known, IterationMethod iterationMethod, boolean topological) throws PrismException
 	{
 		BitSet unknown;
 		int i, n;
@@ -2047,7 +2047,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * Note: if 'known' is specified (i.e. is non-null, 'init' must also be given and is used for the exact values.
 	 * @param topological do topological interval iteration?
 	 */
-	protected ModelCheckerResult doIntervalIterationReachRewards(DTMC dtmc, MCRewards mcRewards, BitSet target, BitSet inf, double init[], BitSet known, IterationMethod iterationMethod, boolean topological)
+	protected ModelCheckerResult doIntervalIterationReachRewards(DTMC<Double> dtmc, MCRewards<Double> mcRewards, BitSet target, BitSet inf, double init[], BitSet known, IterationMethod iterationMethod, boolean topological)
 			throws PrismException
 	{
 		BitSet unknown;
@@ -2174,7 +2174,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param dtmc the DTMC
 	 * @param b the satisfaction set of states for the inner state formula of the operators
 	 */
-	protected StateValues computeSteadyStateFormula(DTMC dtmc, BitSet b) throws PrismException
+	protected StateValues computeSteadyStateFormula(DTMC<Double> dtmc, BitSet b) throws PrismException
 	{
 		double multProbs[] = Utils.bitsetToDoubleArray(b, dtmc.getNumStates());
 		ModelCheckerResult res = computeSteadyStateBackwardsProbs(dtmc, multProbs);
@@ -2204,7 +2204,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param dtmc The DTMC
 	 * @param initDist Initial distribution (will be overwritten)
 	 */
-	public ModelCheckerResult computeSteadyStateProbs(DTMC dtmc, double initDist[]) throws PrismException
+	public ModelCheckerResult computeSteadyStateProbs(DTMC<Double> dtmc, double initDist[]) throws PrismException
 	{
 		return computeSteadyStateProbs(dtmc, initDist, null);
 	}
@@ -2219,7 +2219,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param initDist Initial distribution (will be overwritten)
 	 * @param processor Post-processor for the values of each BSCC (optional: null means no post-processing)
 	 */
-	public ModelCheckerResult computeSteadyStateProbs(DTMC dtmc, double initDist[], BSCCPostProcessor bsccPostProcessor) throws PrismException
+	public ModelCheckerResult computeSteadyStateProbs(DTMC<Double> dtmc, double initDist[], BSCCPostProcessor bsccPostProcessor) throws PrismException
 	{
 		StopWatch watch = new StopWatch().start();
 
@@ -2321,7 +2321,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param dtmc The DTMC
 	 * @param mult Multiplication vector, used to weight the steady-state probabilities for BSCC states (optional: null means all 1s)
 	 */
-	public ModelCheckerResult computeSteadyStateBackwardsProbs(DTMC dtmc, double mult[]) throws PrismException
+	public ModelCheckerResult computeSteadyStateBackwardsProbs(DTMC<Double> dtmc, double mult[]) throws PrismException
 	{
 		return computeSteadyStateBackwardsProbs(dtmc, mult, null);
 	}
@@ -2339,7 +2339,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param mult Multiplication vector, used to weight the steady-state probabilities for BSCC states (optional: null means all 1s)
 	 * @param bsccPostProcessor Post-processor for the values of each BSCC (optional: null means no post-processing)
 	 */
-	public ModelCheckerResult computeSteadyStateBackwardsProbs(DTMC dtmc, double mult[], BSCCPostProcessor bsccPostProcessor) throws PrismException
+	public ModelCheckerResult computeSteadyStateBackwardsProbs(DTMC<Double> dtmc, double mult[], BSCCPostProcessor bsccPostProcessor) throws PrismException
 	{
 		StopWatch watch = new StopWatch().start();
 
@@ -2422,7 +2422,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param dtmc the DTMC
 	 * @param modelRewards the (state) rewards
 	 */
-	public ModelCheckerResult computeSteadyStateRewards(DTMC dtmc, MCRewards modelRewards) throws PrismException
+	public ModelCheckerResult computeSteadyStateRewards(DTMC<Double> dtmc, MCRewards<Double> modelRewards) throws PrismException
 	{
 		int n = dtmc.getNumStates();
 		double multRewards[] = new double[n];
@@ -2437,7 +2437,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	/**
 	 * @see DTMCModelChecker#computeSteadyStateProbsForBSCC(DTMC, BitSet, double[], BSCCPostProcessor)
 	 */
-	public ModelCheckerResult computeSteadyStateProbsForBSCC(DTMC dtmc, BitSet states, double result[]) throws PrismException
+	public ModelCheckerResult computeSteadyStateProbsForBSCC(DTMC<Double> dtmc, BitSet states, double result[]) throws PrismException
 	{
 		return computeSteadyStateProbsForBSCC(dtmc, states, result, null);
 	}
@@ -2463,7 +2463,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param bsccPostProcessor Post-processor for the values of each BSCC (optional: null means no post-processing)
 	 * @param result Storage for result (ignored if null)
 	 */
-	public ModelCheckerResult computeSteadyStateProbsForBSCC(DTMC dtmc, BitSet states, double result[], BSCCPostProcessor bsccPostProcessor) throws PrismException
+	public ModelCheckerResult computeSteadyStateProbsForBSCC(DTMC<Double> dtmc, BitSet states, double result[], BSCCPostProcessor bsccPostProcessor) throws PrismException
 	{
 		if (dtmc.getModelType() != ModelType.DTMC) {
 			throw new PrismNotSupportedException("Explicit engine currently does not support steady-state computation for " + dtmc.getModelType());
@@ -2500,7 +2500,7 @@ public class DTMCModelChecker extends ProbModelChecker
 
 			// Note: diagsQ[state] = 0.0, as it was freshly created
 			// Compute negative exit rate (ignoring a possible self-loop)
-			dtmc.forEachTransition(state, (s, t, prob) -> {
+			dtmc.forEachDoubleTransition(state, (s, t, prob) -> {
 				if (s != t) {
 					diagsQ[state] -= prob;
 				}
@@ -2615,7 +2615,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	 * @param k Time step
 	 * @param initDist Initial distribution (will be overwritten)
 	 */
-	public ModelCheckerResult computeTransientProbs(DTMC dtmc, int k, double initDist[]) throws PrismException
+	public ModelCheckerResult computeTransientProbs(DTMC<Double> dtmc, int k, double initDist[]) throws PrismException
 	{
 		ModelCheckerResult res;
 		int n, iters;
@@ -2663,7 +2663,7 @@ public class DTMCModelChecker extends ProbModelChecker
 	public static void main(String args[])
 	{
 		DTMCModelChecker mc;
-		DTMCSimple dtmc;
+		DTMCSimple<Double> dtmc;
 		ModelCheckerResult res;
 		try {
 			// Two examples of building and solving a DTMC
@@ -2674,7 +2674,7 @@ public class DTMCModelChecker extends ProbModelChecker
 				// 1. Read in from .tra and .lab files
 				//    Run as: PRISM_MAINCLASS=explicit.DTMCModelChecker bin/prism dtmc.tra dtmc.lab target_label
 				mc = new DTMCModelChecker(null);
-				dtmc = new DTMCSimple();
+				dtmc = new DTMCSimple<>();
 				dtmc.buildFromPrismExplicit(args[0]);
 				dtmc.addInitialState(0);
 				//System.out.println(dtmc);
@@ -2696,7 +2696,7 @@ public class DTMCModelChecker extends ProbModelChecker
 				//    Run as: PRISM_MAINCLASS=explicit.DTMCModelChecker bin/prism
 				//    (example taken from p.14 of Lec 5 of http://www.prismmodelchecker.org/lectures/pmc/) 
 				mc = new DTMCModelChecker(null);
-				dtmc = new DTMCSimple(6);
+				dtmc = new DTMCSimple<>(6);
 				dtmc.setProbability(0, 1, 0.1);
 				dtmc.setProbability(0, 2, 0.9);
 				dtmc.setProbability(1, 0, 0.4);

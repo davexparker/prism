@@ -48,14 +48,14 @@ import explicit.SuccessorsIterator;
  * meta-data on the model have to be provided as well. For examples,
  * see the sub-classes contained in this package.
  */
-public abstract class DTMCView extends ModelView implements DTMC, Cloneable
+public abstract class DTMCView<Value> extends ModelView<Value> implements DTMC<Value>, Cloneable
 {
 	public DTMCView()
 	{
 		super();
 	}
 
-	public DTMCView(final ModelView model)
+	public DTMCView(final ModelView<Value> model)
 	{
 		super(model);
 	}
@@ -67,20 +67,20 @@ public abstract class DTMCView extends ModelView implements DTMC, Cloneable
 	@Override
 	public String toString()
 	{
-		final IntFunction<Entry<Integer, Distribution>> getDistribution = new IntFunction<Entry<Integer, Distribution>>()
+		final IntFunction<Entry<Integer, Distribution<Value>>> getDistribution = new IntFunction<Entry<Integer, Distribution<Value>>>()
 		{
 			@Override
-			public final Entry<Integer, Distribution> apply(final int state)
+			public final Entry<Integer, Distribution<Value>> apply(final int state)
 			{
-				final Distribution distribution = new Distribution(getTransitionsIterator(state));
+				final Distribution<Value> distribution = new Distribution<Value>(getTransitionsIterator(state), getEvaluator());
 				return new AbstractMap.SimpleImmutableEntry<>(state, distribution);
 			}
 		};
 		String s = "trans: [ ";
 		final IterableStateSet states = new IterableStateSet(getNumStates());
-		final Iterator<Entry<Integer, Distribution>> distributions = new MappingIterator.FromInt<>(states, getDistribution);
+		final Iterator<Entry<Integer, Distribution<Value>>> distributions = new MappingIterator.FromInt<>(states, getDistribution);
 		while (distributions.hasNext()) {
-			final Entry<Integer, Distribution> dist = distributions.next();
+			final Entry<Integer, Distribution<Value>> dist = distributions.next();
 			s += dist.getKey() + ": " + dist.getValue();
 			if (distributions.hasNext()) {
 				s += ", ";
@@ -96,7 +96,7 @@ public abstract class DTMCView extends ModelView implements DTMC, Cloneable
 	@Override
 	public SuccessorsIterator getSuccessors(final int state)
 	{
-		final Iterator<Entry<Integer, Double>> transitions = getTransitionsIterator(state);
+		final Iterator<Entry<Integer, Value>> transitions = getTransitionsIterator(state);
 
 		return SuccessorsIterator.from(new PrimitiveIterator.OfInt() {
 			public boolean hasNext() {return transitions.hasNext();}

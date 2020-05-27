@@ -44,6 +44,7 @@ import explicit.graphviz.Decorator;
 import parser.State;
 import parser.Values;
 import parser.VarList;
+import prism.Evaluator;
 import prism.ModelType;
 import prism.PrismException;
 import prism.PrismFileLog;
@@ -51,8 +52,9 @@ import prism.PrismLog;
 
 /**
  * Interface for (abstract) classes that provide (read-only) access to an explicit-state model.
+ * This is a generic class where probabilities/rates/etc. are of type {@code Value}.
  */
-public interface Model
+public interface Model<Value>
 {
 	// Accessors
 
@@ -523,4 +525,14 @@ public interface Model
 	/** Clear any stored predecessor relation, e.g., because the model was modified */
 	public void clearPredecessorRelation();
 
+	/**
+	 * Get an Evaluator for the values stored in this Model for probabilities etc.
+	 * This is needed, for example, to compute probability sums, check for equality to 0/1, etc.
+	 * A default implementation provides an evaluator for the (usual) case when Value is Double.
+	 */
+	@SuppressWarnings("unchecked")
+	public default Evaluator<Value> getEvaluator()
+	{
+		return (Evaluator<Value>) Evaluator.createForDoubles();
+	}
 }

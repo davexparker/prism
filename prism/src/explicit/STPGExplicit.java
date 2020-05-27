@@ -42,7 +42,7 @@ import prism.PrismLog;
 /**
  * Simple explicit-state representation of a (turn-based) stochastic two-player game (STPG).
  */
-public class STPGExplicit extends MDPSimple implements STPG
+public class STPGExplicit<Value> extends MDPSimple<Value> implements STPG<Value>
 {
 	/** Which player owns each state,fl i.e. stateOwners[i] is owned by player i (1 or 2) */
 	protected List<Integer> stateOwners;
@@ -71,7 +71,7 @@ public class STPGExplicit extends MDPSimple implements STPG
 	 * Construct an STPG from an existing one and a state index permutation,
 	 * i.e. in which state index i becomes index permut[i].
 	 */
-	public STPGExplicit(STPGExplicit stpg, int permut[])
+	public STPGExplicit(STPGExplicit<Value> stpg, int permut[])
 	{
 		super(stpg, permut);
 		stateOwners = new ArrayList<Integer>(numStates);
@@ -88,7 +88,7 @@ public class STPGExplicit extends MDPSimple implements STPG
 	/**
 	 * Copy constructor
 	 */
-	public STPGExplicit(STPGExplicit stpg)
+	public STPGExplicit(STPGExplicit<Value> stpg)
 	{
 		super(stpg);
 		stateOwners = new ArrayList<Integer>(stpg.stateOwners);
@@ -200,7 +200,7 @@ public class STPGExplicit extends MDPSimple implements STPG
 	}
 
 	@Override
-	public Iterator<Entry<Integer, Double>> getTransitionsIterator(int s, int i)
+	public Iterator<Entry<Integer, Value>> getTransitionsIterator(int s, int i)
 	{
 		return super.getTransitionsIterator(s, i);
 	}
@@ -234,7 +234,7 @@ public class STPGExplicit extends MDPSimple implements STPG
 	}
 
 	@Override
-	public Iterator<Entry<Integer, Double>> getNestedTransitionsIterator(int s, int i, int j)
+	public Iterator<Entry<Integer, Value>> getNestedTransitionsIterator(int s, int i, int j)
 	{
 		// No nested choices
 		return null;
@@ -251,7 +251,7 @@ public class STPGExplicit extends MDPSimple implements STPG
 			if (subset.get(i)) {
 				forall = (getPlayer(i) == 1) ? forall1 : forall2;
 				b1 = forall; // there exists or for all
-				for (Distribution distr : trans.get(i)) {
+				for (Distribution<?> distr : trans.get(i)) {
 					b2 = distr.containsOneOf(u);
 					if (forall) {
 						if (!b2) {
@@ -281,7 +281,7 @@ public class STPGExplicit extends MDPSimple implements STPG
 			if (subset.get(i)) {
 				forall = (getPlayer(i) == 1) ? forall1 : forall2;
 				b1 = forall; // there exists or for all
-				for (Distribution distr : trans.get(i)) {
+				for (Distribution<?> distr : trans.get(i)) {
 					b2 = distr.containsOneOf(v) && distr.isSubsetOf(u);
 					if (forall) {
 						if (!b2) {
@@ -377,11 +377,11 @@ public class STPGExplicit extends MDPSimple implements STPG
 	}
 
 	@Override
-	public void mvMultRewMinMax(double vect[], STPGRewards rewards, boolean min1, boolean min2, double result[], BitSet subset, boolean complement, int adv[])
+	public void mvMultRewMinMax(double vect[], STPGRewards<Double> rewards, boolean min1, boolean min2, double result[], BitSet subset, boolean complement, int adv[])
 	{
 		int s;
 		boolean min = false;
-		MDPRewards mdpRewards = rewards.buildMDPRewards();
+		MDPRewards<Double> mdpRewards = rewards.buildMDPRewards();
 		// Loop depends on subset/complement arguments
 		if (subset == null) {
 			for (s = 0; s < numStates; s++) {
@@ -402,17 +402,17 @@ public class STPGExplicit extends MDPSimple implements STPG
 	}
 
 	@Override
-	public double mvMultRewMinMaxSingle(int s, double vect[], STPGRewards rewards, boolean min1, boolean min2, int adv[])
+	public double mvMultRewMinMaxSingle(int s, double vect[], STPGRewards<Double> rewards, boolean min1, boolean min2, int adv[])
 	{
-		MDPRewards mdpRewards = rewards.buildMDPRewards();
+		MDPRewards<Double> mdpRewards = rewards.buildMDPRewards();
 		boolean min = (getPlayer(s) == 1) ? min1 : min2;
 		return mvMultRewMinMaxSingle(s, vect, mdpRewards, min, adv);
 	}
 
 	@Override
-	public List<Integer> mvMultRewMinMaxSingleChoices(int s, double vect[], STPGRewards rewards, boolean min1, boolean min2, double val)
+	public List<Integer> mvMultRewMinMaxSingleChoices(int s, double vect[], STPGRewards<Double> rewards, boolean min1, boolean min2, double val)
 	{
-		MDPRewards mdpRewards = rewards.buildMDPRewards();
+		MDPRewards<Double> mdpRewards = rewards.buildMDPRewards();
 		boolean min = (getPlayer(s) == 1) ? min1 : min2;
 		return mvMultRewMinMaxSingleChoices(s, vect, mdpRewards, min, val);
 	}
@@ -456,26 +456,26 @@ public class STPGExplicit extends MDPSimple implements STPG
 	 * @param disc
 	 * @return
 	 */
-	public double mvMultRewMinMaxSingle(int s, double vect[], MDPRewards mdpRewards, boolean min, int adv[], double disc)
+	public double mvMultRewMinMaxSingle(int s, double vect[], MDPRewards<Double> mdpRewards, boolean min, int adv[], double disc)
 	{
 		int j, k, advCh = -1;
 		double d, prob, minmax;
 		boolean first;
-		List<Distribution> step;
+		List<Distribution<Value>> step;
 
 		minmax = 0;
 		first = true;
 		j = -1;
 		step = trans.get(s);
-		for (Distribution distr : step) {
+		for (Distribution<Value> distr : step) {
 			j++;
 
 			// Compute sum for this distribution
 			d = mdpRewards.getTransitionReward(s, j);
 
-			for (Map.Entry<Integer, Double> e : distr) {
-				k = (Integer) e.getKey();
-				prob = (Double) e.getValue();
+			for (Map.Entry<Integer, Value> e : distr) {
+				k = e.getKey();
+				prob = getEvaluator().toDouble(e.getValue());
 				d += prob * vect[k] * disc;
 			}
 
