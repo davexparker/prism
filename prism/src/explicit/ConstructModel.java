@@ -134,7 +134,7 @@ public class ConstructModel extends PrismComponent
 	 * Build the set of reachable states for a model and return it.
 	 * @param modelGen The ModelGenerator interface providing the model 
 	 */
-	public List<State> computeReachableStates(ModelGenerator<Double> modelGen) throws PrismException
+	public List<State> computeReachableStates(ModelGenerator<?> modelGen) throws PrismException
 	{
 		constructModel(modelGen, true);
 		return getStatesList();
@@ -144,7 +144,7 @@ public class ConstructModel extends PrismComponent
 	 * Construct an explicit-state model and return it.
 	 * @param modelGen The ModelGenerator interface providing the model 
 	 */
-	public Model constructModel(ModelGenerator<Double> modelGen) throws PrismException
+	public <Value> Model<Value> constructModel(ModelGenerator<Value> modelGen) throws PrismException
 	{
 		return constructModel(modelGen, false);
 	}
@@ -156,7 +156,8 @@ public class ConstructModel extends PrismComponent
 	 * @param modelGen The ModelGenerator interface providing the model 
 	 * @param justReach If true, just build the reachable state set, not the model
 	 */
-	public Model constructModel(ModelGenerator<Double> modelGen, boolean justReach) throws PrismException
+	@SuppressWarnings("unchecked")
+	public <Value> Model<Value> constructModel(ModelGenerator<Value> modelGen, boolean justReach) throws PrismException
 	{
 		// Model info
 		ModelType modelType;
@@ -165,13 +166,12 @@ public class ConstructModel extends PrismComponent
 		LinkedList<State> explore;
 		State state, stateNew;
 		// Explicit model storage
-		ModelSimple modelSimple = null;
-		DTMCSimple dtmc = null;
-		CTMCSimple ctmc = null;
-		MDPSimple mdp = null;
-		CTMDPSimple ctmdp = null;
-		ModelExplicit model = null;
-		Distribution distr = null;
+		ModelSimple<Value> modelSimple = null;
+		DTMCSimple<Value> dtmc = null;
+		CTMCSimple<Value> ctmc = null;
+		MDPSimple<Value> mdp = null;
+		CTMDPSimple<Value> ctmdp = null;
+		Distribution<Value> distr = null;
 		// Misc
 		int i, j, nc, nt, src, dest;
 		long timer;
@@ -196,16 +196,16 @@ public class ConstructModel extends PrismComponent
 			// Create a (simple, mutable) model of the appropriate type
 			switch (modelType) {
 			case DTMC:
-				modelSimple = dtmc = new DTMCSimple();
+				modelSimple = dtmc = new DTMCSimple<>();
 				break;
 			case CTMC:
-				modelSimple = ctmc = new CTMCSimple();
+				modelSimple = ctmc = new CTMCSimple<>();
 				break;
 			case MDP:
-				modelSimple = mdp = new MDPSimple();
+				modelSimple = mdp = new MDPSimple<>();
 				break;
 			case CTMDP:
-				modelSimple = ctmdp = new CTMDPSimple();
+				modelSimple = ctmdp = new CTMDPSimple<>();
 				break;
 			case STPG:
 			case SMG:
@@ -213,8 +213,9 @@ public class ConstructModel extends PrismComponent
 			case LTS:
 				throw new PrismNotSupportedException("Model construction not supported for " + modelType + "s");
 			}
-			// Attach variable info
-	        ((ModelExplicit) modelSimple).setVarList(varList);
+			// Attach evaluator and variable info
+	        ((ModelExplicit<Value>) modelSimple).setEvaluator(modelGen.getEvaluator());
+	        ((ModelExplicit<Value>) modelSimple).setVarList(varList);
 		}
 
 		// Initialise states storage
@@ -243,7 +244,7 @@ public class ConstructModel extends PrismComponent
 			for (i = 0; i < nc; i++) {
 				// For nondet models, collect transitions in a Distribution
 				if (!justReach && modelType.nondeterministic()) {
-					distr = new Distribution();
+					distr = new Distribution<>(modelGen.getEvaluator());
 				}
 				// Look at each transition in the choice
 				nt = modelGen.getNumTransitions(i);
@@ -332,32 +333,35 @@ public class ConstructModel extends PrismComponent
 		//mainLog.println(statesList);
 
 		// Construct new explicit-state model (with correct state ordering, if desired)
+		ModelExplicit<Value> model = null;
 		if (!justReach) {
+			boolean isDbl = modelSimple.getEvaluator().one() instanceof Double; 
 			switch (modelType) {
 			case DTMC:
-				if (buildSparse) {
-					model = sortStates ? new DTMCSparse(dtmc, permut) : new DTMCSparse(dtmc);
+				if (buildSparse && isDbl) {
+					model = (ModelExplicit<Value>) (sortStates ? new DTMCSparse((DTMC<Double>) dtmc, permut) : new DTMCSparse((DTMC<Double>) dtmc));
 				} else {
-					model = sortStates ? new DTMCSimple(dtmc, permut) : (DTMCSimple) dtmc;
+					model = sortStates ? new DTMCSimple<>(dtmc, permut) : (DTMCSimple<Value>) dtmc;
 				}
 				break;
 			case CTMC:
-				model = sortStates ? new CTMCSimple(ctmc, permut) : (CTMCSimple) ctmc;
+				model = sortStates ? new CTMCSimple<>(ctmc, permut) : (CTMCSimple<Value>) ctmc;
 				break;
 			case MDP:
-				if (buildSparse) {
-					model = sortStates ? new MDPSparse(mdp, true, permut) : new MDPSparse(mdp);
+				if (buildSparse && isDbl) {
+					model = (ModelExplicit<Value>) (sortStates ? new MDPSparse((MDPSimple<Double>) mdp, true, permut) : new MDPSparse((MDP<Double>) mdp));
 				} else {
-					model = sortStates ? new MDPSimple(mdp, permut) : mdp;
+					model = sortStates ? new MDPSimple<>(mdp, permut) : mdp;
 				}
 				break;
 			case CTMDP:
-				model = sortStates ? new CTMDPSimple(ctmdp, permut) : ctmdp;
+				model = sortStates ? new CTMDPSimple<>(ctmdp, permut) : ctmdp;
 				break;
 			case STPG:
 			case SMG:
 			case PTA:
 			case LTS:
+			default:
 				throw new PrismNotSupportedException("Model construction not supported for " + modelType + "s");
 			}
 			model.setStatesList(statesList);
@@ -374,7 +378,7 @@ public class ConstructModel extends PrismComponent
 		return model;
 	}
 
-	private void attachLabels(ModelGenerator modelGen, ModelExplicit model) throws PrismException
+	private <Value> void attachLabels(ModelGenerator<Value> modelGen, ModelExplicit<Value> model) throws PrismException
 	{
 		// Get state info
 		List <State> statesList = model.getStatesList();
@@ -419,8 +423,8 @@ public class ConstructModel extends PrismComponent
 			modulesFile.setUndefinedConstants(undefinedConstants.getMFConstantValues());
 			ConstructModel constructModel = new ConstructModel(prism);
 			constructModel.setSortStates(true);
-			simulator.ModulesFileModelGenerator modelGen = simulator.ModulesFileModelGenerator.create(modulesFile, constructModel);
-			Model model = constructModel.constructModel(modelGen);
+			simulator.ModulesFileModelGenerator<?> modelGen = simulator.ModulesFileModelGenerator.create(modulesFile, constructModel);
+			Model<?> model = constructModel.constructModel(modelGen);
 			model.exportToPrismExplicitTra(args[1]);
 		} catch (FileNotFoundException e) {
 			System.out.println("Error: " + e.getMessage());

@@ -87,7 +87,7 @@ public class StateValues implements StateVector
 	 * @param type Value type
 	 * @param model Associated model 
 	 */
-	public StateValues(Type type, Model model) throws PrismLangException
+	public StateValues(Type type, Model<?> model) throws PrismLangException
 	{
 		this(type, model.getNumStates());
 		statesList = model.getStatesList();
@@ -110,7 +110,7 @@ public class StateValues implements StateVector
 	 * @param init Initial value for all states (as an appropriate Object)
 	 * @param model Associated model 
 	 */
-	public StateValues(Type type, Object init, Model model) throws PrismLangException
+	public StateValues(Type type, Object init, Model<?> model) throws PrismLangException
 	{
 		this(type, model.getNumStates(), init);
 		statesList = model.getStatesList();
@@ -162,7 +162,7 @@ public class StateValues implements StateVector
 	 * The array is stored directly, not copied.
 	 * Also set associated model (whose state space size should match vector size).
 	 */
-	public static StateValues createFromIntegerArray(int[] array, Model model)
+	public static StateValues createFromIntegerArray(int[] array, Model<?> model)
 	{
 		StateValues sv = new StateValues();
 		sv.type = TypeInt.getInstance();
@@ -177,7 +177,7 @@ public class StateValues implements StateVector
 	 * The array is stored directly, not copied.
 	 * Also set associated model (whose state space size should match vector size).
 	 */
-	public static StateValues createFromDoubleArray(double[] array, Model model)
+	public static StateValues createFromDoubleArray(double[] array, Model<?> model)
 	{
 		StateValues sv = new StateValues();
 		sv.type = TypeDouble.getInstance();
@@ -192,7 +192,7 @@ public class StateValues implements StateVector
 	 * The BitSet is stored directly, not copied.
 	 * Also set associated model (and this determines the vector size).
 	 */
-	public static StateValues createFromBitSet(BitSet bs, Model model)
+	public static StateValues createFromBitSet(BitSet bs, Model<?> model)
 	{
 		StateValues sv = new StateValues();
 		sv.type = TypeBool.getInstance();
@@ -208,7 +208,7 @@ public class StateValues implements StateVector
 	 * Also set associated model (and this determines the vector size).
 	 * The bitset is not modified or stored.
 	 */
-	public static StateValues createFromBitSetAsDoubles(BitSet bitset, Model model)
+	public static StateValues createFromBitSetAsDoubles(BitSet bitset, Model<?> model)
 	{
 		int size = model.getNumStates();
 		double[] array = new double[size];

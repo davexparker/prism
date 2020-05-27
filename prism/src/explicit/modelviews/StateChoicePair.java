@@ -1,9 +1,9 @@
 //==============================================================================
 //	
-//	Copyright (c) 2002-
+//	Copyright (c) 2016-
 //	Authors:
-//	* Dave Parker <david.parker@comlab.ox.ac.uk> (University of Oxford)
-//	* Christian von Essen <christian.vonessen@imag.fr> (Verimag, Grenoble)
+//	* Steffen Maercker <maercker@tcs.inf.tu-dresden.de> (TU Dresden)
+//	* Joachim Klein <klein@tcs.inf.tu-dresden.de> (TU Dresden)
 //	
 //------------------------------------------------------------------------------
 //	
@@ -25,42 +25,26 @@
 //	
 //==============================================================================
 
-package explicit;
+package explicit.modelviews;
 
-import java.util.HashSet;
-
-import strat.MDStrategy;
-
-/**
- * Base class for explicit-state representations of an MDP.
- */
-public abstract class MDPExplicit<Value> extends ModelExplicit<Value> implements MDP<Value>
+public class StateChoicePair
 {
-	// Accessors (for NondetModel)
-	
-	@Override
-	public boolean areAllChoiceActionsUnique()
+	final int state;
+	final int choice;
+
+	protected StateChoicePair(final int theState, final int theChoice)
 	{
-		HashSet<Object> sActions = new HashSet<Object>();
-		for (int s = 0; s < numStates; s++) {
-			int n = getNumChoices(s);
-			if (n > 1) {
-				sActions.clear();
-				for (int i = 0; i < n; i++) {
-					if (!sActions.add(getAction(s, i))) {
-						return false;
-					}
-				}
-			}
-		}
-		return true;
+		state = theState;
+		choice = theChoice;
 	}
 
-	// Accessors (for MDP)
-
-	@Override
-	public Model<Value> constructInducedModel(MDStrategy strat)
+	public int getState()
 	{
-		return new DTMCFromMDPAndMDStrategy<Value>(this, strat);
+		return state;
+	}
+
+	public int getChoice()
+	{
+		return choice;
 	}
 }

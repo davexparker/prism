@@ -57,7 +57,7 @@ import prism.PrismUtils;
  * Use {@link #getNumNestedChoices(s, i)}, {@link #getNestedAction(s, i)} and {@link #getNestedTransitionsIterator(s, i, j)}
  * to access the information.
  */
-public interface STPG extends NondetModel
+public interface STPG<Value> extends NondetModel<Value>
 {
 	// Accessors (for Model) - default implementations
 	
@@ -74,20 +74,19 @@ public interface STPG extends NondetModel
 		// Just use MDP format for now; no specific format for games 
 		int numStates = getNumStates();
 		out.print(numStates + " " + getNumChoices() + " " + getNumTransitions() + "\n");
-		TreeMap<Integer, Double> sorted = new TreeMap<Integer, Double>();
+		TreeMap<Integer, Value> sorted = new TreeMap<Integer, Value>();
 		for (int i = 0; i < numStates; i++) {
 			int numChoices = getNumChoices(i);
 			for (int j = 0; j < numChoices; j++) {
 				// Extract transitions and sort by destination state index (to match PRISM-exported files)
-				Iterator<Map.Entry<Integer, Double>> iter = getTransitionsIterator(i, j);
+				Iterator<Map.Entry<Integer, Value>> iter = getTransitionsIterator(i, j);
 				while (iter.hasNext()) {
-					Map.Entry<Integer, Double> e = iter.next();
+					Map.Entry<Integer, Value> e = iter.next();
 					sorted.put(e.getKey(), e.getValue());
 				}
 				// Print out (sorted) transitions
-				for (Map.Entry<Integer, Double> e : sorted.entrySet()) {
-					// Note use of PrismUtils.formatDouble to match PRISM-exported files
-					out.print(i + " " + j + " " + e.getKey() + " " + PrismUtils.formatDouble(e.getValue()));
+				for (Map.Entry<Integer, Value> e : sorted.entrySet()) {
+					out.print(i + " " + j + " " + e.getKey() + " " + getEvaluator().toStringExport(e.getValue()));
 					Object action = getAction(i, j);
 					out.print(action == null ? "\n" : (" " + action + "\n"));
 				}
@@ -141,7 +140,7 @@ public interface STPG extends NondetModel
 	/**
 	 * Get an iterator over the transitions from choice {@code i} of state {@code s}.
 	 */
-	public Iterator<Entry<Integer, Double>> getTransitionsIterator(int s, int i);
+	public Iterator<Entry<Integer, Value>> getTransitionsIterator(int s, int i);
 
 	/**
 	 * Is choice {@code i} of state {@code s} in nested form? (See {@link explicit.STPG} for details)
@@ -166,7 +165,7 @@ public interface STPG extends NondetModel
 	/**
 	 * Get an iterator over the transitions from nested choice {@code i,j} of state {@code s}.
 	 */
-	public Iterator<Entry<Integer, Double>> getNestedTransitionsIterator(int s, int i, int j);
+	public Iterator<Entry<Integer, Value>> getNestedTransitionsIterator(int s, int i, int j);
 
 	/**
 	 * Perform a single step of precomputation algorithm Prob0, i.e., for states i in {@code subset},
@@ -265,7 +264,7 @@ public interface STPG extends NondetModel
 	 * @param complement If true, {@code subset} is taken to be its complement (ignored if {@code subset} is null)
 	 * @param adv Storage for adversary choice indices (ignored if null)
 	 */
-	public void mvMultRewMinMax(double vect[], STPGRewards rewards, boolean min1, boolean min2, double result[], BitSet subset, boolean complement, int adv[]);
+	public void mvMultRewMinMax(double vect[], STPGRewards<Double> rewards, boolean min1, boolean min2, double result[], BitSet subset, boolean complement, int adv[]);
 
 	/**
 	 * Do a single row of matrix-vector multiplication and sum of action reward followed by min/max.
@@ -276,7 +275,7 @@ public interface STPG extends NondetModel
 	 * @param min2 Min or max for player 2 (true=min, false=max)
 	 * @param adv Storage for adversary choice indices (ignored if null)
 	 */
-	public double mvMultRewMinMaxSingle(int s, double vect[], STPGRewards rewards, boolean min1, boolean min2, int adv[]);
+	public double mvMultRewMinMaxSingle(int s, double vect[], STPGRewards<Double> rewards, boolean min1, boolean min2, int adv[]);
 
 	/**
 	 * Determine which choices result in min/max after a single row of matrix-vector multiplication and sum of action reward.
@@ -286,7 +285,7 @@ public interface STPG extends NondetModel
 	 * @param min2 Min or max for player 2 (true=min, false=max)
 	 * @param val Min or max value to match
 	 */
-	public List<Integer> mvMultRewMinMaxSingleChoices(int s, double vect[], STPGRewards rewards, boolean min1, boolean min2, double val);
+	public List<Integer> mvMultRewMinMaxSingleChoices(int s, double vect[], STPGRewards<Double> rewards, boolean min1, boolean min2, double val);
 
 	/**
 	 * Checks  whether all successors of action c in state s are in a given set
