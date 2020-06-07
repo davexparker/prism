@@ -50,7 +50,7 @@ import jdd.JDDVars;
 import mtbdd.PrismMTBDD;
 import odd.ODDUtils;
 import param.BigRational;
-import param.Function;
+import param.FunctionFactory;
 import param.ModelBuilder;
 import param.ParamModel;
 import param.ParamModelChecker;
@@ -1770,7 +1770,7 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 		currentModulesFile = modulesFile;
 		// Create a model generator for the PRISM model if appropriate - we will use that where possible
 		try {
-			currentModelGenerator = new ModulesFileModelGenerator(currentModulesFile, this);
+			currentModelGenerator = ModulesFileModelGenerator.create(currentModulesFile, this);
 			currentRewardGenerator = ((ModulesFileModelGenerator) currentModelGenerator);
 		} catch(PrismException e) {
 			// If a ModelGenerator couldn't be created, just store null
@@ -2031,7 +2031,7 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 				if (currentModulesFile == null)
 					throw new PrismException("There is no currently loaded PRISM model");
 				// PRISM model exists but no generator - this will provide the error message
-				new ModulesFileModelGenerator(currentModulesFile, this);
+				ModulesFileModelGenerator.create(currentModulesFile, this);
 				// Shouldn't happen, so generic error message
 				throw new PrismException("No model generator was created");
 			case MODEL_GENERATOR:
@@ -2316,7 +2316,8 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 			mainLog.println("Model constants: " + currentDefinedMFConstants);
 
 		constructModel = new ConstructModel(this);
-		modelExpl = constructModel.constructModel(new ModulesFileModelGenerator(modulesFile, this));
+		ModelGenerator<Double> modelGen = ModulesFileModelGenerator.createForDoubles(modulesFile, this);
+		modelExpl = constructModel.constructModel(modelGen);
 		statesList = constructModel.getStatesList();
 
 		// create Explicit2MTBDD object
@@ -3385,9 +3386,8 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 		String[] paramUpperBounds = new String[] { "1" };
 		// And execute parameteric model checking
 		param.ModelBuilder builder = new ModelBuilder(this, param.ParamMode.EXACT);
-		Evaluator<Function> eval = Evaluator.createForRationalFunctions(builder.getFunctionFactory(paramNames, paramLowerBounds, paramUpperBounds));
-		ModelGenerator<Function> modelGenSym = new ModulesFileModelGenerator<Function>(currentModulesFile, eval, this);
-		ParamModel modelExpl = builder.constructModel(modelGenSym);
+		FunctionFactory functionFactory = builder.getFunctionFactory(paramNames, paramLowerBounds, paramUpperBounds);
+		ParamModel modelExpl = builder.constructModel(ModulesFileModelGenerator.createForRationalFunctions(currentModulesFile, functionFactory, this));
 		ParamModelChecker mc = new ParamModelChecker(this, param.ParamMode.EXACT);
 		mc.setModelBuilder(builder);
 		mc.setParameters(paramNames, paramLowerBounds, paramUpperBounds);
@@ -3459,9 +3459,8 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 			mainLog.println("Property constants: " + definedPFConstants);
 
 		param.ModelBuilder builder = new ModelBuilder(this, param.ParamMode.PARAMETRIC);
-		Evaluator<Function> eval = Evaluator.createForRationalFunctions(builder.getFunctionFactory(paramNames, paramLowerBounds, paramUpperBounds));
-		ModelGenerator<Function> modelGenSym = new ModulesFileModelGenerator<Function>(currentModulesFile, eval, this);
-		ParamModel modelExpl = builder.constructModel(modelGenSym);
+		FunctionFactory functionFactory = builder.getFunctionFactory(paramNames, paramLowerBounds, paramUpperBounds);
+		ParamModel modelExpl = builder.constructModel(ModulesFileModelGenerator.createForRationalFunctions(currentModulesFile, functionFactory, this));
 		ParamModelChecker mc = new ParamModelChecker(this, param.ParamMode.PARAMETRIC);
 		mc.setModelBuilder(builder);
 		mc.setParameters(paramNames, paramLowerBounds, paramUpperBounds);
@@ -3688,7 +3687,7 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 			if (fileIn != null) {
 				throw new PrismException("Fast adaptive uniformisation cannot read an initial distribution from a file");
 			}
-			ModulesFileModelGenerator prismModelGen = new ModulesFileModelGenerator(currentModulesFile, this);
+			ModulesFileModelGenerator<Double> prismModelGen = ModulesFileModelGenerator.createForDoubles(currentModulesFile, this);
 			FastAdaptiveUniformisation fau = new FastAdaptiveUniformisation(this, prismModelGen);
 			fau.setConstantValues(currentModulesFile.getConstantValues());
 			probsExpl = fau.doTransient(time);
@@ -3797,7 +3796,7 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 				if (fileIn != null) {
 					throw new PrismException("Fast adaptive uniformisation cannot read an initial distribution from a file");
 				}
-				ModulesFileModelGenerator prismModelGen = new ModulesFileModelGenerator(currentModulesFile, this);
+				ModulesFileModelGenerator<Double> prismModelGen = ModulesFileModelGenerator.createForDoubles(currentModulesFile, this);
 				FastAdaptiveUniformisation fau = new FastAdaptiveUniformisation(this, prismModelGen);
 				fau.setConstantValues(currentModulesFile.getConstantValues());
 				if (i == 0) {
