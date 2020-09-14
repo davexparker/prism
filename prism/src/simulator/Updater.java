@@ -55,8 +55,6 @@ public class Updater<Value> extends PrismComponent
 	// Settings:
 	// Do we check that probabilities sum to 1?
 	protected boolean doProbChecks = true;
-	// The precision to which we check probabilities sum to 1
-	protected double sumRoundOff = 1e-5;
 	
 	// Info on model being explored
 	protected ModulesFile modulesFile;
@@ -91,7 +89,6 @@ public class Updater<Value> extends PrismComponent
 	{
 		// Store some settings
 		doProbChecks = parent.getSettings().getBoolean(PrismSettings.PRISM_DO_PROB_CHECKS);
-		sumRoundOff = parent.getSettings().getDouble(PrismSettings.PRISM_SUM_ROUND_OFF);
 		
 		// Get info from model
 		this.modulesFile = modulesFile;
@@ -135,22 +132,6 @@ public class Updater<Value> extends PrismComponent
 		for (int j = 0; j < numSynchs + 1; j++) {
 			enabledModules[j] = new BitSet(numModules);
 		}
-	}
-
-	/**
-	 * Set the precision to which we check that probabilities sum to 1.
-	 */
-	public void setSumRoundOff(double sumRoundOff)
-	{
-		this.sumRoundOff = sumRoundOff;
-	}
-
-	/**
-	 * Get the precision to which we check that probabilities sum to 1.
-	 */
-	public double getSumRoundOff()
-	{
-		return sumRoundOff;
 	}
 
 	/**
