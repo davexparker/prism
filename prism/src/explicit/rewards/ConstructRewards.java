@@ -86,7 +86,6 @@ public class ConstructRewards extends PrismComponent
 		default:
 			throw new PrismNotSupportedException("Cannot build rewards for " + model.getModelType() + "s");
 		}
-		((RewardsExplicit<Value>) rewards).setEvaluator(rewardGen.getEvaluator());
 		return rewards;
 	}
 
@@ -105,13 +104,17 @@ public class ConstructRewards extends PrismComponent
 		boolean dbl = rewardGen.getEvaluator().one() instanceof Double;
 		int numStates = mc.getNumStates();
 		List<State> statesList = mc.getStatesList();
+		// Create reward structure object
+		RewardsExplicit<Value> rewards = null;
 		StateRewardsArray rewSA = null;
 		StateRewardsSimple<Value> rewSimple = null;
 		if (dbl) {
-			rewSA = new StateRewardsArray(numStates);
+			rewards = (RewardsExplicit<Value>) (rewSA = new StateRewardsArray(numStates));
 		} else {
-			rewSimple = new StateRewardsSimple<Value>();
+			rewards = rewSimple = new StateRewardsSimple<Value>();
 		}
+		rewards.setEvaluator(rewardGen.getEvaluator());
+		// Add rewards to it
 		for (int s = 0; s < numStates; s++) {
 			if (rewardGen.rewardStructHasStateRewards(r)) {
 				Value rew = getAndCheckStateReward(s, rewardGen, r, statesList);
@@ -122,7 +125,7 @@ public class ConstructRewards extends PrismComponent
 				}
 			}
 		}
-		return dbl ? ((StateRewards<Value>) rewSA) : rewSimple;
+		return rewards;
 	}
 
 	/**
@@ -136,7 +139,10 @@ public class ConstructRewards extends PrismComponent
 		int numStates = mdp.getNumStates();
 		List<State> statesList = mdp.getStatesList();
 		MDPRewardsSimple<Value> rewSimple = null;
+		// Create reward structure object
 		rewSimple = new MDPRewardsSimple<>(numStates);
+		rewSimple.setEvaluator(rewardGen.getEvaluator());
+		// Add rewards to it
 		for (int s = 0; s < numStates; s++) {
 			if (rewardGen.rewardStructHasStateRewards(r)) {
 				Value rew = getAndCheckStateReward(s, rewardGen, r, statesList);
