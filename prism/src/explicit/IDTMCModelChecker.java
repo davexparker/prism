@@ -29,7 +29,11 @@ package explicit;
 import java.util.BitSet;
 
 import common.IntSet;
+import common.Interval;
+import explicit.rewards.MCRewards;
+import explicit.rewards.StateRewardsSimple;
 import prism.AccuracyFactory;
+import prism.Evaluator;
 import prism.PrismComponent;
 import prism.PrismException;
 import prism.PrismNotSupportedException;
@@ -326,5 +330,150 @@ public class IDTMCModelChecker extends DTMCModelChecker
 		res.timeTaken = timer / 1000.0;
 
 		return res;
+	}
+	
+	/**
+	 * Compute expected reachability rewards.
+	 * @param idtmc The IDTMC
+	 * @param imcRewards The rewards
+	 * @param target Target states
+	 * @param minMax Min/max info
+	 */
+	public ModelCheckerResult computeReachRewards(IDTMC<Double> idtmc, MCRewards<Interval<Double>> imcRewards, BitSet target, MinMax minMax) throws PrismException
+	{
+		// Switch to a supported method, if necessary
+		LinEqMethod linEqMethod = this.linEqMethod;
+		switch (linEqMethod)
+		{
+		case POWER:
+		case GAUSS_SEIDEL:
+		case BACKWARDS_GAUSS_SEIDEL:
+		//case JACOBI:
+			break; // supported
+		default:
+			linEqMethod = LinEqMethod.GAUSS_SEIDEL;
+			mainLog.printWarning("Switching to linear equation solution method \"" + linEqMethod.fullName() + "\"");
+		}
+
+		if (doIntervalIteration && (!precomp || !prob0 || !prob1)) {
+			throw new PrismNotSupportedException("Interval iteration requires precomputations to be active");
+		}
+
+		// Start probabilistic reachability
+		long timer = System.currentTimeMillis();
+		mainLog.println("\nStarting expected reachability...");
+
+		// Check for any zero lower probability bounds (not supported
+		// since this approach assumes the graph structure remains static)
+		idtmc.checkLowerBoundsArePositive();
+		
+		// Check for deadlocks in non-target state (because breaks e.g. prob1)
+		idtmc.checkForDeadlocks(target);
+
+		// Check all rewards are single values, not intervals, and recreate
+		MCRewards<Double> mcRewards = useSingletonRewards(idtmc, imcRewards);
+		
+		// Store num states
+		int n = idtmc.getNumStates();
+
+		// Precomputation (not optional)
+		BitSet inf;
+		if (preRel) {
+			// prob1 via predecessor relation
+			PredecessorRelation pre = idtmc.getPredecessorRelation(this, true);
+			inf = prob1(idtmc, null, target, pre);
+		} else {
+			// prob1 via fixed-point algorithm
+			inf = prob1(idtmc, null, target);
+		}
+		inf.flip(0, n);
+
+		// Print results of precomputation
+		int numTarget = target.cardinality();
+		int numInf = inf.cardinality();
+		mainLog.println("target=" + numTarget + ", inf=" + numInf + ", rest=" + (n - (numTarget + numInf)));
+
+		// Start value iteration
+		timer = System.currentTimeMillis();
+		String sMinMax = minMax.isMinUnc() ? "min" : "max";
+		mainLog.println("Starting value iteration (" + sMinMax + ")...");
+
+		// Store num states
+		n = idtmc.getNumStates();
+
+		// Initialise solution vectors
+		double[] init = new double[n];
+		for (int i = 0; i < n; i++)
+			init[i] = target.get(i) ? 0.0 : inf.get(i) ? Double.POSITIVE_INFINITY : 0.0;
+
+		// Determine set of states actually need to compute values for
+		BitSet unknown = new BitSet();
+		unknown.set(0, n);
+		unknown.andNot(target);
+		unknown.andNot(inf);
+
+		// Compute probabilities (if needed)
+		ModelCheckerResult res;
+		if (numTarget + numInf < n) {
+			IterationMethod iterationMethod = null;
+			switch (linEqMethod) {
+			case POWER:
+				iterationMethod = new IterationMethodPower(termCrit == TermCrit.ABSOLUTE, termCritParam);
+				break;
+			case JACOBI:
+				iterationMethod = new IterationMethodJacobi(termCrit == TermCrit.ABSOLUTE, termCritParam);
+				break;
+			case GAUSS_SEIDEL:
+			case BACKWARDS_GAUSS_SEIDEL:
+				boolean backwards = linEqMethod == LinEqMethod.BACKWARDS_GAUSS_SEIDEL;
+				iterationMethod = new IterationMethodGS(termCrit == TermCrit.ABSOLUTE, termCritParam, backwards);
+				break;
+			default:
+				throw new PrismException("Unknown solution method " + linEqMethod.fullName());
+			}
+			IterationMethod.IterationValIter iterationReachProbs = iterationMethod.forMvMultRewMinMaxUnc(idtmc, mcRewards, minMax);
+			iterationReachProbs.init(init);
+			IntSet unknownStates = IntSet.asIntSet(unknown);
+			String description = sMinMax + ", with " + iterationMethod.getDescriptionShort();
+			res = iterationMethod.doValueIteration(this, description, iterationReachProbs, unknownStates, timer, null);
+		} else {
+			res = new ModelCheckerResult();
+			res.soln = Utils.bitsetToDoubleArray(inf, n, Double.POSITIVE_INFINITY);
+			res.accuracy = AccuracyFactory.doublesFromQualitative();
+		}
+		
+		// Finished probabilistic reachability
+		timer = System.currentTimeMillis() - timer;
+		mainLog.println("Probabilistic reachability took " + timer / 1000.0 + " seconds.");
+
+		// Update time taken
+		res.timeTaken = timer / 1000.0;
+
+		return res;
+	}
+
+	/**
+	 * Check that all of the values in a MC reward structure over (double) intervals
+	 * are actual singleton values, then return a new one just over doubles.
+	 * Throws an exception if a value is not a singleton.
+	 */
+	protected MCRewards<Double> useSingletonRewards(IDTMC<Double> idtmc, MCRewards<Interval<Double>> imcRewards) throws PrismException
+	{
+		int numStates = idtmc.getNumStates();
+		StateRewardsSimple<Double> mcRewards = new StateRewardsSimple<>();
+		mcRewards.setEvaluator(Evaluator.createForDoubles());
+		for (int s = 0; s < numStates; s++) {
+			// Check and add each state reward
+			Interval<Double> ival = imcRewards.getStateReward(s);
+			double lo = ival.getLower();
+			double hi = ival.getUpper();
+			if (lo != hi) {
+				throw new PrismException("Model checking reward structures containing intervals is not supported");
+			}
+			if (lo > 0) {
+				mcRewards.addToStateReward(s, lo);
+			}
+		}
+		return mcRewards;
 	}
 }

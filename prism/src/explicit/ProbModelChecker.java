@@ -30,6 +30,7 @@ import java.io.File;
 import java.util.BitSet;
 import java.util.List;
 
+import common.Interval;
 import explicit.rewards.ConstructRewards;
 import explicit.rewards.MCRewards;
 import explicit.rewards.MDPRewards;
@@ -1176,6 +1177,12 @@ public class ProbModelChecker extends NonProbModelChecker
 			break;
 		case STPG:
 			res = ((STPGModelChecker) this).computeReachRewards((STPG<Double>) model, (STPGRewards<Double>) modelRewards, target, minMax.isMin1(), minMax.isMin2());
+			break;
+		case IDTMC:
+			res = ((IDTMCModelChecker) this).computeReachRewards((IDTMC<Double>) model, (MCRewards<Interval<Double>>) modelRewards, target, minMax);
+			break;
+		case IMDP:
+			res = ((IMDPModelChecker) this).computeReachRewards((IMDP<Double>) model, (MDPRewards<Interval<Double>>) modelRewards, target, minMax);
 			break;
 		default:
 			throw new PrismNotSupportedException("Explicit engine does not yet handle the " + expr.getOperatorSymbol() + " reward operator for " + model.getModelType()

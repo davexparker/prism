@@ -33,7 +33,12 @@ Pmaxmin=? [ F<=k "finished" ]
 Pmaxmax=? [ F<=k "finished" ]
 
 // Min/max expected steps to finish
-//RESULT (K=2): 31.111110
+//RESULT (K=2): 31.1111111111111
 R{"steps"}minmin=? [ F "finished" ]
+//RESULT (K=2): 48.0
+R{"steps"}minmax=? [ F "finished" ]
+
+//RESULT (K=2): 75.0
+R{"steps"}maxmin=? [ F "finished" ]
 //RESULT (K=2): 162.375
 R{"steps"}maxmax=? [ F "finished" ]

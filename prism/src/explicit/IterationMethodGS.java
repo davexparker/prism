@@ -27,8 +27,6 @@
 package explicit;
 
 import common.IntSet;
-import explicit.IterationMethod.IterationValIter;
-import explicit.IterationMethod.TwoVectorIteration;
 import explicit.rewards.MCRewards;
 import explicit.rewards.MDPRewards;
 import prism.PrismException;
@@ -224,6 +222,21 @@ public class IterationMethodGS extends IterationMethod {
 	}
 	
 	@Override
+	public IterationValIter forMvMultRewMinMaxUnc(IDTMC<Double> idtmc, MCRewards<Double> mcRewards, MinMax minMax)
+	{
+		return new SingleVectorIterationValIter(idtmc) {
+			@Override
+			public boolean iterateAndCheckConvergence(IntSet states)
+			{
+				// Matrix-vector multiply
+				error = idtmc.mvMultRewGS(soln, mcRewards, minMax, states.iterator(), absolute);
+				// Check termination
+				return (error < termCritParam);
+			}
+		};
+	}
+	
+	@Override
 	public IterationValIter forMvMultMinMaxUnc(IMDP<Double> imdp, MinMax minMax)
 	{
 		return new SingleVectorIterationValIter(imdp) {
@@ -232,6 +245,21 @@ public class IterationMethodGS extends IterationMethod {
 			{
 				// Matrix-vector multiply
 				error = imdp.mvMultGS(soln, minMax, states.iterator(), absolute);
+				// Check termination
+				return (error < termCritParam);
+			}
+		};
+	}
+	
+	@Override
+	public IterationValIter forMvMultRewMinMaxUnc(IMDP<Double> imdp, MDPRewards<Double> mdpRewards, MinMax minMax)
+	{
+		return new SingleVectorIterationValIter(imdp) {
+			@Override
+			public boolean iterateAndCheckConvergence(IntSet states)
+			{
+				// Matrix-vector multiply
+				error = imdp.mvMultRewGS(soln, mdpRewards, minMax, states.iterator(), absolute);
 				// Check termination
 				return (error < termCritParam);
 			}

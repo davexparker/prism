@@ -78,6 +78,11 @@ rewards "num_rounds"
 	[pick] true : 1;
 endrewards
 
+// expected number of rounds ())state rewards)
+rewards "num_rounds_s"
+	s1=0 : 1;
+endrewards
+
 // labels
 label "elected" = s1=3&s2=3&s3=3;
 

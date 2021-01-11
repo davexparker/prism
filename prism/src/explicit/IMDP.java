@@ -36,6 +36,7 @@ import java.util.PrimitiveIterator;
 
 import common.Interval;
 import common.IterableStateSet;
+import explicit.rewards.MDPRewards;
 import parser.State;
 import prism.Evaluator;
 import prism.ModelType;
@@ -87,6 +88,7 @@ public interface IMDP<Value> extends MDP<Interval<Value>>
 	 * the DTMC's transition probability matrix P and the vector {@code vect} passed in.
 	 * i.e. for all s: result[s] = sum_j P(s,j)*vect[j]
 	 * @param vect Vector to multiply by
+	 * @param minMax Min or max info
 	 * @param result Vector to store result in
 	 * @param subset Only do multiplication for these rows (ignored if null)
 	 * @param complement If true, {@code subset} is taken to be its complement (ignored if {@code subset} is null)
@@ -104,6 +106,7 @@ public interface IMDP<Value> extends MDP<Interval<Value>>
 	 * If the state indices in the iterator are not distinct, the result will still be valid,
 	 * but this situation should be avoided for performance reasons.
 	 * @param vect Vector to multiply by
+	 * @param minMax Min or max info
 	 * @param result Vector to store result in
 	 * @param states Perform multiplication for these rows, in the iteration order
 	 */
@@ -121,6 +124,7 @@ public interface IMDP<Value> extends MDP<Interval<Value>>
 	 * i.e. return sum_j P(s,j)*vect[j]
 	 * @param s Row index
 	 * @param vect Vector to multiply by
+	 * @param minMax Min or max info
 	 */
 	public default double mvMultSingle(int s, double vect[], MinMax minMax)
 	{
@@ -212,6 +216,96 @@ public interface IMDP<Value> extends MDP<Interval<Value>>
 	}
 	
 	/**
+	 * Do a matrix-vector multiplication and sum of rewards followed by min/max, i.e. one step of value iteration.
+	 * i.e. for all s: result[s] = min/max_k { rew(s) + rew_k(s) + sum_j P_k(s,j)*vect[j] }
+	 * @param vect Vector to multiply by
+	 * @param mdpRewards The rewards
+	 * @param minMax Min or max info
+	 * @param result Vector to store result in
+	 * @param subset Only do multiplication for these rows (ignored if null)
+	 * @param complement If true, {@code subset} is taken to be its complement (ignored if {@code subset} is null)
+	 */
+	public default void mvMultRew(double vect[], MDPRewards<Double> mdpRewards, MinMax minMax, double result[], BitSet subset, boolean complement)
+	{
+		mvMultRew(vect, mdpRewards, minMax, result, new IterableStateSet(subset, getNumStates(), complement).iterator());
+	}
+
+	/**
+	 * Do a matrix-vector multiplication and sum of rewards followed by min/max, i.e. one step of value iteration.
+	 * i.e. for all s: result[s] = min/max_k { rew(s) + rew_k(s) + sum_j P_k(s,j)*vect[j] }
+	 * @param vect Vector to multiply by
+	 * @param mdpRewards The rewards
+	 * @param minMax Min or max info
+	 * @param result Vector to store result in
+	 * @param states Perform multiplication for these rows, in the iteration order
+	 */
+	public default void mvMultRew(double vect[], MDPRewards<Double> mdpRewards, MinMax minMax, double result[], PrimitiveIterator.OfInt states)
+	{
+		while (states.hasNext()) {
+			int s = states.nextInt();
+			result[s] = mvMultRewSingle(s, vect, mdpRewards, minMax);
+		}
+	}
+
+	/**
+	 * Do a single row of matrix-vector multiplication and sum of rewards followed by min/max.
+	 * i.e. return min/max_k { rew(s) + rew_k(s) + sum_j P_k(s,j)*vect[j] }
+	 * Optionally, store optimal (memoryless) strategy info.
+	 * @param s Row index
+	 * @param vect Vector to multiply by
+	 * @param mdpRewards The rewards
+	 * @param minMax Min or max info
+	 * @param strat Storage for (memoryless) strategy choice indices (ignored if null)
+	 */
+	public default double mvMultRewSingle(int s, double vect[], MDPRewards<Double> mdpRewards, MinMax minMax)
+	{
+//		int stratCh = -1;
+		double minmax = 0;
+		boolean first = true;
+		boolean min = minMax.isMin();
+
+		for (int choice = 0, numChoices = getNumChoices(s); choice < numChoices; choice++) {
+			double d = mvMultRewSingle(s, choice, vect, mdpRewards, minMax);
+			// Check whether we have exceeded min/max so far
+			if (first || (min && d < minmax) || (!min && d > minmax)) {
+				minmax = d;
+				// If strategy generation is enabled, remember optimal choice
+//				if (strat != null)
+//					stratCh = choice;
+			}
+			first = false;
+		}
+//		// If strategy generation is enabled, store optimal choice
+//		if (strat != null && !first) {
+//			// For max, only remember strictly better choices
+//			if (min) {
+//				strat[s] = stratCh;
+//			} else if (strat[s] == -1 || minmax > vect[s]) {
+//				strat[s] = stratCh;
+//			}
+//		}
+
+		return minmax;
+	}
+
+	/**
+	 * Do a single row of matrix-vector multiplication and sum of rewards for a specific choice.
+	 * i.e. rew(s) + rew_i(s) + sum_j P_i(s,j)*vect[j]
+	 * @param s State (row) index
+	 * @param i Choice index
+	 * @param vect Vector to multiply by
+	 * @param mdpRewards The rewards (MDP rewards)
+	 * @param minMax Min or max info
+	 */
+	public default double mvMultRewSingle(int s, int i, double vect[], MDPRewards<Double> mdpRewards, MinMax minMax)
+	{
+		double d = mdpRewards.getStateReward(s);
+		d += mdpRewards.getTransitionReward(s, i);
+		d += mvMultSingle(s, i, vect, minMax);
+		return d;
+	}
+
+	/**
 	 * Do a Gauss-Seidel-style matrix-vector multiplication followed by min/max.
 	 * i.e. for all s: vect[s] = min/max_k { (sum_{j!=s} P_k(s,j)*vect[j]) / 1-P_k(s,s) }
 	 * and store new values directly in {@code vect} as computed.
@@ -253,6 +347,36 @@ public interface IMDP<Value> extends MDP<Interval<Value>>
 			//d = mvMultJacSingle(s, vect, minMax);
 			// Just do a normal (non-Jacobi) state update - not so easy to adapt for intervals
 			d = mvMultSingle(s, vect, minMax);
+			diff = absolute ? (Math.abs(d - vect[s])) : (Math.abs(d - vect[s]) / d);
+			maxDiff = diff > maxDiff ? diff : maxDiff;
+			vect[s] = d;
+		}
+		return maxDiff;
+	}
+
+	/**
+	 * Do a Gauss-Seidel-style matrix-vector multiplication and sum of rewards followed by min/max.
+	 * i.e. for all s: vect[s] = min/max_k { rew(s) + rew_k(s) + (sum_{j!=s} P_k(s,j)*vect[j]) / 1-P_k(s,s) }
+	 * and store new values directly in {@code vect} as computed.
+	 * The maximum (absolute/relative) difference between old/new
+	 * elements of {@code vect} is also returned.
+	 * Optionally, store optimal (memoryless) strategy info.
+	 * @param vect Vector to multiply by (and store the result in)
+	 * @param mdpRewards The rewards
+	 * @param minMax Min or max info
+	 * @param states Perform computation for these rows, in the iteration order
+	 * @param absolute If true, compute absolute, rather than relative, difference
+	 * @param strat Storage for (memoryless) strategy choice indices (ignored if null)
+	 * @return The maximum difference between old/new elements of {@code vect}
+	 */
+	public default double mvMultRewGS(double vect[], MDPRewards<Double> mdpRewards, MinMax minMax, PrimitiveIterator.OfInt states, boolean absolute)
+	{
+		double d, diff, maxDiff = 0.0;
+		while (states.hasNext()) {
+			final int s = states.nextInt();
+			//d = mvMultJacSingle(s, vect, minMax);
+			// Just do a normal (non-Jacobi) state update - not so easy to adapt for intervals
+			d = mvMultRewSingle(s, vect, mdpRewards, minMax);
 			diff = absolute ? (Math.abs(d - vect[s])) : (Math.abs(d - vect[s]) / d);
 			maxDiff = diff > maxDiff ? diff : maxDiff;
 			vect[s] = d;

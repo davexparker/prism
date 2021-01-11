@@ -36,6 +36,7 @@ import java.util.PrimitiveIterator;
 
 import common.Interval;
 import common.IterableStateSet;
+import explicit.rewards.MCRewards;
 import parser.State;
 import prism.Evaluator;
 import prism.ModelType;
@@ -176,6 +177,51 @@ public interface IDTMC<Value> extends DTMC<Interval<Value>>
 	}
 	
 	/**
+	 * Do a matrix-vector multiplication and sum of rewards, i.e. one step of value iteration.
+	 * @param vect Vector to multiply by
+	 * @param mcRewards The rewards
+	 * @param minMax Min or max info
+	 * @param result Vector to store result in
+	 * @param subset Only do multiplication for these rows (ignored if null)
+	 * @param complement If true, {@code subset} is taken to be its complement (ignored if {@code subset} is null)
+	 */
+	public default void mvMultRew(double vect[], MCRewards<Double> mcRewards, MinMax minMax, double result[], BitSet subset, boolean complement)
+	{
+		mvMultRew(vect, mcRewards, minMax, result, new IterableStateSet(subset, getNumStates(), complement).iterator());
+	}
+
+	/**
+	 * Do a matrix-vector multiplication and sum of rewards, i.e. one step of value iteration.
+	 * @param vect Vector to multiply by
+	 * @param mcRewards The rewards
+	 * @param minMax Min or max info
+	 * @param result Vector to store result in
+	 * @param states Perform multiplication for these rows, in the iteration order
+	 */
+	public default void mvMultRew(double vect[], MCRewards<Double> mcRewards, MinMax minMax, double result[], PrimitiveIterator.OfInt states)
+	{
+		while (states.hasNext()) {
+			int s = states.nextInt();
+			result[s] = mvMultRewSingle(s, vect, mcRewards, minMax);
+		}
+	}
+
+	/**
+	 * Do a single row of matrix-vector multiplication and sum of rewards.
+	 * @param s Row index
+	 * @param vect Vector to multiply by
+	 * @param mcRewards The rewards
+	 * @param minMax Min or max info
+	 */
+	public default double mvMultRewSingle(int s, double vect[], MCRewards<Double> mcRewards, MinMax minMax)
+	{
+		double d = mcRewards.getStateReward(s);
+		// TODO d += mcRewards.getTransitionReward(s);
+		d += mvMultSingle(s, vect, minMax);
+		return d;
+	}
+	
+	/**
 	 * Do a Gauss-Seidel-style matrix-vector multiplication followed by min/max.
 	 * i.e. for all s: vect[s] = min/max_k { (sum_{j!=s} P_k(s,j)*vect[j]) / 1-P_k(s,s) }
 	 * and store new values directly in {@code vect} as computed.
@@ -217,6 +263,36 @@ public interface IDTMC<Value> extends DTMC<Interval<Value>>
 			//d = mvMultJacSingle(s, vect, minMax);
 			// Just do a normal (non-Jacobi) state update - not so easy to adapt for intervals
 			d = mvMultSingle(s, vect, minMax);
+			diff = absolute ? (Math.abs(d - vect[s])) : (Math.abs(d - vect[s]) / d);
+			maxDiff = diff > maxDiff ? diff : maxDiff;
+			vect[s] = d;
+		}
+		return maxDiff;
+	}
+
+	/**
+	 * Do a Gauss-Seidel-style matrix-vector multiplication and sum of rewards followed by min/max.
+	 * i.e. for all s: vect[s] = min/max_k { rew(s) + rew_k(s) + (sum_{j!=s} P_k(s,j)*vect[j]) / 1-P_k(s,s) }
+	 * and store new values directly in {@code vect} as computed.
+	 * The maximum (absolute/relative) difference between old/new
+	 * elements of {@code vect} is also returned.
+	 * Optionally, store optimal (memoryless) strategy info.
+	 * @param vect Vector to multiply by (and store the result in)
+	 * @param mcRewards The rewards
+	 * @param minMax Min or max info
+	 * @param states Perform computation for these rows, in the iteration order
+	 * @param absolute If true, compute absolute, rather than relative, difference
+	 * @param strat Storage for (memoryless) strategy choice indices (ignored if null)
+	 * @return The maximum difference between old/new elements of {@code vect}
+	 */
+	public default double mvMultRewGS(double vect[], MCRewards<Double> mcRewards, MinMax minMax, PrimitiveIterator.OfInt states, boolean absolute)
+	{
+		double d, diff, maxDiff = 0.0;
+		while (states.hasNext()) {
+			final int s = states.nextInt();
+			//d = mvMultJacSingle(s, vect, minMax);
+			// Just do a normal (non-Jacobi) state update - not so easy to adapt for intervals
+			d = mvMultRewSingle(s, vect, mcRewards, minMax);
 			diff = absolute ? (Math.abs(d - vect[s])) : (Math.abs(d - vect[s]) / d);
 			maxDiff = diff > maxDiff ? diff : maxDiff;
 			vect[s] = d;

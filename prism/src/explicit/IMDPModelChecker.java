@@ -27,10 +27,11 @@
 package explicit;
 
 import java.util.BitSet;
-import java.util.Map;
 
 import common.IntSet;
 import common.Interval;
+import explicit.rewards.MDPRewards;
+import explicit.rewards.MDPRewardsSimple;
 import prism.AccuracyFactory;
 import prism.Evaluator;
 import prism.PrismComponent;
@@ -320,7 +321,159 @@ public class IMDPModelChecker extends MDPModelChecker
 		return res;
 	}
 
+	/**
+	 * Compute expected reachability rewards.
+	 * i.e. compute the min/max reward accumulated to reach a state in {@code target}.
+	 * @param imdp The IMDP
+	 * @param imdpRewards The rewards
+	 * @param target Target states
+	 * @param minMax Min/max info
+	 */
+	public ModelCheckerResult computeReachRewards(IMDP<Double> imdp, MDPRewards<Interval<Double>> imdpRewards, BitSet target, MinMax minMax) throws PrismException
+	{
+		// Switch to a supported method, if necessary
+		LinEqMethod linEqMethod = this.linEqMethod;
+		switch (linEqMethod)
+		{
+		case POWER:
+		case GAUSS_SEIDEL:
+		case BACKWARDS_GAUSS_SEIDEL:
+		//case JACOBI:
+			break; // supported
+		default:
+			linEqMethod = LinEqMethod.GAUSS_SEIDEL;
+			mainLog.printWarning("Switching to linear equation solution method \"" + linEqMethod.fullName() + "\"");
+		}
 
+		if (doIntervalIteration && (!precomp || !prob0 || !prob1)) {
+			throw new PrismNotSupportedException("Interval iteration requires precomputations to be active");
+		}
+
+		// Start probabilistic reachability
+		long timer = System.currentTimeMillis();
+		mainLog.println("\nStarting expected reachability...");
+
+		// Check for any zero lower probability bounds (not supported
+		// since this approach assumes the graph structure remains static)
+		imdp.checkLowerBoundsArePositive();
+		
+		// Check for deadlocks in non-target state (because breaks e.g. prob1)
+		imdp.checkForDeadlocks(target);
+
+		// Check all rewards are single values, not intervals, and recreate
+		MDPRewards<Double> mdpRewards = useSingletonRewards(imdp, imdpRewards);
+		
+		// Store num states
+		int n = imdp.getNumStates();
+
+		// Precomputation (not optional)
+		BitSet inf = prob1(imdp, null, target, minMax.isMin(), null);
+		inf.flip(0, n);
+
+		// Print results of precomputation
+		int numTarget = target.cardinality();
+		int numInf = inf.cardinality();
+		mainLog.println("target=" + numTarget + ", inf=" + numInf + ", rest=" + (n - (numTarget + numInf)));
+
+		// Start value iteration
+		timer = System.currentTimeMillis();
+		String sMinMax = minMax.isMin() ? "min" : "max";
+		sMinMax += minMax.isMinUnc() ? "min" : "max";
+		mainLog.println("Starting value iteration (" + sMinMax + ")...");
+
+		// Store num states
+		n = imdp.getNumStates();
+
+		// Initialise solution vectors
+		double[] init = new double[n];
+		for (int i = 0; i < n; i++)
+			init[i] = target.get(i) ? 0.0 : inf.get(i) ? Double.POSITIVE_INFINITY : 0.0;
+
+		// Determine set of states actually need to compute values for
+		BitSet unknown = new BitSet();
+		unknown.set(0, n);
+		unknown.andNot(target);
+		unknown.andNot(inf);
+
+		// Compute probabilities (if needed)
+		ModelCheckerResult res;
+		if (numTarget + numInf < n) {
+			IterationMethod iterationMethod = null;
+			switch (linEqMethod) {
+			case POWER:
+				iterationMethod = new IterationMethodPower(termCrit == TermCrit.ABSOLUTE, termCritParam);
+				break;
+			case JACOBI:
+				iterationMethod = new IterationMethodJacobi(termCrit == TermCrit.ABSOLUTE, termCritParam);
+				break;
+			case GAUSS_SEIDEL:
+			case BACKWARDS_GAUSS_SEIDEL:
+				boolean backwards = linEqMethod == LinEqMethod.BACKWARDS_GAUSS_SEIDEL;
+				iterationMethod = new IterationMethodGS(termCrit == TermCrit.ABSOLUTE, termCritParam, backwards);
+				break;
+			default:
+				throw new PrismException("Unknown solution method " + linEqMethod.fullName());
+			}
+			IterationMethod.IterationValIter iterationReachProbs = iterationMethod.forMvMultRewMinMaxUnc(imdp, mdpRewards, minMax);
+			iterationReachProbs.init(init);
+			IntSet unknownStates = IntSet.asIntSet(unknown);
+			String description = sMinMax + ", with " + iterationMethod.getDescriptionShort();
+			res = iterationMethod.doValueIteration(this, description, iterationReachProbs, unknownStates, timer, null);
+		} else {
+			res = new ModelCheckerResult();
+			res.soln = Utils.bitsetToDoubleArray(inf, n, Double.POSITIVE_INFINITY);
+			res.accuracy = AccuracyFactory.doublesFromQualitative();
+		}
+		
+		// Finished probabilistic reachability
+		timer = System.currentTimeMillis() - timer;
+		mainLog.println("Probabilistic reachability took " + timer / 1000.0 + " seconds.");
+
+		// Update time taken
+		res.timeTaken = timer / 1000.0;
+
+		return res;
+	}
+
+	/**
+	 * Check that all of the values in an MDP reward structure over (double) intervals
+	 * are actual singleton values, then return a new one just over doubles.
+	 * Throws an exception if a value is not a singleton.
+	 */
+	protected MDPRewards<Double> useSingletonRewards(IMDP<Double> imdp, MDPRewards<Interval<Double>> imdpRewards) throws PrismException
+	{
+		int numStates = imdp.getNumStates();
+		MDPRewardsSimple<Double> mdpRewards = new MDPRewardsSimple<>(numStates);
+		mdpRewards.setEvaluator(Evaluator.createForDoubles());
+		for (int s = 0; s < numStates; s++) {
+			// Check and add each state reward
+			Interval<Double> ival = imdpRewards.getStateReward(s);
+			double lo = ival.getLower();
+			double hi = ival.getUpper();
+			if (lo != hi) {
+				throw new PrismException("Model checking reward structures containing intervals is not supported");
+			}
+			if (lo > 0) {
+				mdpRewards.addToStateReward(s, lo);
+			}
+			
+			// Check and add each transition reward
+			int numChoices = imdp.getNumChoices(s);
+			for (int k = 0; k < numChoices; k++) {
+				ival = imdpRewards.getTransitionReward(s, k);
+				lo = ival.getLower();
+				hi = ival.getUpper();
+				if (lo != hi) {
+					throw new PrismException("Model checking reward structures containing intervals is not supported");
+				}
+				if (lo > 0) {
+					mdpRewards.addToTransitionReward(s, k, lo);
+				}
+			}
+		}
+		return mdpRewards;
+	}
+	
 	/**
 	 * Simple test program.
 	 */

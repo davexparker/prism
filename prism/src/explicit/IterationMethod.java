@@ -32,8 +32,6 @@ import java.util.PrimitiveIterator;
 
 import common.IntSet;
 import common.PeriodicTimer;
-import explicit.IterationMethod.IterationValIter;
-import explicit.IterationMethod.TwoVectorIteration;
 import explicit.rewards.MCRewards;
 import explicit.rewards.MDPRewards;
 import prism.AccuracyFactory;
@@ -411,10 +409,28 @@ public abstract class IterationMethod {
 	/**
 	 * Obtain an Iteration object using mvMult (matrix-vector multiplication, followed by min/max)
 	 * in an IDTMC.
+	 * @param idtmc the IDTMC
+	 * @param mcRewards the reward structure
+	 * @param minMax min/max info
+	 */
+	public abstract IterationValIter forMvMultRewMinMaxUnc(IDTMC<Double> idtmc, MCRewards<Double> mcRewards, MinMax minMax) throws PrismException;
+	
+	/**
+	 * Obtain an Iteration object using mvMult (matrix-vector multiplication, followed by min/max)
+	 * in an IDTMC.
 	 * @param imdp the IMDP
 	 * @param minMax min/max info
 	 */
 	public abstract IterationValIter forMvMultMinMaxUnc(IMDP<Double> imdp, MinMax minMax) throws PrismException;
+	
+	/**
+	 * Obtain an Iteration object using mvMult (matrix-vector multiplication, followed by min/max)
+	 * in an IDTMC.
+	 * @param imdp the IMDP
+	 * @param mdpRewards the reward structure
+	 * @param minMax min/max info
+	 */
+	public abstract IterationValIter forMvMultRewMinMaxUnc(IMDP<Double> imdp, MDPRewards<Double> mdpRewards, MinMax minMax) throws PrismException;
 	
 	// ------------ Abstract generic methods ----------------------------
 
