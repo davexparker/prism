@@ -37,6 +37,7 @@ import prism.Evaluator;
 import prism.PrismComponent;
 import prism.PrismException;
 import prism.PrismNotSupportedException;
+import strat.MDStrategyArray;
 
 /**
  * Explicit-state model checker for interval Markov decision prcoesses (IMDPs).
@@ -77,7 +78,7 @@ public class IMDPModelChecker extends MDPModelChecker
 		double[] soln2 = new double[n];
 
 		// Next-step probabilities 
-		imdp.mvMult(soln, minMax, soln2, null);
+		imdp.mvMult(soln, minMax, soln2, null, null);
 
 		// Return results
 		ModelCheckerResult res = new ModelCheckerResult();
@@ -152,7 +153,7 @@ public class IMDPModelChecker extends MDPModelChecker
 		while (iters < k) {
 			iters++;
 			// Matrix-vector multiply and min/max ops
-			imdp.mvMult(soln, minMax, soln2, unknownStates.iterator());
+			imdp.mvMult(soln, minMax, soln2, unknownStates.iterator(), null);
 			// Swap vectors for next iter
 			tmpsoln = soln;
 			soln = soln2;
@@ -211,6 +212,7 @@ public class IMDPModelChecker extends MDPModelChecker
 	 */
 	public ModelCheckerResult computeReachProbs(IMDP<Double> imdp, BitSet remain, BitSet target, MinMax minMax) throws PrismException
 	{
+		int strat[] = null;
 		// Switch to a supported method, if necessary
 		LinEqMethod linEqMethod = this.linEqMethod;
 		switch (linEqMethod)
@@ -243,15 +245,25 @@ public class IMDPModelChecker extends MDPModelChecker
 		// Store num states
 		int n = imdp.getNumStates();
 
+		// If required, create/initialise strategy storage
+		// Set choices to -1, denoting unknown
+		// (except for target states, which are -2, denoting arbitrary)
+		if (genStrat || exportAdv) {
+			strat = new int[n];
+			for (int i = 0; i < n; i++) {
+				strat[i] = target.get(i) ? -2 : -1;
+			}
+		}
+
 		// Precomputation
 		BitSet no, yes;
 		if (precomp && prob0) {
-			no = prob0(imdp, remain, target, minMax.isMin(), null);
+			no = prob0(imdp, remain, target, minMax.isMin(), strat);
 		} else {
 			no = new BitSet();
 		}
 		if (precomp && prob1) {
-			yes = prob1(imdp, remain, target, minMax.isMin(), null);
+			yes = prob1(imdp, remain, target, minMax.isMin(), strat);
 		} else {
 			yes = (BitSet) target.clone();
 		}
@@ -260,6 +272,21 @@ public class IMDPModelChecker extends MDPModelChecker
 		int numYes = yes.cardinality();
 		int numNo = no.cardinality();
 		mainLog.println("target=" + target.cardinality() + ", yes=" + numYes + ", no=" + numNo + ", maybe=" + (n - (numYes + numNo)));
+
+		// If still required, store strategy for no/yes (0/1) states.
+		// This is just for the cases max=0 and min=1, where arbitrary choices suffice (denoted by -2)
+		if (genStrat || exportAdv) {
+			if (minMax.isMin()) {
+				for (int i = yes.nextSetBit(0); i >= 0; i = yes.nextSetBit(i + 1)) {
+					if (!target.get(i))
+						strat[i] = -2;
+				}
+			} else {
+				for (int i = no.nextSetBit(0); i >= 0; i = no.nextSetBit(i + 1)) {
+					strat[i] = -2;
+				}
+			}
+		}
 
 		// Start value iteration
 		timer = System.currentTimeMillis();
@@ -300,7 +327,7 @@ public class IMDPModelChecker extends MDPModelChecker
 			default:
 				throw new PrismException("Unknown solution method " + linEqMethod.fullName());
 			}
-			IterationMethod.IterationValIter iterationReachProbs = iterationMethod.forMvMultMinMaxUnc(imdp, minMax);
+			IterationMethod.IterationValIter iterationReachProbs = iterationMethod.forMvMultMinMaxUnc(imdp, minMax, strat);
 			iterationReachProbs.init(init);
 			IntSet unknownStates = IntSet.asIntSet(unknown);
 			String description = sMinMax + ", with " + iterationMethod.getDescriptionShort();
@@ -309,6 +336,11 @@ public class IMDPModelChecker extends MDPModelChecker
 			res = new ModelCheckerResult();
 			res.soln = Utils.bitsetToDoubleArray(yes, n);
 			res.accuracy = AccuracyFactory.doublesFromQualitative();
+		}
+		
+		// Store strategy
+		if (genStrat) {
+			res.strat = new MDStrategyArray(imdp, strat);
 		}
 		
 		// Finished probabilistic reachability
@@ -331,6 +363,7 @@ public class IMDPModelChecker extends MDPModelChecker
 	 */
 	public ModelCheckerResult computeReachRewards(IMDP<Double> imdp, MDPRewards<Interval<Double>> imdpRewards, BitSet target, MinMax minMax) throws PrismException
 	{
+		int strat[] = null;
 		// Switch to a supported method, if necessary
 		LinEqMethod linEqMethod = this.linEqMethod;
 		switch (linEqMethod)
@@ -366,14 +399,47 @@ public class IMDPModelChecker extends MDPModelChecker
 		// Store num states
 		int n = imdp.getNumStates();
 
+		// If required, create/initialise strategy storage
+		// Set choices to -1, denoting unknown
+		// (except for target states, which are -2, denoting arbitrary)
+		if (genStrat || exportAdv) {
+			strat = new int[n];
+			for (int i = 0; i < n; i++) {
+				strat[i] = target.get(i) ? -2 : -1;
+			}
+		}
+		
 		// Precomputation (not optional)
-		BitSet inf = prob1(imdp, null, target, minMax.isMin(), null);
+		BitSet inf = prob1(imdp, null, target, minMax.isMin(), strat);
 		inf.flip(0, n);
 
 		// Print results of precomputation
 		int numTarget = target.cardinality();
 		int numInf = inf.cardinality();
 		mainLog.println("target=" + numTarget + ", inf=" + numInf + ", rest=" + (n - (numTarget + numInf)));
+
+		// If required, generate strategy for "inf" states.
+		if (genStrat || exportAdv || mdpSolnMethod == MDPSolnMethod.POLICY_ITERATION) {
+			if (minMax.isMin()) {
+				// If min reward is infinite, all choices give infinity
+				// So the choice can be arbitrary, denoted by -2; 
+				for (int i = inf.nextSetBit(0); i >= 0; i = inf.nextSetBit(i + 1)) {
+					strat[i] = -2;
+				}
+			} else {
+				// If max reward is infinite, there is at least one choice giving infinity.
+				// So we pick, for all "inf" states, the first choice for which some transitions stays in "inf".
+				for (int i = inf.nextSetBit(0); i >= 0; i = inf.nextSetBit(i + 1)) {
+					int numChoices = imdp.getNumChoices(i);
+					for (int k = 0; k < numChoices; k++) {
+						if (imdp.someSuccessorsInSet(i, k, inf)) {
+							strat[i] = k;
+							continue;
+						}
+					}
+				}
+			}
+		}
 
 		// Start value iteration
 		timer = System.currentTimeMillis();
@@ -414,7 +480,7 @@ public class IMDPModelChecker extends MDPModelChecker
 			default:
 				throw new PrismException("Unknown solution method " + linEqMethod.fullName());
 			}
-			IterationMethod.IterationValIter iterationReachProbs = iterationMethod.forMvMultRewMinMaxUnc(imdp, mdpRewards, minMax);
+			IterationMethod.IterationValIter iterationReachProbs = iterationMethod.forMvMultRewMinMaxUnc(imdp, mdpRewards, minMax, strat);
 			iterationReachProbs.init(init);
 			IntSet unknownStates = IntSet.asIntSet(unknown);
 			String description = sMinMax + ", with " + iterationMethod.getDescriptionShort();
@@ -423,6 +489,11 @@ public class IMDPModelChecker extends MDPModelChecker
 			res = new ModelCheckerResult();
 			res.soln = Utils.bitsetToDoubleArray(inf, n, Double.POSITIVE_INFINITY);
 			res.accuracy = AccuracyFactory.doublesFromQualitative();
+		}
+		
+		// Store strategy
+		if (genStrat) {
+			res.strat = new MDStrategyArray(imdp, strat);
 		}
 		
 		// Finished probabilistic reachability

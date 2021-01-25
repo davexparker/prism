@@ -92,10 +92,11 @@ public interface IMDP<Value> extends MDP<Interval<Value>>
 	 * @param result Vector to store result in
 	 * @param subset Only do multiplication for these rows (ignored if null)
 	 * @param complement If true, {@code subset} is taken to be its complement (ignored if {@code subset} is null)
+	 * @param strat Storage for (memoryless) strategy choice indices (ignored if null)
 	 */
-	public default void mvMult(double vect[], MinMax minMax, double result[], BitSet subset, boolean complement)
+	public default void mvMult(double vect[], MinMax minMax, double result[], BitSet subset, boolean complement, int[] strat)
 	{
-		mvMult(vect, minMax, result, new IterableStateSet(subset, getNumStates(), complement).iterator());
+		mvMult(vect, minMax, result, new IterableStateSet(subset, getNumStates(), complement).iterator(), strat);
 	}
 
 	/**
@@ -109,12 +110,13 @@ public interface IMDP<Value> extends MDP<Interval<Value>>
 	 * @param minMax Min or max info
 	 * @param result Vector to store result in
 	 * @param states Perform multiplication for these rows, in the iteration order
+	 * @param strat Storage for (memoryless) strategy choice indices (ignored if null)
 	 */
-	public default void mvMult(double vect[], MinMax minMax, double result[], PrimitiveIterator.OfInt states)
+	public default void mvMult(double vect[], MinMax minMax, double result[], PrimitiveIterator.OfInt states, int[] strat)
 	{
 		while (states.hasNext()) {
 			int s = states.nextInt();
-			result[s] = mvMultSingle(s, vect, minMax);
+			result[s] = mvMultSingle(s, vect, minMax, strat);
 		}
 	}
 
@@ -125,10 +127,11 @@ public interface IMDP<Value> extends MDP<Interval<Value>>
 	 * @param s Row index
 	 * @param vect Vector to multiply by
 	 * @param minMax Min or max info
+	 * @param strat Storage for (memoryless) strategy choice indices (ignored if null)
 	 */
-	public default double mvMultSingle(int s, double vect[], MinMax minMax)
+	public default double mvMultSingle(int s, double vect[], MinMax minMax, int[] strat)
 	{
-//		int stratCh = -1;
+		int stratCh = -1;
 		double minmax = 0;
 		boolean first = true;
 		boolean min = minMax.isMin();
@@ -141,20 +144,20 @@ public interface IMDP<Value> extends MDP<Interval<Value>>
 			if (first || (min && d < minmax) || (!min && d > minmax)) {
 				minmax = d;
 				// If strategy generation is enabled, remember optimal choice
-//				if (strat != null)
-//					stratCh = choice;
+				if (strat != null)
+					stratCh = choice;
 			}
 			first = false;
 		}
-//		// If strategy generation is enabled, store optimal choice
-//		if (strat != null && !first) {
-//			// For max, only remember strictly better choices
-//			if (min) {
-//				strat[s] = stratCh;
-//			} else if (strat[s] == -1 || minmax > vect[s]) {
-//				strat[s] = stratCh;
-//			}
-//		}
+		// If strategy generation is enabled, store optimal choice
+		if (strat != null && !first) {
+			// For max, only remember strictly better choices
+			if (min) {
+				strat[s] = stratCh;
+			} else if (strat[s] == -1 || minmax > vect[s]) {
+				strat[s] = stratCh;
+			}
+		}
 
 		return minmax;	
 	}
@@ -224,10 +227,11 @@ public interface IMDP<Value> extends MDP<Interval<Value>>
 	 * @param result Vector to store result in
 	 * @param subset Only do multiplication for these rows (ignored if null)
 	 * @param complement If true, {@code subset} is taken to be its complement (ignored if {@code subset} is null)
+	 * @param strat Storage for (memoryless) strategy choice indices (ignored if null)
 	 */
-	public default void mvMultRew(double vect[], MDPRewards<Double> mdpRewards, MinMax minMax, double result[], BitSet subset, boolean complement)
+	public default void mvMultRew(double vect[], MDPRewards<Double> mdpRewards, MinMax minMax, double result[], BitSet subset, boolean complement, int[] strat)
 	{
-		mvMultRew(vect, mdpRewards, minMax, result, new IterableStateSet(subset, getNumStates(), complement).iterator());
+		mvMultRew(vect, mdpRewards, minMax, result, new IterableStateSet(subset, getNumStates(), complement).iterator(), strat);
 	}
 
 	/**
@@ -239,11 +243,11 @@ public interface IMDP<Value> extends MDP<Interval<Value>>
 	 * @param result Vector to store result in
 	 * @param states Perform multiplication for these rows, in the iteration order
 	 */
-	public default void mvMultRew(double vect[], MDPRewards<Double> mdpRewards, MinMax minMax, double result[], PrimitiveIterator.OfInt states)
+	public default void mvMultRew(double vect[], MDPRewards<Double> mdpRewards, MinMax minMax, double result[], PrimitiveIterator.OfInt states, int[] strat)
 	{
 		while (states.hasNext()) {
 			int s = states.nextInt();
-			result[s] = mvMultRewSingle(s, vect, mdpRewards, minMax);
+			result[s] = mvMultRewSingle(s, vect, mdpRewards, minMax, strat);
 		}
 	}
 
@@ -257,9 +261,9 @@ public interface IMDP<Value> extends MDP<Interval<Value>>
 	 * @param minMax Min or max info
 	 * @param strat Storage for (memoryless) strategy choice indices (ignored if null)
 	 */
-	public default double mvMultRewSingle(int s, double vect[], MDPRewards<Double> mdpRewards, MinMax minMax)
+	public default double mvMultRewSingle(int s, double vect[], MDPRewards<Double> mdpRewards, MinMax minMax, int[] strat)
 	{
-//		int stratCh = -1;
+		int stratCh = -1;
 		double minmax = 0;
 		boolean first = true;
 		boolean min = minMax.isMin();
@@ -270,20 +274,20 @@ public interface IMDP<Value> extends MDP<Interval<Value>>
 			if (first || (min && d < minmax) || (!min && d > minmax)) {
 				minmax = d;
 				// If strategy generation is enabled, remember optimal choice
-//				if (strat != null)
-//					stratCh = choice;
+				if (strat != null)
+					stratCh = choice;
 			}
 			first = false;
 		}
-//		// If strategy generation is enabled, store optimal choice
-//		if (strat != null && !first) {
-//			// For max, only remember strictly better choices
-//			if (min) {
-//				strat[s] = stratCh;
-//			} else if (strat[s] == -1 || minmax > vect[s]) {
-//				strat[s] = stratCh;
-//			}
-//		}
+		// If strategy generation is enabled, store optimal choice
+		if (strat != null && !first) {
+			// For max, only remember strictly better choices
+			if (min) {
+				strat[s] = stratCh;
+			} else if (strat[s] == -1 || minmax > vect[s]) {
+				strat[s] = stratCh;
+			}
+		}
 
 		return minmax;
 	}
@@ -320,9 +324,9 @@ public interface IMDP<Value> extends MDP<Interval<Value>>
 	 * @param strat Storage for (memoryless) strategy choice indices (ignored if null)
 	 * @return The maximum difference between old/new elements of {@code vect}
 	 */
-	public default double mvMultGS(double vect[], MinMax minMax, BitSet subset, boolean complement, boolean absolute)
+	public default double mvMultGS(double vect[], MinMax minMax, BitSet subset, boolean complement, boolean absolute, int[] strat)
 	{
-		return mvMultGS(vect, minMax, new IterableStateSet(subset, getNumStates(), complement).iterator(), absolute);
+		return mvMultGS(vect, minMax, new IterableStateSet(subset, getNumStates(), complement).iterator(), absolute, strat);
 	}
 
 	/**
@@ -339,14 +343,14 @@ public interface IMDP<Value> extends MDP<Interval<Value>>
 	 * @param strat Storage for (memoryless) strategy choice indices (ignored if null)
 	 * @return The maximum difference between old/new elements of {@code vect}
 	 */
-	public default double mvMultGS(double vect[], MinMax minMax, PrimitiveIterator.OfInt states, boolean absolute)
+	public default double mvMultGS(double vect[], MinMax minMax, PrimitiveIterator.OfInt states, boolean absolute, int[] strat)
 	{
 		double d, diff, maxDiff = 0.0;
 		while (states.hasNext()) {
 			final int s = states.nextInt();
 			//d = mvMultJacSingle(s, vect, minMax);
 			// Just do a normal (non-Jacobi) state update - not so easy to adapt for intervals
-			d = mvMultSingle(s, vect, minMax);
+			d = mvMultSingle(s, vect, minMax, strat);
 			diff = absolute ? (Math.abs(d - vect[s])) : (Math.abs(d - vect[s]) / d);
 			maxDiff = diff > maxDiff ? diff : maxDiff;
 			vect[s] = d;
@@ -369,14 +373,14 @@ public interface IMDP<Value> extends MDP<Interval<Value>>
 	 * @param strat Storage for (memoryless) strategy choice indices (ignored if null)
 	 * @return The maximum difference between old/new elements of {@code vect}
 	 */
-	public default double mvMultRewGS(double vect[], MDPRewards<Double> mdpRewards, MinMax minMax, PrimitiveIterator.OfInt states, boolean absolute)
+	public default double mvMultRewGS(double vect[], MDPRewards<Double> mdpRewards, MinMax minMax, PrimitiveIterator.OfInt states, boolean absolute, int[] strat)
 	{
 		double d, diff, maxDiff = 0.0;
 		while (states.hasNext()) {
 			final int s = states.nextInt();
 			//d = mvMultJacSingle(s, vect, minMax);
 			// Just do a normal (non-Jacobi) state update - not so easy to adapt for intervals
-			d = mvMultRewSingle(s, vect, mdpRewards, minMax);
+			d = mvMultRewSingle(s, vect, mdpRewards, minMax, strat);
 			diff = absolute ? (Math.abs(d - vect[s])) : (Math.abs(d - vect[s]) / d);
 			maxDiff = diff > maxDiff ? diff : maxDiff;
 			vect[s] = d;

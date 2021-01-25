@@ -237,14 +237,14 @@ public class IterationMethodGS extends IterationMethod {
 	}
 	
 	@Override
-	public IterationValIter forMvMultMinMaxUnc(IMDP<Double> imdp, MinMax minMax)
+	public IterationValIter forMvMultMinMaxUnc(IMDP<Double> imdp, MinMax minMax, int[] strat)
 	{
 		return new SingleVectorIterationValIter(imdp) {
 			@Override
 			public boolean iterateAndCheckConvergence(IntSet states)
 			{
 				// Matrix-vector multiply
-				error = imdp.mvMultGS(soln, minMax, states.iterator(), absolute);
+				error = imdp.mvMultGS(soln, minMax, states.iterator(), absolute, strat);
 				// Check termination
 				return (error < termCritParam);
 			}
@@ -252,14 +252,14 @@ public class IterationMethodGS extends IterationMethod {
 	}
 	
 	@Override
-	public IterationValIter forMvMultRewMinMaxUnc(IMDP<Double> imdp, MDPRewards<Double> mdpRewards, MinMax minMax)
+	public IterationValIter forMvMultRewMinMaxUnc(IMDP<Double> imdp, MDPRewards<Double> mdpRewards, MinMax minMax, int[] strat)
 	{
 		return new SingleVectorIterationValIter(imdp) {
 			@Override
 			public boolean iterateAndCheckConvergence(IntSet states)
 			{
 				// Matrix-vector multiply
-				error = imdp.mvMultRewGS(soln, mdpRewards, minMax, states.iterator(), absolute);
+				error = imdp.mvMultRewGS(soln, mdpRewards, minMax, states.iterator(), absolute, strat);
 				// Check termination
 				return (error < termCritParam);
 			}

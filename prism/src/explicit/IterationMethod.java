@@ -421,7 +421,7 @@ public abstract class IterationMethod {
 	 * @param imdp the IMDP
 	 * @param minMax min/max info
 	 */
-	public abstract IterationValIter forMvMultMinMaxUnc(IMDP<Double> imdp, MinMax minMax) throws PrismException;
+	public abstract IterationValIter forMvMultMinMaxUnc(IMDP<Double> imdp, MinMax minMax, int[] strat) throws PrismException;
 	
 	/**
 	 * Obtain an Iteration object using mvMult (matrix-vector multiplication, followed by min/max)
@@ -430,7 +430,7 @@ public abstract class IterationMethod {
 	 * @param mdpRewards the reward structure
 	 * @param minMax min/max info
 	 */
-	public abstract IterationValIter forMvMultRewMinMaxUnc(IMDP<Double> imdp, MDPRewards<Double> mdpRewards, MinMax minMax) throws PrismException;
+	public abstract IterationValIter forMvMultRewMinMaxUnc(IMDP<Double> imdp, MDPRewards<Double> mdpRewards, MinMax minMax, int[] strat) throws PrismException;
 	
 	// ------------ Abstract generic methods ----------------------------
 
