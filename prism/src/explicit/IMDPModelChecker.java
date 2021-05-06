@@ -186,7 +186,7 @@ public class IMDPModelChecker extends MDPModelChecker
 							out.write(",");
 						}
 						//out.write("" + strat[j][i]);
-						Object action = imdp.getAction(j, strat[j][i]);
+						Object action = imdp.getAction(i, strat[j][i]);
 						out.write(action == null ? "" : action.toString());
 					}
 					out.write("\n");
