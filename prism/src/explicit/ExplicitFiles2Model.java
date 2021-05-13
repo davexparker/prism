@@ -39,6 +39,7 @@ import java.util.Map.Entry;
 
 import common.IterableStateSet;
 import parser.State;
+import prism.Evaluator;
 import prism.ModelInfo;
 import prism.PrismComponent;
 import prism.PrismException;
@@ -108,6 +109,18 @@ public class ExplicitFiles2Model extends PrismComponent
 			MDPSimple<?> mdp = new MDPSimple<>();
 			mdp.buildFromPrismExplicit(transFile.getAbsolutePath());
 			model = mdp;
+			break;
+		case IDTMC:
+			IDTMCSimple<Double> idtmc = new IDTMCSimple<>();
+			idtmc.setEvaluator(Evaluator.createForDoubleIntervals());
+			idtmc.buildFromPrismExplicit(transFile.getAbsolutePath());
+			model = idtmc;
+			break;
+		case IMDP:
+			IMDPSimple<Double> imdp = new IMDPSimple<>();
+			imdp.setEvaluator(Evaluator.createForDoubleIntervals());
+			imdp.buildFromPrismExplicit(transFile.getAbsolutePath());
+			model = imdp;
 			break;
 		case CTMDP:
 		case LTS:

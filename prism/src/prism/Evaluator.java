@@ -707,8 +707,15 @@ public interface Evaluator<Value>
 		@Override
 		public Interval<Double> fromString(String s) throws NumberFormatException
 		{
-			// TODO
-			throw new UnsupportedOperationException();
+			if (!(s.charAt(0) == '[' && s.charAt(s.length() - 1) == ']')) {
+				throw new NumberFormatException("Illegal interval " + s);
+			}
+			s = s.substring(1, s.length() - 1);
+			String ss[] = s.split(",");
+			if (ss.length != 2) {
+				throw new NumberFormatException("Illegal interval " + s);
+			}
+			return new Interval<Double>(Double.parseDouble(ss[0]), Double.parseDouble(ss[1]));
 		}
 		
 		@Override
