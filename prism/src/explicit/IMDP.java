@@ -172,7 +172,7 @@ public interface IMDP<Value> extends MDP<Interval<Value>>
 		
 		// Extract, for each transition, the probability interval (lo/hi)
 		// and the value from vector vect for the successor state
-		int numTransitions = getNumTransitions(s);
+		int numTransitions = getNumTransitions(s, choice);
 		double[] probsLo = new double[numTransitions];
 		double[] probsHi = new double[numTransitions];
 		double[] succVals = new double[numTransitions];
