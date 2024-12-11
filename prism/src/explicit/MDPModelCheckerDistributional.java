@@ -15,6 +15,7 @@ import strat.MDStrategyArray;
 
 import java.text.DecimalFormat;
 import java.util.*;
+import explicit.MDPModelChecker;
 
 import static explicit.DistributionalBellmanOperatorProb.toBigRationalPoint;
 
@@ -79,7 +80,6 @@ public class MDPModelCheckerDistributional extends ProbModelChecker
 	{
 		MDPModelChecker mcMDP = new MDPModelChecker(this);
 		mcMDP.inheritSettings(this);
-
 		// Start expected reachability
 		long timer = System.currentTimeMillis();
 		mainLog.println("\nStarting expected reachability (" + (min ? "min" : "max") + ")...");
@@ -108,7 +108,7 @@ public class MDPModelCheckerDistributional extends ProbModelChecker
 
 		// Set up distribution variables
 		int atoms;
-		int iterations = 3000;
+		int iterations = 5000;
 		int min_iter = 8;
 		double error_thresh = 0.01;
 		double gamma = 1;
@@ -218,6 +218,7 @@ public class MDPModelCheckerDistributional extends ProbModelChecker
 
 			transition_distr.add(transition_temp);
 		}
+		System.out.println(transition_distr);
 
 		Map<Integer, Point> jointSupp=new HashMap<>(uncertain_atoms); Map<Integer, BigRational> jointProb;
 		DiscreteDistribution joint_distr; int joint_atoms = 0;
@@ -325,6 +326,7 @@ public class MDPModelCheckerDistributional extends ProbModelChecker
 				temp_p.update(save_p, s);
 			}
 
+			System.out.println(policy);
 			states = unknownStates.iterator();
 			max_dist = 0.0;
 

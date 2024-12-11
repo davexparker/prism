@@ -1,8 +1,8 @@
-dtmc
+mdp
 
 // Uncertain parameters
 const double p;  // Transition probability from state 1 to state 2
-const double p_prime;  // Transition probability from state 2 to state 3
+//const double p_prime;  // Transition probability from state 2 to state 3
 const int timeS=10;
 
 module three_state_dtmc
@@ -15,7 +15,7 @@ module three_state_dtmc
     [] s=1 -> p : (s'=2) + (1-p) : (s'=3); // Uncertain transition to State 2 or 3
 
     // Transitions from State 2
-    [] s=2 -> p_prime : (s'=3) + (1-p_prime) : (s'=1); // Uncertain transition to State 3 or back to State 1
+    [] s=2 -> p : (s'=3) + (1-p) : (s'=1); // Uncertain transition to State 3 or back to State 1
 
     // State 3 is absorbing
     [] s=3 -> (s'=3);  // Absorbing state

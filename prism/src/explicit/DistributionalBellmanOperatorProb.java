@@ -15,16 +15,16 @@ import java.io.FileNotFoundException;
 import java.io.PrintWriter;
 import java.util.*;
 
- class DistributionalBellmanOperatorProb extends DistributionalBellmanOperator {
+class DistributionalBellmanOperatorProb extends DistributionalBellmanOperator {
 
-   public DistributionalBellmanOperatorProb(int atoms, double vmin, double vmax, int numStates, String distr_type, prism.PrismLog log) {
+    public DistributionalBellmanOperatorProb(int atoms, double vmin, double vmax, int numStates, String distr_type, prism.PrismLog log) {
         super(atoms, vmin, vmax, numStates, distr_type, log);
 
     }
 
     // Step for when the support represents the possible expected values and the transition is uncertain
     // Assumption : only one uncertain parameter is associated with a state-action pair.
-/*       public DiscreteDistribution step(MDP<Function> mdp, double param, double param_val, Map<Integer, Point> jointMap, int s, int choice, double gamma, double state_reward) {
+    public TreeMap<Integer, DiscreteDistribution> stepSep(MDP<Function> mdp, DiscreteDistribution param, Map<Integer, Point> jointMap, int s, int choice, double gamma, double state_reward) {
         TreeMap<Double, Double> sum_p = new TreeMap<>();
         Iterator<Map.Entry<Integer,Double>> iter;
         double exp_value;
@@ -36,265 +36,84 @@ import java.util.*;
         } else {
             res = new DistributionQuantile(atoms, mainLog);
         }
+
         // tree map construction
-        //System.out.println(param.getValue(0));
-        if (isCategorical) {
-            //System.out.println("Hi 3 from 1");
 
-            // Iterate over each possible transition probability group
-            // For ex. (p, 1-p), (1-p, p/2, p/2), etc.
-            //for (int i = 0; i < param.getAtoms(); i++) {
+        TreeMap<Integer, DiscreteDistribution> valuesForRealizations = new TreeMap<>();
 
-                exp_value = 0.0;
+    for (int i = 0; i < param.getAtoms(); i++) {
+        double expValue = 0.0;
 
-                //if(param.getValue(i)>0) {
-                    // instantiate the transitions for a possible parameter
-                    //int finalI = i;
-                    //double p_value = param.getSupport(finalI);
-                    //System.out.println(p_value);
-                    //System.out.println(p_value);
-                    //System.out.println("Starting state: " + s + " - uncertainty: " + p_value);
-                    // For multiple parameters, use the jointmap to get the support, and the joint distr for values
-                    if (!jointMap.isEmpty()){
-                        iter = mdp.getTransitionsMappedIterator(s, choice,
-                                p -> p.evaluate(jointMap.get(0)).doubleValue());
-                    } else {
-                        iter = mdp.getTransitionsMappedIterator(s, choice,
-                                p -> p.evaluate(toBigRationalPoint(param)).doubleValue());
-                    }
+        // Check if the parameter realization has a non-zero probability
+        if (param.getValue(i) > 0) {
+            int finalI = i;
+            DiscreteDistribution tempDist;
+            if (isCategorical) {
+                tempDist = new DistributionCategorical(atoms, v_min, v_max, mainLog);
+            } else {
+                tempDist = new DistributionQuantile(atoms, mainLog);
+            }
 
-                    // Iterate over possible transitions and successors
-                    while (iter.hasNext()) {
-                        Map.Entry<Integer, Double> e = iter.next();
-                        //System.out.println(e.getKey());
-                        double transition_val = e.getValue(); // possible values for the transition probability
-                        //System.out.println(transition_val);
-                        
-                        temp_atoms = distr[e.getKey()].getAtoms();
-                        //System.out.println(distr[e.getKey()].getValue(0));
-                        //System.out.println("   Next State: " + e.getKey() + ", uncertainty: " + param.getSupport(i));
-                        for (int j = 0; j < temp_atoms; j++) {
-                            // exp += nextstate_val[j] * nextstate_supp[j] * Pr[nextstate | s,a][i]
-                            //System.out.println("get_support: "+distr[e.getKey()].getValue(j));
-                            exp_value += (distr[e.getKey()].getValue(j) * distr[e.getKey()].getSupport(j) * transition_val);
-                            //System.out.println(exp_value);
-                            //double temp = distr[e.getKey()].getValue(j) * distr[e.getKey()].getSupport(j) * transition_val;
-                            // if (temp > 0) {
-                            //     mainLog.print("i:" + i + " - val: " + distr[e.getKey()].getValue(j) + " - supp: " + distr[e.getKey()].getSupport(j)
-                            //             + " - parameter val: " + transition_val + "- exp: " + exp_value + "\n");
-                            // }
-                        }
-                    }
-                    //System.out.println("--------");
+            Iterator<Map.Entry<Integer, Double>> iter2;
+            if (!jointMap.isEmpty()) {
+                iter2 = mdp.getTransitionsMappedIterator(s, choice,
+                        p -> p.evaluate(jointMap.get(finalI)).doubleValue());
+            } else {
+                iter2 = mdp.getTransitionsMappedIterator(s, choice,
+                        p -> p.evaluate(toBigRationalPoint(param.getSupport(finalI))).doubleValue());
+            }
 
-                    //System.out.println("During State: " + s + ", uncertainty: " + param.getSupport((i)));
+            // Compute the value for this parameter realization
+            while (iter2.hasNext()) {
+                Map.Entry<Integer, Double> e = iter2.next();
+                double transitionVal = e.getValue();
+                int tempAtoms = distr[e.getKey()].getAtoms();
 
-                    // mainLog.println("------------------------------------------");
-                    exp_value = exp_value * gamma; // discount information from successor states
-                    exp_value += state_reward; // add reward for current state
-                    //System.out.println("final: " + exp_value);
-                    // if it already exists, increase probability; else, create particle
-                    //System.out.println("Jeez: " + sum_p.get(exp_value));
-                    if (sum_p.containsKey(exp_value)) {
-                        sum_p.put(exp_value, sum_p.get(exp_value) + param_val);
-                    } else {
-                        sum_p.put(exp_value,  param_val);
-                    }
-
-                //}
-            //}
-            //System.out.println(sum_p);
-        }
-        /* else{
-            // since its quantile, probability for each parameter value is the same and strictly positive
-            //System.out.println("Hi 3 from 2");
-            double temp_value = param.getValue(0); // probability of each parameter atom
-            double temp_p= 0.0;
-            // INFO: quantile representation for
-            for (int i = 0; i < param.getAtoms(); i++) {
-                exp_value = 0.0;
-                int finalI = i;
-                //System.out.println("Realization: " + i + " - Support: " + param.getSupport(finalI) + ", Value: " + param.getValue(finalI));
-                // For multiple parameters, use the jointmap to get the support, and the joint distr for values
-                if (!jointMap.isEmpty()){
-                    iter = mdp.getTransitionsMappedIterator(s, choice,
-                            p -> p.evaluate(jointMap.get(finalI)).doubleValue());
-                } else {
-                    iter = mdp.getTransitionsMappedIterator(s, choice,
-                            p -> p.evaluate(toBigRationalPoint(param.getSupport(finalI))).doubleValue());
-                }
-
-                // Iterate over possible transitiopns and successors
-                while (iter.hasNext()) {
-                    Map.Entry<Integer, Double> e = iter.next();
-
-                    double transition_val = e.getValue(); // possible values for the transition probability
-                    //System.out.println("State: " + s + ", Next State: " + e.getKey() + ", p-value: " + transition_val);
-                    temp_atoms = distr[e.getKey()].getAtoms();
-                    temp_p = distr[e.getKey()].getValue(0); // all the same
-                    for (int j = 0; j < temp_atoms; j++) {
-                        // exp += nextstate_val[j] * nextstate_supp[j] * Pr[nextstate | s,a][i]
-                        exp_value += (temp_p * distr[e.getKey()].getSupport(j) * transition_val);
-                    }
-                }
-                exp_value = exp_value * gamma; // discount information from successor states
-                exp_value += state_reward; // add reward for current state
-                // if it already exists, increase probability; else, create particle
-                if (sum_p.containsKey(exp_value)) {
-                    sum_p.put(exp_value, sum_p.get(exp_value) + temp_value);
-                } else {
-                    sum_p.put(exp_value, temp_value);
-                }
-
-            } 
-        }
-
-
-        //mainLog.println(sum_p.keySet());
-        //mainLog.println(sum_p.values());
-
-        // Perform projection on the intermediate target
-        res.project(sum_p);
-        //System.out.println(res);
-        return res;
-    } */
-          public DiscreteDistribution step(MDP<Function> mdp, DiscreteDistribution param, Map<Integer, Point> jointMap, int s, int choice, double gamma, double state_reward) {
-        TreeMap<Double, Double> sum_p = new TreeMap<>();
-        Iterator<Map.Entry<Integer,Double>> iter;
-        double exp_value;
-        int temp_atoms;
-        DiscreteDistribution res;
-
-        if (isCategorical) {
-            res = new DistributionCategorical(atoms, v_min, v_max, mainLog);
-        } else {
-            res = new DistributionQuantile(atoms, mainLog);
-        }
-        // tree map construction
-        //System.out.println(param.getValue(0));
-        if (isCategorical) {
-            //System.out.println("Hi 3 from 1");
-
-            // Iterate over each possible transition probability group
-            // For ex. (p, 1-p), (1-p, p/2, p/2), etc.
-            for (int i = 0; i < param.getAtoms(); i++) {
-
-                exp_value = 0.0;
-
-                if(param.getValue(i)>0) {
-                    // instantiate the transitions for a possible parameter
-                    int finalI = i;
-                    double p_value = param.getSupport(finalI);
-                    //System.out.println(p_value);
-                    //System.out.println(p_value);
-                    //System.out.println("Starting state: " + s + " - uncertainty: " + p_value);
-                    // For multiple parameters, use the jointmap to get the support, and the joint distr for values
-                    if (!jointMap.isEmpty()){
-                        iter = mdp.getTransitionsMappedIterator(s, choice,
-                                p -> p.evaluate(jointMap.get(finalI)).doubleValue());
-                    } else {
-                        iter = mdp.getTransitionsMappedIterator(s, choice,
-                                p -> p.evaluate(toBigRationalPoint(param.getSupport(finalI))).doubleValue());
-                    }
-
-                    // Iterate over possible transitions and successors
-                    while (iter.hasNext()) {
-                        Map.Entry<Integer, Double> e = iter.next();
-                        //System.out.println(e.getKey());
-                        double transition_val = e.getValue(); // possible values for the transition probability
-                        //System.out.println(transition_val);
-                        
-                        temp_atoms = distr[e.getKey()].getAtoms();
-                        //System.out.println(distr[e.getKey()].getValue(0));
-                        //System.out.println("   Next State: " + e.getKey() + ", uncertainty: " + param.getSupport(i));
-                        for (int j = 0; j < temp_atoms; j++) {
-                            // exp += nextstate_val[j] * nextstate_supp[j] * Pr[nextstate | s,a][i]
-                            //System.out.println("get_support: "+distr[e.getKey()].getValue(j));
-                            exp_value += (distr[e.getKey()].getValue(j) * distr[e.getKey()].getSupport(j) * transition_val);
-                            //System.out.println(exp_value);
-                            //double temp = distr[e.getKey()].getValue(j) * distr[e.getKey()].getSupport(j) * transition_val;
-                            // if (temp > 0) {
-                            //     mainLog.print("i:" + i + " - val: " + distr[e.getKey()].getValue(j) + " - supp: " + distr[e.getKey()].getSupport(j)
-                            //             + " - parameter val: " + transition_val + "- exp: " + exp_value + "\n");
-                            // }
-                        }
-                    }
-                    //System.out.println("--------");
-
-                    //System.out.println("During State: " + s + ", uncertainty: " + param.getSupport((i)));
-
-                    // mainLog.println("------------------------------------------");
-                    exp_value = exp_value * gamma; // discount information from successor states
-                    exp_value += state_reward; // add reward for current state
-                    //System.out.println("final: " + exp_value);
-                    // if it already exists, increase probability; else, create particle
-                    System.out.println("Jeez: " + sum_p.get(exp_value));
-                    if (sum_p.containsKey(exp_value)) {
-                        sum_p.put(exp_value, sum_p.get(exp_value) + param.getValue(i));
-                    } else {
-                        sum_p.put(exp_value,  param.getValue(i));
-                    }
-
+                for (int j = 0; j < tempAtoms; j++) {
+                    expValue += (distr[e.getKey()].getValue(j) * 
+                                 distr[e.getKey()].getSupport(j) * 
+                                 transitionVal);
                 }
             }
-            //System.out.println(sum_p);
-        }
-        else{
-            // since its quantile, probability for each parameter value is the same and strictly positive
-            //System.out.println("Hi 3 from 2");
-            double temp_value = param.getValue(0); // probability of each parameter atom
-            double temp_p= 0.0;
-            // INFO: quantile representation for
-            for (int i = 0; i < param.getAtoms(); i++) {
-                exp_value = 0.0;
-                int finalI = i;
-                //System.out.println("Realization: " + i + " - Support: " + param.getSupport(finalI) + ", Value: " + param.getValue(finalI));
-                // For multiple parameters, use the jointmap to get the support, and the joint distr for values
-                if (!jointMap.isEmpty()){
-                    iter = mdp.getTransitionsMappedIterator(s, choice,
-                            p -> p.evaluate(jointMap.get(finalI)).doubleValue());
-                } else {
-                    iter = mdp.getTransitionsMappedIterator(s, choice,
-                            p -> p.evaluate(toBigRationalPoint(param.getSupport(finalI))).doubleValue());
-                }
+            expValue = expValue * gamma + state_reward;
 
-                // Iterate over possible transitiopns and successors
-                while (iter.hasNext()) {
-                    Map.Entry<Integer, Double> e = iter.next();
-
-                    double transition_val = e.getValue(); // possible values for the transition probability
-                    //System.out.println("State: " + s + ", Next State: " + e.getKey() + ", p-value: " + transition_val);
-                    temp_atoms = distr[e.getKey()].getAtoms();
-                    temp_p = distr[e.getKey()].getValue(0); // all the same
-                    for (int j = 0; j < temp_atoms; j++) {
-                        // exp += nextstate_val[j] * nextstate_supp[j] * Pr[nextstate | s,a][i]
-                        exp_value += (temp_p * distr[e.getKey()].getSupport(j) * transition_val);
-                    }
-                }
-                exp_value = exp_value * gamma; // discount information from successor states
-                exp_value += state_reward; // add reward for current state
-                // if it already exists, increase probability; else, create particle
-                if (sum_p.containsKey(exp_value)) {
-                    sum_p.put(exp_value, sum_p.get(exp_value) + temp_value);
-                } else {
-                    sum_p.put(exp_value, temp_value);
-                }
-
+            // Store the value in the distribution for this realization
+            if (sum_p.containsKey(expValue)) {
+                sum_p.put(expValue, sum_p.get(expValue) + param.getValue(i));
+            } else {
+                sum_p.put(expValue,  param.getValue(i));
             }
+            tempDist.project(sum_p);
+            valuesForRealizations.put(i, tempDist);
         }
-
-
-        //mainLog.println(sum_p.keySet());
-        //mainLog.println(sum_p.values());
-
-        // Perform projection on the intermediate target
-        res.project(sum_p);
-        System.out.println(res);
-        return res;
     }
-   
-   
 
+        return valuesForRealizations;
+    }
+
+    public DiscreteDistribution step(MDP<Function> mdp, DiscreteDistribution param, Map<Integer, Point> jointMap, int s, int choice, double gamma, double state_reward) {
+        TreeMap<Integer, DiscreteDistribution> values = stepSep(mdp, param, jointMap, s, choice, gamma, state_reward);
+        TreeMap<Double, Double> aggregatedValues = new TreeMap<>();
+
+        for (DiscreteDistribution dist : values.values()) {
+            for (int i = 0; i < dist.getAtoms(); i++) {
+                double value = dist.getSupport(i);
+                double probability = dist.getValue(i);
+                aggregatedValues.put(value, aggregatedValues.getOrDefault(value, 0.0) + probability);
+            }
+        }
+
+        DiscreteDistribution result;
+        if (isCategorical) {
+            result = new DistributionCategorical(atoms, v_min, v_max, mainLog);
+        } else {
+            result = new DistributionQuantile(atoms, mainLog);
+        }
+
+        result.project(aggregatedValues);
+
+        return result;
+    }    
     // Log distribution for a state to a file <filename> as a csv with columns : support index, probability, support value
     // Categorical : support index, probability, support value
     // Quantile : support value, probability, cumulative probability
