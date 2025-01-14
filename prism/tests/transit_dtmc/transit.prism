@@ -1,0 +1,28 @@
+mdp
+
+const int M = 5; // represents starting amount
+const int MAX_MONEY = 100;
+const int STAGES = 3; // number of stages
+
+// Uncertain parameters
+const double p; // original 0.7
+const double p_jackpot=0.05; // original 0.05
+
+module game
+    m:[0..MAX_MONEY] init M; // represents current money
+    s:[1..STAGES+1] init 1; // current stage
+
+    // Betting transitions
+    [zero] (s < STAGES) ->  (s'=min(s+1, STAGES)) & (m'=m);
+    [one] m > 0 & (s < STAGES)-> p:(s'=min(s+1, STAGES)) & (m'=min(m+1, MAX_MONEY)) + p_jackpot: (s'=min(s+1, STAGES)) & (m'=min(m+10, MAX_MONEY)) + (1-(p+p_jackpot)): (s'=min(s+1, STAGES)) & (m'=max(m-1,0));
+    [two] m > 1 & (s < STAGES)-> p:(s'=min(s+1, STAGES)) & (m'=min(m+2, MAX_MONEY)) + p_jackpot: (s'=min(s+1, STAGES)) & (m'=min(m+2*10, MAX_MONEY)) + (1-(p+p_jackpot)): (s'=min(s+1, STAGES)) & (m'=max(m-2,0));
+    [three] m > 2 & (s < STAGES)-> p:(s'=min(s+1, STAGES)) & (m'=min(m+3, MAX_MONEY)) + p_jackpot: (s'=min(s+1, STAGES)) & (m'=min(m+3*10, MAX_MONEY)) + (1-(p+p_jackpot)): (s'=min(s+1, STAGES)) & (m'=max(m-3,0));
+    [end] s=(STAGES) -> (s'=s+1);
+endmodule
+
+label "goal" = (s=STAGES+1);
+label "obs" = (m=0);
+
+rewards
+    [end] s=STAGES : MAX_MONEY-m;
+endrewards

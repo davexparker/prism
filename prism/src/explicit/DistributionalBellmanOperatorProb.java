@@ -24,96 +24,27 @@ class DistributionalBellmanOperatorProb extends DistributionalBellmanOperator {
 
     // Step for when the support represents the possible expected values and the transition is uncertain
     // Assumption : only one uncertain parameter is associated with a state-action pair.
-    public TreeMap<Integer, DiscreteDistribution> stepSep(MDP<Function> mdp, DiscreteDistribution param, Map<Integer, Point> jointMap, int s, int choice, double gamma, double state_reward) {
+    public double step(MDP<Function> mdp, double realization, int s, int choice, double gamma, double reward) {
         TreeMap<Double, Double> sum_p = new TreeMap<>();
         Iterator<Map.Entry<Integer,Double>> iter;
-        double exp_value;
+        double exp_value = 0.0;
         int temp_atoms;
         DiscreteDistribution res;
-
-        if (isCategorical) {
-            res = new DistributionCategorical(atoms, v_min, v_max, mainLog);
-        } else {
-            res = new DistributionQuantile(atoms, mainLog);
-        }
-
-        // tree map construction
-
-        TreeMap<Integer, DiscreteDistribution> valuesForRealizations = new TreeMap<>();
-
-    for (int i = 0; i < param.getAtoms(); i++) {
-        double expValue = 0.0;
-
-        // Check if the parameter realization has a non-zero probability
-        if (param.getValue(i) > 0) {
-            int finalI = i;
-            DiscreteDistribution tempDist;
-            if (isCategorical) {
-                tempDist = new DistributionCategorical(atoms, v_min, v_max, mainLog);
-            } else {
-                tempDist = new DistributionQuantile(atoms, mainLog);
+		System.out.println("realization: " + realization);
+        Iterator<Map.Entry<Integer,Double>> transit;
+        transit = mdp.getTransitionsMappedIterator(s, choice, p -> p.evaluate(toBigRationalPoint(realization)).doubleValue());
+		while (transit.hasNext()){
+			Map.Entry<Integer,Double> e = transit.next();
+            double transition_val = e.getValue();
+			int numTrans = distr[e.getKey()].getAtoms();
+            System.out.println(transition_val);
+			for (int j =0; j< numTrans; j++){
+                exp_value += (distr[e.getKey()].getValue(j) * distr[e.getKey()].getSupport(j) * transition_val);
             }
-
-            Iterator<Map.Entry<Integer, Double>> iter2;
-            if (!jointMap.isEmpty()) {
-                iter2 = mdp.getTransitionsMappedIterator(s, choice,
-                        p -> p.evaluate(jointMap.get(finalI)).doubleValue());
-            } else {
-                iter2 = mdp.getTransitionsMappedIterator(s, choice,
-                        p -> p.evaluate(toBigRationalPoint(param.getSupport(finalI))).doubleValue());
-            }
-
-            // Compute the value for this parameter realization
-            while (iter2.hasNext()) {
-                Map.Entry<Integer, Double> e = iter2.next();
-                double transitionVal = e.getValue();
-                int tempAtoms = distr[e.getKey()].getAtoms();
-
-                for (int j = 0; j < tempAtoms; j++) {
-                    expValue += (distr[e.getKey()].getValue(j) * 
-                                 distr[e.getKey()].getSupport(j) * 
-                                 transitionVal);
-                }
-            }
-            expValue = expValue * gamma + state_reward;
-
-            // Store the value in the distribution for this realization
-            if (sum_p.containsKey(expValue)) {
-                sum_p.put(expValue, sum_p.get(expValue) + param.getValue(i));
-            } else {
-                sum_p.put(expValue,  param.getValue(i));
-            }
-            tempDist.project(sum_p);
-            valuesForRealizations.put(i, tempDist);
-        }
+		}
+        exp_value += reward;
+        return exp_value;
     }
-
-        return valuesForRealizations;
-    }
-
-    public DiscreteDistribution step(MDP<Function> mdp, DiscreteDistribution param, Map<Integer, Point> jointMap, int s, int choice, double gamma, double state_reward) {
-        TreeMap<Integer, DiscreteDistribution> values = stepSep(mdp, param, jointMap, s, choice, gamma, state_reward);
-        TreeMap<Double, Double> aggregatedValues = new TreeMap<>();
-
-        for (DiscreteDistribution dist : values.values()) {
-            for (int i = 0; i < dist.getAtoms(); i++) {
-                double value = dist.getSupport(i);
-                double probability = dist.getValue(i);
-                aggregatedValues.put(value, aggregatedValues.getOrDefault(value, 0.0) + probability);
-            }
-        }
-
-        DiscreteDistribution result;
-        if (isCategorical) {
-            result = new DistributionCategorical(atoms, v_min, v_max, mainLog);
-        } else {
-            result = new DistributionQuantile(atoms, mainLog);
-        }
-
-        result.project(aggregatedValues);
-
-        return result;
-    }    
     // Log distribution for a state to a file <filename> as a csv with columns : support index, probability, support value
     // Categorical : support index, probability, support value
     // Quantile : support value, probability, cumulative probability
