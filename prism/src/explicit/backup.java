@@ -13,6 +13,8 @@ import prism.PrismSettings;
 import strat.MDStrategy;
 import strat.MDStrategyArray;
 
+import static java.lang.Math.exp;
+
 import java.text.DecimalFormat;
 import java.util.*;
 
@@ -159,7 +161,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 		int iterations = 3000;
 		int min_iter = 8;
 		double error_thresh = 0.01;
-		double gamma = 1;
+		double gamma =0.1;
 		double alpha=0.5;
 		Double dtmc_epsilon = null;
 		boolean check_dtmc_distr = true;
@@ -191,10 +193,12 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 				i += 1;
 			}
 		}
-		System.out.println(trans_distr_file);
-		System.out.println(trans_prob);
 
 		DiscreteDistribution m = null;
+		double [][][] q_value = new double[trans_distr_file.size()][n][nactions];
+		double [][] v = new double[trans_distr_file.size()][n];
+		double [][] vPrev = new double[trans_distr_file.size()][n];
+		double [] finalV = new double[n];
 		double [] action_val = new double[nactions];
 		double [] action_exp = new double[n];
 		Object [] policy = new Object[n];
@@ -203,9 +207,23 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 		double max_dist ; int numChoices;
 		int iters; boolean isUncertain;
 
+		// Initiate q_value to 0
+		PrimitiveIterator.OfInt states = unknownStates.iterator();
+		while (states.hasNext()){
+			final int s = states.nextInt();
+			numChoices = mdp.getNumChoices(s);
+			for (int i = 0; i < numChoices; i++)
+				for (int j = 0; j < trans_distr_file.size(); j++){
+					q_value[j][s][i] = 0.0;
+					v[j][s] = 0.0;
+				}
+			finalV[s] = 0.0;
+
+		}
+
 		for (iters= 0; iters < iterations; iters ++){	
-			PrimitiveIterator.OfInt states = unknownStates.iterator();
-			System.out.println(unknownStates);
+			System.out.println(iters);
+			states = unknownStates.iterator();
 			while (states.hasNext()){
 				final int s = states.nextInt();
 				max_v = Float.POSITIVE_INFINITY; max_a = 0;
@@ -213,42 +231,88 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 				for (int choice = 0; choice < numChoices; choice ++){
 					double reward = mdpRewards.getStateReward(s).evaluate(toBigRationalPoint(empty_eval_array)).doubleValue();
 					reward += mdpRewards.getTransitionReward(s, choice).evaluate(toBigRationalPoint(empty_eval_array)).doubleValue();
-					System.out.println(reward);
 					Iterator<Map.Entry<Integer, Function>> iter3 = mdp.getTransitionsIterator(s, choice);
-					isUncertain = true;
-					while (iter3.hasNext()){
-						Map.Entry<Integer,Function> e = iter3.next();
-						isUncertain &= e.getValue().isConstant();
-					}
-					Iterator<Map.Entry<Integer,Double>> transit;
-					double q_value = 0;
 					for (int i = 0; i < trans_distr_file.size(); i++){ 
 						if (trans_distr_file.get(i)>0){
 							double realization = trans_distr_file.get(i);
-							System.out.println("realization: " + realization);
-							double raw_exp = operator.step(mdp, realization, s, choice, gamma, reward);
-							System.out.println(raw_exp);
-							q_value += trans_prob.get(i)*raw_exp;
+							Iterator<Map.Entry<Integer,Double>> transit;
+        					transit = mdp.getTransitionsMappedIterator(s, choice, p -> p.evaluate(toBigRationalPoint(realization)).doubleValue());
+							while (transit.hasNext()){
+								Map.Entry<Integer,Double> e = transit.next();
+            					double transition_val = e.getValue();
+								int next_state = e.getKey();
+								q_value[i][s][choice] = reward + transition_val*v[i][next_state];
+							}
 						}
 					}
-					action_val[choice] = q_value;
-					if (action_val[choice] < max_v) {
-						max_a = choice;
-						max_v = action_val[choice]; 
-						action_exp[s] = max_v;
-					}
-					policy[s] = mdp.getAction(s, max_a);
-					choices[s] = max_a;
-					System.out.println(choices[79]);
+					//action_val[choice] = q_value;
+					//if (action_val[choice] < max_v) {
+					//	max_a = choice;
+					//	max_v = action_val[choice]; 
+					//	action_exp[s] = max_v;
+					//}
 				}
+				
+				double prev = 0.0;
+				for (int choice = 0; choice < numChoices; choice ++){
+					double tmpV = 0.0;
+					for (int i=0; i < trans_distr_file.size(); i++){
+						if (trans_distr_file.get(i) > 0){
+							tmpV += trans_prob.get(i)*q_value[i][s][choice];
+						}
+					}
+					if (tmpV > prev){
+						prev = tmpV;
+						choices[s] = choice;
+						action_exp[s] = prev;
+						max_a = choice;
+					}
+					for (int i=0; i < trans_distr_file.size(); i++){
+						v[i][s] = q_value[i][s][max_a];
+					}
+				}
+				policy[s] = mdp.getAction(s, max_a);
+			}
+			states = unknownStates.iterator();
+			double error = 0.0;
+			while (states.hasNext()){
+				final int s = states.nextInt();
+				double preV = finalV[s];
+				double curV = 0.0;
+				double curE = 0.0;
+				for (int j = 0; j < trans_distr_file.size(); j++){
+					curV += trans_prob.get(j)*v[j][s];
+				}
+				finalV[s] = curV;
+				if (curV - preV < 0){
+					curE = preV - curV;
+				} else {
+					curE = curV - preV;
+				}
+				if (curE > error){
+					error = curE;
+				}
+			}
+			if (error <= error_thresh){
+				break;
 			}
 		}
 
-
-		
+		states = unknownStates.iterator();
+		while (states.hasNext()){
+			final int s = states.nextInt();
+			System.out.println(choices[s]);
+		}
+		operator.writeToFile(mdp.getFirstInitialState(), null);
 		ModelCheckerResult res = new ModelCheckerResult();
-		res.solnObj = new Object[mdp.getNumStates()];
-		res.solnObj[0] = 99.0;
+		res.soln = Arrays.copyOf(action_exp, action_exp.length); // return the expected values for each state
+		res.numIters = iterations;
+		res.timeTaken = (System.currentTimeMillis() - total_timer) / 1000.0;
+		// Store strategy
+		if (genStrat) {
+			res.strat = new MDStrategyArray<>(mdp, choices);
+		}
+
 		return res;
 	}
 

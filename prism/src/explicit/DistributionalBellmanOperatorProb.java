@@ -30,19 +30,18 @@ class DistributionalBellmanOperatorProb extends DistributionalBellmanOperator {
         double exp_value = 0.0;
         int temp_atoms;
         DiscreteDistribution res;
-		System.out.println("realization: " + realization);
         Iterator<Map.Entry<Integer,Double>> transit;
         transit = mdp.getTransitionsMappedIterator(s, choice, p -> p.evaluate(toBigRationalPoint(realization)).doubleValue());
 		while (transit.hasNext()){
 			Map.Entry<Integer,Double> e = transit.next();
             double transition_val = e.getValue();
 			int numTrans = distr[e.getKey()].getAtoms();
-            System.out.println(transition_val);
 			for (int j =0; j< numTrans; j++){
                 exp_value += (distr[e.getKey()].getValue(j) * distr[e.getKey()].getSupport(j) * transition_val);
             }
 		}
-        exp_value += reward;
+        System.out.println(exp_value);
+        exp_value = exp_value*gamma + reward;
         return exp_value;
     }
     // Log distribution for a state to a file <filename> as a csv with columns : support index, probability, support value
