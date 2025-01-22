@@ -381,6 +381,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 				for (int choice = 0; choice < numChoices; choice ++){
 					double reward = mdpRewards.getStateReward(s).evaluate(toBigRationalPoint(empty_eval_array)).doubleValue();
 					reward += mdpRewards.getTransitionReward(s, choice).evaluate(toBigRationalPoint(empty_eval_array)).doubleValue();
+					System.out.println(reward);
 					Iterator<Map.Entry<Integer, Function>> iter3 = mdp.getTransitionsIterator(s, choice);
 						for (int i = 0; i < jointRealization.size(); i++){ 
 							Double[] realization = jointRealization.get(i);
@@ -412,7 +413,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 					if (tmpV > prev){
 						prev = tmpV;
 						choices[s] = choice;
-						action_exp[s] = prev;
+						action_exp[s] = tmpV;
 						max_a = choice;
 					}
 					for (int i=0; i < jointRealization.size(); i++){
@@ -444,12 +445,6 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 			if (error <= error_thresh){
 				break;
 			}
-		}
-
-		states = unknownStates.iterator();
-		while (states.hasNext()){
-			final int s = states.nextInt();
-			System.out.println(choices[s]);
 		}
 		operator.writeToFile(mdp.getFirstInitialState(), null);
 		ModelCheckerResult res = new ModelCheckerResult();
