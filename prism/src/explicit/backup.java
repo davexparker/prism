@@ -264,11 +264,12 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 								double realization = trans_distr_file.get(i);
 								Iterator<Map.Entry<Integer,Double>> transit;
         						transit = mdp.getTransitionsMappedIterator(s, choice, p -> p.evaluate(toBigRationalPoint(realization)).doubleValue());
+								q_value[i][s][choice] = reward;
 								while (transit.hasNext()){
 									Map.Entry<Integer,Double> e = transit.next();
             						double transition_val = e.getValue();
 									int next_state = e.getKey();
-									q_value[i][s][choice] = reward + transition_val*v[i][next_state];
+									q_value[i][s][choice] += transition_val*v[i][next_state];
 								}
 							}
 						}
@@ -387,12 +388,13 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 							Double[] realization = jointRealization.get(i);
 							Iterator<Map.Entry<Integer,Double>> transit;
         					transit = mdp.getTransitionsMappedIterator(s, choice, p -> p.evaluate(toBigRationalPoint(realization)).doubleValue());
+							q_value[i][s][choice] = reward;
 							while (transit.hasNext()){
 								Map.Entry<Integer,Double> e = transit.next();
             					double transition_val = e.getValue();
 								int next_state = e.getKey();
 								
-								q_value[i][s][choice] = reward + transition_val*v[i][next_state];
+								q_value[i][s][choice] += transition_val*v[i][next_state];
 				
 							}
 						}

@@ -1,4 +1,4 @@
-Rmax=?[F "goal"] // maybe max of Rmin/Pmax for best policy
+Rmin=?[F "goal"] // maybe max of Rmin/Pmax for best policy
 R(cvar)min=? [ F "goal" ];
 R(dist)min=? [ F "goal" ];
 
