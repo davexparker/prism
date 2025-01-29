@@ -161,7 +161,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 		int iterations = 3000;
 		int min_iter = 8;
 		double error_thresh = 0.01;
-		double gamma =0.1;
+		double gamma =1;
 		double alpha=0.5;
 		Double dtmc_epsilon = null;
 		boolean check_dtmc_distr = true;
@@ -219,7 +219,6 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 
 		//System.out.println(trans_distr_file);
 		//System.out.println(trans_prob);
-		System.out.println(numParams);
 		if (numParams == 1){
 			DiscreteDistribution m = null;
 		double [][][] q_value = new double[trans_distr_file.size()][n][nactions];
@@ -249,7 +248,6 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 		}
 
 		for (iters= 0; iters < iterations; iters ++){	
-			System.out.println(iters);
 			states = unknownStates.iterator();
 			while (states.hasNext()){
 				final int s = states.nextInt();
@@ -269,7 +267,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 									Map.Entry<Integer,Double> e = transit.next();
             						double transition_val = e.getValue();
 									int next_state = e.getKey();
-									q_value[i][s][choice] += transition_val*v[i][next_state];
+									q_value[i][s][choice] += gamma*transition_val*v[i][next_state];
 								}
 							}
 						}
@@ -325,12 +323,56 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 				break;
 			}
 		}
+		double expected_dtmc = 0;
+		double [] exp_dtmc_atom = new double[trans_distr_file.size()];
+		int total_atoms = trans_distr_file.size();
+		long dtmc_timer = System.currentTimeMillis();
+		for (int i = 0; i < total_atoms; i ++){
+			int finalI = i;
+			double realization = trans_distr_file.get(i);
+			MDP<Double> atom_mdp;
+			atom_mdp = new MDPSimple<>(mdp,p -> p.evaluate(toBigRationalPoint(realization)).doubleValue(),Evaluator.forDouble());
+			MDStrategy strat = new MDStrategyArray(atom_mdp, choices);
+			DTMC dtmc = new DTMCFromMDPAndMDStrategy(atom_mdp, strat);
+			StateRewardsArray mcRewards = new StateRewardsArray(n);
+
+			for (int s = 0; s < n; s++) {
+				double reward = mdpRewards.getStateReward(s).evaluate(toBigRationalPoint(empty_eval_array)).doubleValue() ;
+				reward +=  mdpRewards.getTransitionReward(s, choices[s]).evaluate(toBigRationalPoint(empty_eval_array)).doubleValue();
+				mcRewards.setStateReward(s, reward);
+			}
+			DTMCModelChecker mcDTMC = new DTMCModelChecker(this);
+			timer = System.currentTimeMillis();
+			ModelCheckerResult dtmc_result = mcDTMC.computeReachRewardsDistr(dtmc, mcRewards, target, "prism/umdp_out/distr_dtmc_prob_exp_"+i+".csv", dtmc_epsilon);
+			timer = System.currentTimeMillis() - timer;
+			if (verbosity >= 1) {
+				mainLog.print("\nDTMC computation (" + (min ? "min" : "max") + ")");
+				mainLog.println(" : " + timer / 1000.0 + " seconds.");
+			}
+			TreeMap<Integer,Double> result_i = (TreeMap<Integer, Double>) dtmc_result.solnObj[dtmc.getFirstInitialState()];
+			for(Map.Entry<Integer, Double> entry : result_i.entrySet())
+				{
+					exp_dtmc_atom[i]+= entry.getKey() *entry.getValue();
+				}
+
+				// Use the joint distribution if there are multiple parameters
+			expected_dtmc += trans_prob.get(i) * exp_dtmc_atom[i];
+				
+				
+			}
+
+			dtmc_timer = System.currentTimeMillis() - dtmc_timer;
+			if (verbosity >= 1) {
+				mainLog.print("\nTotal DTMC computation for total atoms - "+total_atoms);
+				mainLog.println(" : " + dtmc_timer / 1000.0 + " seconds.");
+			}
+			
+
+			// print info for DTMC results
+			mainLog.println("Exp values: " + Arrays.toString(exp_dtmc_atom));
+			mainLog.println("DTMC weighted expected value :" + expected_dtmc);
 
 		states = unknownStates.iterator();
-		while (states.hasNext()){
-			final int s = states.nextInt();
-			System.out.println(choices[s]);
-		}
 		operator.writeToFile(mdp.getFirstInitialState(), null);
 		ModelCheckerResult res = new ModelCheckerResult();
 		res.soln = Arrays.copyOf(action_exp, action_exp.length); // return the expected values for each state
@@ -358,96 +400,146 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 			double max_dist ; int numChoices;
 			int iters; boolean isUncertain;
 
-		// Initiate q_value to 0
-		PrimitiveIterator.OfInt states = unknownStates.iterator();
-		while (states.hasNext()){
-			final int s = states.nextInt();
-			numChoices = mdp.getNumChoices(s);
-			for (int i = 0; i < numChoices; i++)
-				for (int j = 0; j < trans_distr_file.size(); j++){
-					q_value[j][s][i] = 0.0;
-					v[j][s] = 0.0;
-				}
-			finalV[s] = 0.0;
-
-		}
-
-		for (iters= 0; iters < iterations; iters ++){	
-			System.out.println(iters);
-			states = unknownStates.iterator();
+			// Initiate q_value to 0
+			PrimitiveIterator.OfInt states = unknownStates.iterator();
 			while (states.hasNext()){
 				final int s = states.nextInt();
-				max_v = Float.POSITIVE_INFINITY; max_a = 0;
 				numChoices = mdp.getNumChoices(s);
-				for (int choice = 0; choice < numChoices; choice ++){
-					double reward = mdpRewards.getStateReward(s).evaluate(toBigRationalPoint(empty_eval_array)).doubleValue();
-					reward += mdpRewards.getTransitionReward(s, choice).evaluate(toBigRationalPoint(empty_eval_array)).doubleValue();
-					System.out.println(reward);
-					Iterator<Map.Entry<Integer, Function>> iter3 = mdp.getTransitionsIterator(s, choice);
-						for (int i = 0; i < jointRealization.size(); i++){ 
-							Double[] realization = jointRealization.get(i);
-							Iterator<Map.Entry<Integer,Double>> transit;
-        					transit = mdp.getTransitionsMappedIterator(s, choice, p -> p.evaluate(toBigRationalPoint(realization)).doubleValue());
-							q_value[i][s][choice] = reward;
-							while (transit.hasNext()){
-								Map.Entry<Integer,Double> e = transit.next();
-            					double transition_val = e.getValue();
-								int next_state = e.getKey();
+				for (int i = 0; i < numChoices; i++)
+					for (int j = 0; j < trans_distr_file.size(); j++){
+						q_value[j][s][i] = 0.0;
+						v[j][s] = 0.0;
+					}
+				finalV[s] = 0.0;
+
+			}
+
+			for (iters= 0; iters < iterations; iters ++){	
+				states = unknownStates.iterator();
+				while (states.hasNext()){
+					final int s = states.nextInt();
+					max_v = Float.POSITIVE_INFINITY; max_a = 0;
+					numChoices = mdp.getNumChoices(s);
+					for (int choice = 0; choice < numChoices; choice ++){
+						double reward = mdpRewards.getStateReward(s).evaluate(toBigRationalPoint(empty_eval_array)).doubleValue();
+						reward += mdpRewards.getTransitionReward(s, choice).evaluate(toBigRationalPoint(empty_eval_array)).doubleValue();
+						Iterator<Map.Entry<Integer, Function>> iter3 = mdp.getTransitionsIterator(s, choice);
+							for (int i = 0; i < jointRealization.size(); i++){ 
+								Double[] realization = jointRealization.get(i);
+								Iterator<Map.Entry<Integer,Double>> transit;
+        						transit = mdp.getTransitionsMappedIterator(s, choice, p -> p.evaluate(toBigRationalPoint(realization)).doubleValue());
+								q_value[i][s][choice] = reward;
+								while (transit.hasNext()){
+									Map.Entry<Integer,Double> e = transit.next();
+            						double transition_val = e.getValue();
+									int next_state = e.getKey();
 								
-								q_value[i][s][choice] += transition_val*v[i][next_state];
+									q_value[i][s][choice] += gamma*transition_val*v[i][next_state];
 				
+								}
 							}
-						}
 					//action_val[choice] = q_value;
 					//if (action_val[choice] < max_v) {
 					//	max_a = choice;
 					//	max_v = action_val[choice]; 
 					//	action_exp[s] = max_v;
 					//}
-				}
+					}
 				
-				double prev = 0.0;
-				for (int choice = 0; choice < numChoices; choice ++){
-					double tmpV = 0.0;
-					for (int i=0; i < jointRealization.size(); i++){
-						tmpV += jointProb.get(i)*q_value[i][s][choice];
+					double prev = 0.0;
+					for (int choice = 0; choice < numChoices; choice ++){
+						double tmpV = 0.0;
+						for (int i=0; i < jointRealization.size(); i++){
+							tmpV += jointProb.get(i)*q_value[i][s][choice];
+						}
+						if (tmpV > prev){
+							prev = tmpV;
+							choices[s] = choice;
+							action_exp[s] = tmpV;
+							max_a = choice;
+						}
+						for (int i=0; i < jointRealization.size(); i++){
+							v[i][s] = q_value[i][s][max_a];
+						}
 					}
-					if (tmpV > prev){
-						prev = tmpV;
-						choices[s] = choice;
-						action_exp[s] = tmpV;
-						max_a = choice;
+					policy[s] = mdp.getAction(s, max_a);
+				}
+				states = unknownStates.iterator();
+				double error = 0.0;
+				while (states.hasNext()){
+					final int s = states.nextInt();
+					double preV = finalV[s];
+					double curV = 0.0;
+					double curE = 0.0;
+					for (int j = 0; j < jointRealization.size(); j++){
+						curV += jointProb.get(j)*v[j][s];
 					}
-					for (int i=0; i < jointRealization.size(); i++){
-						v[i][s] = q_value[i][s][max_a];
+					finalV[s] = curV;
+					if (curV - preV < 0){
+						curE = preV - curV;
+					} else {
+						curE = curV - preV;
+					}
+					if (curE > error){
+						error = curE;
 					}
 				}
-				policy[s] = mdp.getAction(s, max_a);
-			}
-			states = unknownStates.iterator();
-			double error = 0.0;
-			while (states.hasNext()){
-				final int s = states.nextInt();
-				double preV = finalV[s];
-				double curV = 0.0;
-				double curE = 0.0;
-				for (int j = 0; j < jointRealization.size(); j++){
-					curV += jointProb.get(j)*v[j][s];
-				}
-				finalV[s] = curV;
-				if (curV - preV < 0){
-					curE = preV - curV;
-				} else {
-					curE = curV - preV;
-				}
-				if (curE > error){
-					error = curE;
+				if (error <= error_thresh){
+					break;
 				}
 			}
-			if (error <= error_thresh){
-				break;
+		
+		double expected_dtmc = 0;
+		double [] exp_dtmc_atom = new double[jointRealization.size()];
+		int total_atoms = jointRealization.size();
+		long dtmc_timer = System.currentTimeMillis();
+		for (int i = 0; i < total_atoms; i ++){
+			int finalI = i;
+			Double[] realization = jointRealization.get(i);
+			MDP<Double> atom_mdp;
+			atom_mdp = new MDPSimple<>(mdp,p -> p.evaluate(toBigRationalPoint(realization)).doubleValue(),Evaluator.forDouble());
+			MDStrategy strat = new MDStrategyArray(atom_mdp, choices);
+			DTMC dtmc = new DTMCFromMDPAndMDStrategy(atom_mdp, strat);
+			StateRewardsArray mcRewards = new StateRewardsArray(n);
+
+			for (int s = 0; s < n; s++) {
+				double reward = mdpRewards.getStateReward(s).evaluate(toBigRationalPoint(empty_eval_array)).doubleValue() ;
+				reward +=  mdpRewards.getTransitionReward(s, choices[s]).evaluate(toBigRationalPoint(empty_eval_array)).doubleValue();
+				mcRewards.setStateReward(s, reward);
 			}
-		}
+			DTMCModelChecker mcDTMC = new DTMCModelChecker(this);
+			timer = System.currentTimeMillis();
+			ModelCheckerResult dtmc_result = mcDTMC.computeReachRewardsDistr(dtmc, mcRewards, target, "prism/umdp_out/distr_dtmc_prob_exp_"+i+".csv", dtmc_epsilon);
+			timer = System.currentTimeMillis() - timer;
+			if (verbosity >= 1) {
+				mainLog.print("\nDTMC computation (" + (min ? "min" : "max") + ")");
+				mainLog.println(" : " + timer / 1000.0 + " seconds.");
+			}
+			TreeMap<Integer,Double> result_i = (TreeMap<Integer, Double>) dtmc_result.solnObj[dtmc.getFirstInitialState()];
+			for(Map.Entry<Integer, Double> entry : result_i.entrySet())
+				{
+					exp_dtmc_atom[i]+= entry.getKey() *entry.getValue();
+				}
+
+				// Use the joint distribution if there are multiple parameters
+			expected_dtmc += jointProb.get(i) * exp_dtmc_atom[i];
+				
+				
+			}
+
+			dtmc_timer = System.currentTimeMillis() - dtmc_timer;
+			if (verbosity >= 1) {
+				mainLog.print("\nTotal DTMC computation for total atoms - "+total_atoms);
+				mainLog.println(" : " + dtmc_timer / 1000.0 + " seconds.");
+			}
+			
+
+			// print info for DTMC results
+			mainLog.println("Exp values: " + Arrays.toString(exp_dtmc_atom));
+			mainLog.println("DTMC weighted expected value :" + expected_dtmc);
+
+
+
 		operator.writeToFile(mdp.getFirstInitialState(), null);
 		ModelCheckerResult res = new ModelCheckerResult();
 		res.soln = Arrays.copyOf(action_exp, action_exp.length); // return the expected values for each state
