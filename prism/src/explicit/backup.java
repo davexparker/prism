@@ -3,6 +3,7 @@ package explicit;
 import common.IntSet;
 import common.Interval;
 import explicit.rewards.MDPRewards;
+import explicit.rewards.MDPRewardsSimple;
 import explicit.rewards.StateRewardsArray;
 import explicit.*;
 import param.BigRational;
@@ -181,14 +182,12 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 
 		Evaluator.EvaluatorFunction eval = (Evaluator.EvaluatorFunction) mdp.getEvaluator();
 		int numParams = eval.getNumParameters();
-		ArrayList<DiscreteDistribution> transition_distr = new ArrayList<>(numParams);
 		Double [] empty_eval_array = new Double[numParams];
 		ArrayList<Double> trans_distr_file = new ArrayList<>(uncertain_atoms);
 		ArrayList<Double> trans_prob = new ArrayList<>(uncertain_atoms);
 		int [] index = new int[numParams];
 		int counter = 0;
 		for(int j=0; j<numParams; j++){
-			DiscreteDistribution transition_temp;
 			String p_name = eval.getParameterName(j);
 			ArrayList<String[]> params = mcMDP.readParams("prism/tests/param_distr/param_"+p_name+".csv", 2);
 			int i = 0; empty_eval_array[j] = 0.0;
@@ -211,21 +210,6 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 		}
 
 
-
-		/*Iterator<Map.Entry<Integer,Double>> transit;
-		Double [] pointArr = new Double[2];
-		pointArr[0] = 0.8;
-		pointArr[1] = 0.1;
-		transit = mdp.getTransitionsMappedIterator(25, 1, p -> p.evaluate(toBigRationalPoint(result.get(8))).doubleValue());
-		while (transit.hasNext()){
-			Map.Entry<Integer,Double> e = transit.next();
-            double transition_val = e.getValue();
-			int next_state = e.getKey();
-			System.out.println(e);
-		} */
-
-		//System.out.println(trans_distr_file);
-		//System.out.println(trans_prob);
 		if (numParams == 1){
 			DiscreteDistribution m = null;
 		double [][][] q_value = new double[trans_distr_file.size()][n][nactions];
@@ -237,7 +221,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 		Object [] policy = new Object[n];
 		int[] choices = new int[n];
 		double max_v; int max_a;
-		double max_dist ; int numChoices;
+		int numChoices;
 		int iters; boolean isUncertain;
 
 		// Initiate q_value to 0
@@ -278,12 +262,6 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 								}
 							}
 						}
-					//action_val[choice] = q_value;
-					//if (action_val[choice] < max_v) {
-					//	max_a = choice;
-					//	max_v = action_val[choice]; 
-					//	action_exp[s] = max_v;
-					//}
 				}
 				
 				double prev = 0.0;
@@ -336,7 +314,6 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 		int total_atoms = trans_distr_file.size();
 		long dtmc_timer = System.currentTimeMillis();
 		for (int i = 0; i < total_atoms; i ++){
-			int finalI = i;
 			double realization = trans_distr_file.get(i);
 			MDP<Double> atom_mdp;
 			atom_mdp = new MDPSimple<>(mdp,p -> p.evaluate(toBigRationalPoint(realization)).doubleValue(),Evaluator.forDouble());
@@ -376,7 +353,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 				mainLog.println(" : " + dtmc_timer / 1000.0 + " seconds.");
 			}
 			
-			writeCSV(exp_dtmc_atom, trans_prob, "/Users/khangvhuynh/prism-new/prism/tests/result/result.csv");
+			writeCSV(exp_dtmc_atom, trans_prob, trans_distr_file, "/Users/khangvhuynh/prism-new/prism/tests/result/result.csv");
 			// print info for DTMC results
 			mainLog.println("Exp values: " + Arrays.toString(exp_dtmc_atom));
 			mainLog.println("After weighted: " + Arrays.toString(exp_weighted));
@@ -430,6 +407,18 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
     			e.printStackTrace();
     		// Handle the exception (e.g., log it, rethrow, or notify the user)
 			}
+			IMDP<Double> imdp = makeIMDP(mdp, e_max, e_min, 5);
+			IMDPModelChecker immc = new IMDPModelChecker(null);
+			ModelCheckerResult resim;
+			MDPRewards<Double> mdpRewards2 = new MDPRewardsSimple<Double>(mdpRewards, mdp, f -> f.evaluate(toBigRationalPoint(empty_eval_array)).doubleValue(), Evaluator.forDouble());
+			resim = immc.computeReachRewards(imdp, mdpRewards2, target, MinMax.min().setMinUnc(true));
+			System.out.println("minmin: " + resim.soln[0]);
+			resim = immc.computeReachRewards(imdp, mdpRewards2, target, MinMax.min().setMinUnc(false));
+			System.out.println("minmax: " + resim.soln[0]);
+			resim = immc.computeReachRewards(imdp, mdpRewards2,target, MinMax.max().setMinUnc(true));
+			System.out.println("maxmin: " + resim.soln[0]);
+			resim = immc.computeReachRewards(imdp, mdpRewards2, target, MinMax.max().setMinUnc(false));
+			System.out.println("maxmax: " + resim.soln[0]);
 
 		states = unknownStates.iterator();
 		ModelCheckerResult res = new ModelCheckerResult();
@@ -660,7 +649,9 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 			//computeNextProbs(mdp, target, true, gridRealization);
 			//mainLog.println("Compute Global Sensitivity (Sobol Index): ");
 			//computeGlobalSensitivity(mdp, mdpRewards, choices, target, min, X_min, X_max, 1000);
-			//IMDP<Double> imdp = makeIMDP(mdp, X_max, X_min, 5);
+
+
+
 
 		ModelCheckerResult res = new ModelCheckerResult();
 		res.soln = Arrays.copyOf(action_exp, action_exp.length); // return the expected values for each state
@@ -1103,8 +1094,9 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 		// Store num states
 		int n = mdp.getNumStates();		
 		Double[] step = new Double[X_max.length];
-		step[0] = (X_max[0] - X_min[0]) / (numGridPoints - 1);
-		step[1] = (X_max[1] - X_min[1]) / (numGridPoints - 1);
+		for (int i = 0; i < X_max.length; i++){
+			step[i] = (X_max[i] - X_min[i]) / (numGridPoints - 1);
+		}
 		int[] indices = new int[X_max.length];
 		int cur = 0;
 		int numPa = (int) Math.pow(numGridPoints, X_max.length) - 1;
@@ -1158,7 +1150,6 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 						int nextState = e.getKey();
 						Double upper = max.get(nextState);
 						Double lower = min.get(nextState);
-						mainLog.println("Current state: " + s + ", Choice: " + choice + ", transition_val: " + transition_val);
 						if (transition_val > max.get(nextState)){
 							max.replace(nextState, transition_val);
 						} 
@@ -1191,7 +1182,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 		return imdp;
 	}
 
-	public static void writeCSV(double[] values, ArrayList<Double> probability, String fileName) {
+	public static void writeCSV(double[] values, ArrayList<Double> probability,ArrayList<Double> prob_val, String fileName) {
     // Separate the base name and extension.
     int dotIndex = fileName.lastIndexOf(".");
     String baseName = (dotIndex != -1) ? fileName.substring(0, dotIndex) : fileName;
@@ -1212,11 +1203,11 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
     
     try (PrintWriter writer = new PrintWriter(file)) {
         // Write the CSV header.
-        writer.println("realization,exp_value,probability,weighted_exp_value");
+        writer.println("id,exp_value,probability,realization,weighted_exp_value");
 
         // Write each row: index and corresponding value.
         for (int i = 0; i < values.length; i++) {
-            writer.println(i + "," + values[i] + "," + probability.get(i) + "," + (values[i] * probability.get(i)));
+            writer.println(i + "," + values[i] + "," + probability.get(i) + "," +prob_val.get(i)+","+ (values[i] * probability.get(i)));
         }
         
         System.out.println("CSV file created successfully: " + file.getName());
