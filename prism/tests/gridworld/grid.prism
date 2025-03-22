@@ -1,0 +1,64 @@
+mdp
+
+// p is the probability that an attempted move action actually succeeds.
+const double p; // Can be overridden at the command line or in the GUI.
+
+// For a 4x4 grid: x ranges from 0..3, y ranges from 0..3
+const int X_MAX = 3;
+const int Y_MAX = 3;
+const int allowance = 20;
+
+// The exit (goal) is at (3,3).
+
+module Maze
+
+    // (x, y) track the agent's position, starting at (0,0)
+    x : [0..X_MAX] init 0;
+    y : [0..Y_MAX] init 0;
+    c : [0..allowance] init 0;
+    
+    //----------------------------------------------------------------
+    // For each action, if we are NOT already at the exit (3,3) and 
+    // if moving is possible (i.e., within bounds and not an obstacle),
+    // we move with probability p and stay put with probability (1 - p).
+    // If the move is not possible (out of bounds, obstacle, or at exit),
+    // we remain in the same state with probability 1.
+    //----------------------------------------------------------------
+    
+    // UP
+    [up] (x>0) & !((x-1=1 & y=1) & !(x-1=2 & y=1))
+        -> p     : (x' = x-1) & (y' = y) & (c' = c + 3)
+         + (1-p) : (x' = x)   & (y' = y) & (c' = c + 6);
+    // If not possible or at exit
+    [up] !(x>0 & !(x=3 & y=3)) & !((x-1=1 & y=1) & !(x-1=2 & y=1))
+        -> 1 : (x' = x) & (y' = y);
+
+    // DOWN
+    [down] (x<X_MAX & !(x=3 & y=3)) & !((x+1=1 & y=1) & !(x+1=2 & y=1))
+        -> p     : (x' = x+1) & (y' = y) & (c' = c+1)
+         + (1-p) : (x' = x)   & (y' = y) & (c' = c+2);
+    [down] !(x<X_MAX & !(x=3 & y=3)) & !((x+1=1 & y=1) & !(x+1=2 & y=1))
+        -> 1 : (x' = x) & (y' = y);
+
+    // LEFT
+    [left] (y>0 & !(x=3 & y=3)) & !((x=1 & y-1=1) & !(x=2 & y-1=1))
+        -> p     : (x' = x)   & (y' = y-1) & (c'=c+2)
+         + (1-p) : (x' = x)   & (y' = y) & (c'=c+4);
+    [left] !(y>0 & !(x=3 & y=3)) & !((x=1 & y-1=1) & !(x=2 & y-1=1))
+        -> 1 : (x' = x) & (y' = y);
+
+    // RIGHT
+    [right] (y<Y_MAX & !(x=3 & y=3)) & !((x=1 & y+1=1) & !(x=2 & y+1=1))
+        -> p     : (x' = x)   & (y' = y+1) & (c'=c+2)
+         + (1-p) : (x' = x)   & (y' = y) & (c'=c+4);
+    [right] !(y<Y_MAX & !(x=3 & y=3)) & !((x=1 & y+1=1) & !(x=2 & y+1=1))
+        -> 1 : (x' = x) & (y' = y);
+
+endmodule
+
+// A simple step cost for each action.
+rewards "goal"
+    x=3 & y=3 : allowance - c;
+endrewards
+
+label "goal" = (x=3 & y=3);
