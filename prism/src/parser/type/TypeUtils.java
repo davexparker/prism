@@ -70,5 +70,26 @@ public class TypeUtils
 		}
 		return types;
 	}
+
+	/**
+	 * Returns a Type object for a type specified by its name (in PRISM model syntax).
+	 * @throws PrismLangException if the string does not correspond to a type.
+	 */
+	public static Type typeFromName(String typeName) throws PrismLangException
+	{
+		typeName = typeName.trim().toLowerCase();
+		switch (typeName) {
+			case "bool":
+				return TypeBool.getInstance();
+			case "clock":
+				return TypeClock.getInstance();
+			case "double":
+				return TypeDouble.getInstance();
+			case "int":
+				return TypeInt.getInstance();
+			default:
+				throw new PrismLangException("Unknown type \"" + typeName + "\"");
+		}
+	}
 }
 
