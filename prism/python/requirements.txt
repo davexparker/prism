@@ -1,0 +1,9 @@
+colorama==0.4.6
+grpcio==1.54.0
+grpcio-tools==1.54.0
+halo==0.0.31
+log-symbols==0.0.14
+protobuf==4.23.0
+six==1.16.0
+spinners==0.0.24
+termcolor==2.3.0

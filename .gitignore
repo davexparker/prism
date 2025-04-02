@@ -36,3 +36,7 @@ prism/\.project
 # Eclipse project custom settings
 \.settings/
 prism/\.settings/
+
+# Python-generated files
+__pycache__
+*.egg-info

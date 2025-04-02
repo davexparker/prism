@@ -41,6 +41,7 @@ import java.util.Map.Entry;
 
 import common.StackTraceHelper;
 import csv.CsvFormatException;
+import grpc.server.PrismServer;
 import io.ModelExportOptions;
 import io.ModelExportOptions.ModelExportFormat;
 import parser.Values;
@@ -3093,18 +3094,29 @@ public class PrismCL implements PrismModelListener
 
 	public static void main(String[] args)
 	{
-		// Normal operation: just run PrismCL
-		if (!(args.length > 0 && "-ng".equals(args[0]))) {
-			new PrismCL().go(args);
-		}
+		// Check if we are running in server mode
 		// Nailgun server mode (-ng switch)
-		else {
+		if (args.length > 0 && args[0].equals("-ng")){
 			try {
 				System.out.println("Starting PRISM-Nailgun server...");
 				com.martiansoftware.nailgun.NGServer.main(new String[0]);
 			} catch (NumberFormatException | UnknownHostException e) {
 				System.out.println("Failed to launch Nailgun server: " + e);
 			}
+		}
+		// gRPC server mode for PRISM-py (-grpc/-python/-py switch)
+		else if (args.length > 0 && (args[0].equals("-grpc") || args[0].equals("-python") || args[0].equals("-py"))) {
+			System.out.println("Starting PRISM-gRPC server for PRISM-py...");
+			try {
+				PrismServer.main(args);
+			} catch (PrismException e) {
+				System.out.println("Failed to launch PRISM-gRPC server: " + e.getMessage());
+			}
+		}
+		// Normal operation: just run PrismCL
+		else {
+			System.out.println("Starting PRISM...");
+			new PrismCL().go(args);
 		}
 	}
 }

@@ -1,0 +1,620 @@
+syntax = "proto3";
+option java_package = "grpc.server.services";
+import "google/protobuf/wrappers.proto";
+
+
+/*  file transfer */
+message UploadRequest {
+  oneof data {
+    string filename = 2;
+    bytes chunk_data = 3;
+  }
+}
+
+message UploadReply {
+  string filename = 1;
+}
+
+message DownloadRequest {
+  string fileName = 1;
+}
+
+message FileChunk {
+  bytes content = 1;
+}
+
+/* PRISM engine */
+
+message PrismDevNullLog {}
+
+message PrismFileLog {
+  string type = 1;
+}
+
+message PrismLog {
+  oneof log_type {
+    PrismDevNullLog dev_null_log = 1;
+    PrismFileLog file_log = 2;
+  }
+}
+
+message InitialiseRequest {
+  string prism_object_id = 1;
+}
+
+message InitialiseResponse {
+  string status = 2;
+}
+
+message LoadPRISMModelRequest {
+  string prism_object_id = 1;
+  string module_object_id = 2;
+}
+
+message LoadPRISMModelResponse {
+  string prism_object_id = 1;
+  string module_object_id = 2;
+  string status = 3;
+}
+
+
+message ParsePropertiesFileRequest {
+  string prism_object_id = 1;
+  string module_object_id = 2;
+  string properties_file_object_id = 3;
+  string properties_file_name = 4;
+}
+
+message ParsePropertiesFileResponse {
+  string prism_object_id = 1;
+  string status = 2;
+  string properties = 3;
+}
+
+
+
+
+message ModelCheckPropFilePropObjRequest {
+  string prism_object_id = 1;
+  string properties_file_object_id = 2;
+  string property_object_id = 3;
+  string result_object_id = 4;
+}
+
+message ModelCheckPropFilePropObjResponse {
+  string result = 1;
+  string status = 2;
+}
+
+message ParseAndLoadModelRequest {
+  string prism_object_id = 1;
+  string model_file_name = 2;
+}
+
+message ParseAndLoadModelReply {
+  string prism_object_id = 1;
+  string status = 2;
+}
+
+message ClosePrismRequest {
+  string prism_object_id = 1;
+}
+
+message ClosePrismResponse {
+  string prism_object_id = 1;
+  string status = 2;
+}
+
+message ParseModelFileRequest {
+  string prism_object_id = 1;
+  string module_object_id = 2;
+  string model_file_name = 3;
+}
+
+message ParseModelFileResponse {
+  string prism_object_id = 1;
+  string module_object_id = 2;
+  string status = 3;
+}
+
+message GetPropertyObjectRequest {
+  string properties_file_object_id = 1;
+  string property_object_id = 2;
+  int32 property_index = 3;
+}
+
+message GetPropertyObjectResponse {
+  string properties_file_object_id = 1;
+  string status = 2;
+  string property = 3;
+}
+
+message PropertiesFileForwardMethodCallRequest {
+  string properties_file_object_id = 1;
+  string method = 2;
+  string args = 3;
+  string kwargs = 4;
+}
+
+message PropertiesFileForwardMethodCallResponse {
+  string properties_file_object_id = 1;
+  string status = 2;
+  string result = 3;
+}
+message GetUndefinedConstantsUsedInPropertyRequest {
+  string properties_file_object_id = 1;
+  string property_object_id = 2;
+}
+
+message GetUndefinedConstantsUsedInPropertyResponse {
+  string status = 1;
+  repeated string constants = 2;
+}
+
+message AddValueRequest {
+  string values_object_id = 1;
+  string const_name = 2;
+  int32 value = 3;
+}
+
+message AddValueResponse {
+  string result = 1;
+  string status = 2;
+}
+
+message SetSomeUndefinedConstantsRequest {
+  string properties_file_object_id = 1;
+  string values_object_id = 2;
+}
+
+message SetSomeUndefinedConstantsResponse {
+  string status = 1;
+}
+
+message DeleteObjectRequest {
+  string object_id = 1;
+}
+
+message DeleteObjectResponse {
+  string status = 1;
+}
+
+
+message InitUndefinedConstantsResponse {
+  string status = 1;
+}
+
+message DefineUsingConstSwitchRequest{
+  string undefined_constants_object_id = 1;
+  string constant = 2;
+}
+
+message DefineUsingConstSwitchResponse{
+  string status = 1;
+}
+
+message GetNumberPropertyIterationsRequest {
+  string undefined_constants_object_id = 1;
+}
+
+message GetNumberPropertyIterationsResponse {
+  string status = 1;
+  int32 number_iterations = 2;
+}
+
+
+message InitValuesResponse {
+  string status = 1;
+}
+
+message GetPFConstantValuesRequest {
+  string undefined_constants_object_id = 1;
+  string values_object_id = 2;
+}
+
+message GetPFConstantValuesResponse {
+  string status = 1;
+  string values = 2;
+}
+
+///////////////////////////////////////// Initializer Messages /////////////////////////////////////////
+// Init response (for all initializers)
+message InitResponse {
+  string status = 1;
+}
+// Init arguments
+message InitPrismLogRequest {
+  string prism_log_object_id = 1;
+  string type = 2;
+}
+
+message InitPrismRequest {
+  string prism_object_id = 1;
+  string main_log_object_id = 2;
+}
+
+message InitModulesFileRequest {
+  string modules_file_object_id = 1;
+}
+
+
+
+message InitPrismDevNullLogRequest {
+  string main_log_object_id = 1;
+}
+
+message InitPrismFileLogRequest {
+  string main_log_object_id = 1;
+  string output_type = 2;
+}
+
+message InitPropertiesFileRequest {
+  string properties_file_object_id = 1;
+}
+
+message InitPropertyObjectRequest {
+  string property_object_object_id = 1;
+}
+
+message InitResultRequest {
+  string result_object_id = 1;
+}
+
+
+message InitUndefinedConstantsRequest {
+  string module_object_id = 1;
+  string properties_file_object_id = 2;
+  string property_object_id = 3;
+  string undefined_constants_object_id = 4;
+}
+
+message InitValuesRequest {
+  string values_object_id = 1;
+}
+
+// can be either state with a number or a list of state objects
+message InitStateRequest {
+  string state_object_id = 1;
+
+  oneof arg {
+    ArgStateObjectIDs arg_state_object_ids = 2;
+    int32 state_number = 3;
+  }
+
+  message ArgStateObjectIDs {
+    repeated string state_object_id = 1;
+  }
+}
+
+message StateVarValuesRequest {
+  string state_object_id = 1;
+}
+
+message StateVarValuesResponse {
+  string status = 1;
+  repeated int32 values = 2;
+}
+
+message IteratePropertyRequest {
+  string undefined_constants_object_id = 1;
+}
+
+message IteratePropertyResponse {
+  string status = 1;
+}
+
+message ParsePropertiesStringRequest {
+  string prism_object_id = 1;
+  string module_object_id = 2;
+  string properties_string = 3;
+  string properties_file_object_id = 4;
+}
+
+message ParsePropertiesStringResponse {
+  string status = 1;
+}
+
+message ModelCheckPropStringRequest {
+  string prism_object_id = 1;
+  string properties_string = 2;
+  string result_object_id = 3;
+}
+
+message ModelCheckPropStringResponse {
+  string status = 1;
+  string result = 2;
+}
+
+//message LoadModelGeneratorRequest {
+//  string prism_object_id = 1;
+//  string model_generator_object_id = 2;
+//}
+
+//message LoadModelGeneratorResponse {
+//  string status = 1;
+//}
+
+message CloseDownRequest {
+  string prism_object_id = 1;
+}
+
+message CloseDownResponse {
+  string status = 1;
+}
+
+///////////////////////////////////////// Client Service Definitions /////////////////////////////////////////
+// Generic Responses
+message StatusResponse {
+  string status = 1;
+}
+
+message InitialiseClientModelGeneratorResponse {
+  string prism_object_id = 1;
+  string model_generator_object_id = 2;
+}
+
+message LoadModelGeneratorRequest {
+  string prism_object_id = 1;
+  string model_generator_object_id = 2;
+}
+
+message IntRequest {
+  google.protobuf.Int32Value value = 1;
+}
+
+message ArrayResponse {
+  repeated google.protobuf.Int32Value values = 1;
+}
+
+message IntResponse {
+  google.protobuf.Int32Value value = 1;
+}
+
+message DoubleResponse {
+  google.protobuf.DoubleValue value = 1;
+}
+
+message StringResponse {
+  google.protobuf.StringValue value = 1;
+}
+
+message BoolResponse {
+  google.protobuf.BoolValue value = 1;
+}
+
+message StringArrayResponse {
+  repeated google.protobuf.StringValue values = 1;
+}
+
+// Requests
+message ArrayRequest {
+  repeated int32 values = 1;
+}
+
+message ModelTypeRequest {
+  // Empty message as get_model_type doesn't require parameters
+}
+
+message VarNamesRequest {
+  // Empty message as get_var_names doesn't require parameters
+}
+
+message VarTypesRequest {
+  // Empty message as get_var_types doesn't require parameters
+}
+
+message VarDeclarationTypeRequest {
+  int32 index = 1;
+}
+
+message LabelNamesRequest {
+  // Empty message as get_label_names doesn't require parameters
+}
+
+message InitialStateRequest {
+  // Empty message as get_initial_state doesn't require parameters
+}
+
+message ExploreStateRequest {
+  ArrayRequest state = 1;
+}
+
+message NumChoicesRequest {
+  // Empty message as get_num_choices doesn't require parameters
+}
+
+message NumTransitionsRequest {
+  int32 index = 1;
+}
+
+message TransitionActionRequest {
+  int32 index = 1;
+  int32 offset = 2;
+}
+
+message TransitionProbabilityRequest {
+  int32 index = 1;
+  int32 offset = 2;
+}
+
+message TransitionTargetRequest {
+  int32 index = 1;
+  int32 offset = 2;
+}
+
+message LabelTrueRequest {
+  int32 index = 1;
+}
+
+message RewardStructNamesRequest {
+  // Empty message as get_reward_struct_names doesn't require parameters
+}
+
+message StateRewardRequest {
+  int32 reward = 1;
+  State state = 2;
+}
+
+message StateActionRewardRequest {
+  int32 reward = 1;
+  State state = 2;
+  google.protobuf.Int32Value action = 3;
+}
+
+message CloseClientModelGeneratorRequest {
+  // Empty message
+}
+
+message State {
+  string state_object_id = 1;
+}
+
+message ClientModelGeneratorRequestWrapper {
+  oneof request {
+    ModelTypeRequest modelTypeRequest = 1;
+    VarNamesRequest varNamesRequest = 2;
+    VarTypesRequest varTypesRequest = 3;
+    VarDeclarationTypeRequest varDeclarationTypeRequest = 4;
+    LabelNamesRequest labelNamesRequest = 5;
+    InitialStateRequest initialStateRequest = 6;
+    State exploreStateRequest = 7;
+    NumChoicesRequest numChoicesRequest = 8;
+    NumTransitionsRequest numTransitionsRequest = 9;
+    TransitionActionRequest transitionActionRequest = 10;
+    TransitionProbabilityRequest transitionProbabilityRequest = 11;
+    TransitionTargetRequest transitionTargetRequest = 12;
+    LabelTrueRequest labelTrueRequest = 13;
+    RewardStructNamesRequest rewardStructNamesRequest = 14;
+    StateRewardRequest stateRewardRequest = 15;
+    StateActionRewardRequest stateActionRewardRequest = 16;
+    CloseClientModelGeneratorRequest closeClientModelGeneratorRequest = 17;
+    StatusResponse exportTransToFileResponse = 18;
+    ModelCheckPropStringResponse modelCheckPropStringResponse = 19;
+  }
+}
+
+message ClientModelGeneratorResponseWrapper {
+  oneof response {
+    StringResponse modelTypeResponse = 1;
+    StringArrayResponse varNamesResponse = 2;
+    StringArrayResponse varTypesResponse = 3;
+    ArrayResponse varDeclarationTypeResponse = 4;
+    StringArrayResponse labelNamesResponse = 5;
+    State initialStateResponse = 6;
+    StatusResponse exploreStateResponse = 7;
+    IntResponse numChoicesResponse = 8;
+    IntResponse numTransitionsResponse = 9;
+    IntResponse transitionActionResponse = 10;
+    DoubleResponse transitionProbabilityResponse = 11;
+    State transitionTargetResponse = 12;
+    BoolResponse labelTrueResponse = 13;
+    StringArrayResponse rewardStructNamesResponse = 14;
+    DoubleResponse stateRewardResponse = 15;
+    DoubleResponse stateActionRewardResponse = 16;
+    InitialiseClientModelGeneratorResponse initialiseClientModelGeneratorResponse = 17;
+    ExportTransToFileRequest exportTransToFileRequest = 18;
+    ModelCheckPropStringRequest modelCheckPropStringRequest = 19;
+    LoadModelGeneratorRequest loadModelGeneratorRequest = 20;
+  }
+}
+
+message SetStateValueRequest {
+  string state_object_id = 1;
+  int32 index = 2;
+  int32 value = 3;
+}
+
+message SetStateValueResponse {
+  string status = 1;
+}
+
+message ExportTransToFileRequest {
+  string prism_object_id = 1;
+  bool ordered = 2;
+  int32 export_type = 3;
+  string file_name = 4;
+}
+
+message ExportTransToFileResponse {
+  string status = 1;
+}
+
+
+
+// Service Definitions
+service PrismProtoService {
+  ///////////////////////////////////////// Initializer /////////////////////////////////////////
+  // Prism Log
+  rpc InitPrismLog(InitPrismLogRequest) returns (InitResponse) {}
+  // ModulesFile
+  rpc InitModulesFile(InitModulesFileRequest) returns (InitResponse) {}
+  // Prism
+  rpc InitPrism(InitPrismRequest) returns (InitResponse) {}
+  // PropertiesFile
+  rpc InitPropertiesFile(InitPropertiesFileRequest) returns (InitResponse) {}
+  // Property Object (called Property Object because "property" is a reserved word in Python)
+  rpc InitPropertyObject(InitPropertyObjectRequest) returns (InitResponse) {}
+  // Result
+  rpc InitResult(InitResultRequest) returns (InitResponse) {}
+  // init undefined constants
+  rpc InitUndefinedConstants(InitUndefinedConstantsRequest) returns (InitResponse) {}
+  // Values
+  rpc InitValues(InitValuesRequest) returns (InitResponse) {}
+
+  // State
+  rpc InitState(InitStateRequest) returns (InitResponse) {}
+
+  // State var values
+  rpc StateVarValues(StateVarValuesRequest) returns (StateVarValuesResponse) {}
+
+  ///////////////////////////////////////// Generic Functions /////////////////////////////////////////
+  // delete a PRISM object
+  rpc DeleteObject(DeleteObjectRequest) returns (DeleteObjectResponse) {}
+  // Generic method to upload files
+  rpc UploadFile (stream UploadRequest) returns (UploadReply) {}
+  // Generic method to download files
+  rpc DownloadFile (DownloadRequest) returns (stream FileChunk) {}
+
+  ///////////////////////////////////////// Object specific functions /////////////////////////////////////////
+  // Initialise the PRISM engine
+  rpc Initialise(InitialiseRequest) returns (InitialiseResponse) {}
+  // Parse model file
+  rpc ParseModelFile(ParseModelFileRequest) returns (ParseModelFileResponse) {}
+  // Load a PRISM model
+  rpc LoadPRISMModel(LoadPRISMModelRequest) returns (LoadPRISMModelResponse) {}
+  // Parse a properties file
+  rpc ParsePropertiesFile(ParsePropertiesFileRequest) returns (ParsePropertiesFileResponse) {}
+  // Get property object from properties file
+  rpc GetPropertyObject(GetPropertyObjectRequest) returns (GetPropertyObjectResponse) {}
+  // Model check properties file using property object
+  rpc ModelCheckPropFilePropObj(ModelCheckPropFilePropObjRequest) returns (ModelCheckPropFilePropObjResponse) {}
+  // Get undefined constants used in property
+  rpc GetUndefinedConstantsUsedInProperty(GetUndefinedConstantsUsedInPropertyRequest) returns (GetUndefinedConstantsUsedInPropertyResponse) {}
+  // add values
+  rpc AddValue(AddValueRequest) returns (AddValueResponse) {}
+  // set some undefined constants
+  rpc SetSomeUndefinedConstants(SetSomeUndefinedConstantsRequest) returns (SetSomeUndefinedConstantsResponse) {}
+  // define using const switch for undefined constants
+  rpc DefineUsingConstSwitch(DefineUsingConstSwitchRequest) returns (DefineUsingConstSwitchResponse) {}
+  // get number of property iterations for undefined constants
+  rpc GetNumberPropertyIterations(GetNumberPropertyIterationsRequest) returns (GetNumberPropertyIterationsResponse) {}
+  // get properties file constant values
+  rpc GetPFConstantValues(GetPFConstantValuesRequest) returns (GetPFConstantValuesResponse) {}
+  // iterate property
+  rpc IterateProperty(IteratePropertyRequest) returns (IteratePropertyResponse) {}
+  // parse properties string
+  rpc ParsePropertiesString(ParsePropertiesStringRequest) returns (ParsePropertiesStringResponse) {}
+  // model check properties string
+  rpc ModelCheckPropString(ModelCheckPropStringRequest) returns (ModelCheckPropStringResponse) {}
+  // close down PRISM
+  rpc CloseDown(CloseDownRequest) returns (CloseDownResponse) {}
+
+  ///////////////////////////////////////// Client Service Definitions /////////////////////////////////////////
+//  rpc LoadModelGenerator(LoadModelGeneratorRequest) returns (LoadModelGeneratorResponse) {}
+
+  rpc SetStateValue(SetStateValueRequest) returns (SetStateValueResponse) {}
+
+  rpc ExportTransToFile(ExportTransToFileRequest) returns (ExportTransToFileResponse) {}
+
+  rpc ClientModelGenerator(stream ClientModelGeneratorResponseWrapper) returns (stream ClientModelGeneratorRequestWrapper) {}
+}
