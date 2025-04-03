@@ -578,9 +578,7 @@ public class IMDPModelChecker extends ProbModelChecker
 		}
 		
 		// Store strategy
-		if (genStrat) {
-			res.strat = new MDStrategyArray<>(imdp, strat);
-		}
+		res.strat = new MDStrategyArray<>(imdp, strat);
 		
 		// Finished probabilistic reachability
 		timer = System.currentTimeMillis() - timer;

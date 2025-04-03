@@ -3,6 +3,7 @@ mdp
 
 const int n = 8;
 const double p;
+const MAX_MONEY=(n+1)*10
 module bet
 
 	money : [0..(n+1)*10] init 10;
@@ -16,14 +17,15 @@ module bet
 
 	[end] steps = n -> 1: (steps'=n+1);
 	[end] steps = n+1 -> 1: true;
+	
 
 endmodule
 
 rewards
-	steps < n : 0;
-	steps = n : money;
-	steps = n+1 : 0;	
+	//steps < n : 0;
+	steps = n+1 : MAX_MONEY - money;
+	//steps = n+1 : 0;	
 
 endrewards
 
-label "done" = steps = n+1;
+label "done" = (steps = n+1) ;

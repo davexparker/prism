@@ -28,6 +28,12 @@ import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 
 import static explicit.DistributionalBellmanOperatorProb.toBigRationalPoint;
 
@@ -72,46 +78,6 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 	{
 		super(parent);
 	}
-
-	public ModelCheckerResult computeReachRewardsExample(MDP<Function> mdp, MDPRewards<Function> mdpRewards, BitSet target, boolean min) throws PrismException
-	{
-		Point paramValues =  new Point(new BigRational[]{new BigRational("0.8"), new BigRational("0.6")});
-		// Print out MDP (before and after parameter instantiation)
-		System.out.println(mdp);
-		int numStates = mdp.getNumStates();
-		for (int s = 0; s < numStates; s++) {
-			int numChoices = mdp.getNumChoices(s);
-			for (int i = 0; i < numChoices; i++) {
-
-				Iterator<Map.Entry<Integer, Function>> iter = mdp.getTransitionsIterator(s, i);
-//				FunctionalIterator<Map.Entry<Integer, Double>> iter = mdp.getTransitionsMappedIterator(s, i, p -> p.evaluate(paramValues).doubleValue());
-				while (iter.hasNext()) {
-					Map.Entry<Integer, Function> e = iter.next();
-					mainLog.println(s + "," + mdp.getAction(s, i) + ":" + e.getKey() + "=" + e.getValue().evaluate(paramValues).doubleValue());
-				}
-
-			}
-		}
-
-		// Print out rewards
-		for (int s = 0; s < numStates; s++) {
-			double rewS = mdpRewards.getStateReward(s).evaluate(paramValues).doubleValue();
-			mainLog.println(s + ":" + rewS);
-			int numChoices = mdp.getNumChoices(s);
-			for (int i = 0; i < numChoices; i++) {
-				double rewA = mdpRewards.getTransitionReward(s, i).evaluate(paramValues).doubleValue();
-				mainLog.println(s + "," + mdp.getAction(s, i) + ":" + rewA);
-			}
-
-		}
-
-		// Dummy result
-		ModelCheckerResult res = new ModelCheckerResult();
-		res.solnObj = new Object[mdp.getNumStates()];
-		res.solnObj[0] = 99.0;
-		return res;
-	}
-
 	/**
 	 * Compute expected reachability rewards for an uncertain MDP with transition probabilities specified as a distribution.
 	 * @param mdp The parametric MDP
@@ -119,7 +85,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 	 * @param target Target states
 	 * @param min Min or max rewards (true=min, false=max)
 	 */
- 	public ModelCheckerResult computeReachRewards(MDP<Function> mdp, MDPRewards<Function> mdpRewards, BitSet target, boolean min) throws PrismException
+ 	public ModelCheckerResult computeReachRewards(MDP<Function> mdp, MDPRewards<Function> mdpRewards, BitSet target, boolean min) throws PrismException, IOException
 	{
 		MDPModelChecker mcMDP = new MDPModelChecker(this);
 		mcMDP.inheritSettings(this);
@@ -213,162 +179,109 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 
 		if (numParams == 1){
 			DiscreteDistribution m = null;
-		double [][][] q_value = new double[trans_distr_file.size()][n][nactions];
-		double [][] v = new double[trans_distr_file.size()][n];
-		double [][] vPrev = new double[trans_distr_file.size()][n];
-		double [] finalV = new double[n];
-		double [] action_val = new double[nactions];
-		double [] action_exp = new double[n];
-		Object [] policy = new Object[n];
-		int[] choices = new int[n];
-		double max_v; int max_a;
-		int numChoices;
-		int iters; boolean isUncertain;
+			double [][][] q_value = new double[trans_distr_file.size()][n][nactions];
+			double [][] v = new double[trans_distr_file.size()][n];
+			double [][] vPrev = new double[trans_distr_file.size()][n];
+			double [] finalV = new double[n];
+			double [] action_val = new double[nactions];
+			double [] action_exp = new double[n];
+			Object [] policy = new Object[n];
+			int[] choices = new int[n];
+			double max_v; int max_a;
+			int numChoices;
+			int iters; boolean isUncertain;
 
-		// Initiate q_value to 0
-		PrimitiveIterator.OfInt states = unknownStates.iterator();
-		while (states.hasNext()){
-			final int s = states.nextInt();
-			numChoices = mdp.getNumChoices(s);
-			for (int i = 0; i < numChoices; i++)
-				for (int j = 0; j < trans_distr_file.size(); j++){
-					q_value[j][s][i] = 0.0;
-					v[j][s] = 0.0;
-				}
-			finalV[s] = 0.0;
-
-		}
-
-		for (iters= 0; iters < iterations; iters ++){	
-			states = unknownStates.iterator();
+			// Initiate q_value to 0
+			PrimitiveIterator.OfInt states = unknownStates.iterator();
 			while (states.hasNext()){
 				final int s = states.nextInt();
-				max_v = Float.POSITIVE_INFINITY; max_a = 0;
 				numChoices = mdp.getNumChoices(s);
-				for (int choice = 0; choice < numChoices; choice ++){
-					double reward = mdpRewards.getStateReward(s).evaluate(toBigRationalPoint(empty_eval_array)).doubleValue();
-					reward += mdpRewards.getTransitionReward(s, choice).evaluate(toBigRationalPoint(empty_eval_array)).doubleValue();
-					Iterator<Map.Entry<Integer, Function>> iter3 = mdp.getTransitionsIterator(s, choice);
-						for (int i = 0; i < trans_distr_file.size(); i++){ 
-							if (trans_distr_file.get(i)>0){
-								double realization = trans_distr_file.get(i);
-								Iterator<Map.Entry<Integer,Double>> transit;
-        						transit = mdp.getTransitionsMappedIterator(s, choice, p -> p.evaluate(toBigRationalPoint(realization)).doubleValue());
-								q_value[i][s][choice] = reward;
-								while (transit.hasNext()){
-									Map.Entry<Integer,Double> e = transit.next();
-            						double transition_val = e.getValue();
-									int next_state = e.getKey();
-									q_value[i][s][choice] += gamma*transition_val*v[i][next_state];
+				for (int i = 0; i < numChoices; i++)
+					for (int j = 0; j < trans_distr_file.size(); j++){
+						q_value[j][s][i] = 0.0;
+						v[j][s] = 0.0;
+					}
+				finalV[s] = 0.0;
+
+			}
+
+			for (iters= 0; iters < iterations; iters ++){	
+				states = unknownStates.iterator();
+				while (states.hasNext()){
+					final int s = states.nextInt();
+					max_v = Float.POSITIVE_INFINITY; max_a = 0;
+					numChoices = mdp.getNumChoices(s);
+					for (int choice = 0; choice < numChoices; choice ++){
+						double reward = mdpRewards.getStateReward(s).evaluate(toBigRationalPoint(empty_eval_array)).doubleValue();
+						reward += mdpRewards.getTransitionReward(s, choice).evaluate(toBigRationalPoint(empty_eval_array)).doubleValue();
+						Iterator<Map.Entry<Integer, Function>> iter3 = mdp.getTransitionsIterator(s, choice);
+							for (int i = 0; i < trans_distr_file.size(); i++){ 
+								if (trans_distr_file.get(i)>0){
+									double realization = trans_distr_file.get(i);
+									Iterator<Map.Entry<Integer,Double>> transit;
+									transit = mdp.getTransitionsMappedIterator(s, choice, p -> p.evaluate(toBigRationalPoint(realization)).doubleValue());
+									q_value[i][s][choice] = reward;
+									while (transit.hasNext()){
+										Map.Entry<Integer,Double> e = transit.next();
+										double transition_val = e.getValue();
+										int next_state = e.getKey();
+										q_value[i][s][choice] += gamma*transition_val*v[i][next_state];
+									}
 								}
 							}
+					}
+					
+					double prev = 0.0;
+					for (int choice = 0; choice < numChoices; choice ++){
+						double tmpV = 0.0;
+						for (int i=0; i < trans_distr_file.size(); i++){
+							if (trans_distr_file.get(i) > 0){
+								tmpV += trans_prob.get(i)*q_value[i][s][choice];
+							}
 						}
-				}
-				
-				double prev = 0.0;
-				for (int choice = 0; choice < numChoices; choice ++){
-					double tmpV = 0.0;
-					for (int i=0; i < trans_distr_file.size(); i++){
-						if (trans_distr_file.get(i) > 0){
-							tmpV += trans_prob.get(i)*q_value[i][s][choice];
+						if (tmpV > prev){
+							prev = tmpV;
+							choices[s] = choice;
+							action_exp[s] = prev;
+							max_a = choice;
+						}
+						for (int i=0; i < trans_distr_file.size(); i++){
+							v[i][s] = q_value[i][s][max_a];
 						}
 					}
-					if (tmpV > prev){
-						prev = tmpV;
-						choices[s] = choice;
-						action_exp[s] = prev;
-						max_a = choice;
+					policy[s] = mdp.getAction(s, max_a);
+				}
+				states = unknownStates.iterator();
+				double error = 0.0;
+				while (states.hasNext()){
+					final int s = states.nextInt();
+					double preV = finalV[s];
+					double curV = 0.0;
+					double curE = 0.0;
+					for (int j = 0; j < trans_distr_file.size(); j++){
+						curV += trans_prob.get(j)*v[j][s];
 					}
-					for (int i=0; i < trans_distr_file.size(); i++){
-						v[i][s] = q_value[i][s][max_a];
+					finalV[s] = curV;
+					if (curV - preV < 0){
+						curE = preV - curV;
+					} else {
+						curE = curV - preV;
+					}
+					if (curE > error){
+						error = curE;
 					}
 				}
-				policy[s] = mdp.getAction(s, max_a);
-			}
-			states = unknownStates.iterator();
-			double error = 0.0;
-			while (states.hasNext()){
-				final int s = states.nextInt();
-				double preV = finalV[s];
-				double curV = 0.0;
-				double curE = 0.0;
-				for (int j = 0; j < trans_distr_file.size(); j++){
-					curV += trans_prob.get(j)*v[j][s];
-				}
-				finalV[s] = curV;
-				if (curV - preV < 0){
-					curE = preV - curV;
-				} else {
-					curE = curV - preV;
-				}
-				if (curE > error){
-					error = curE;
+				if (error <= error_thresh){
+					break;
 				}
 			}
-			if (error <= error_thresh){
-				break;
-			}
-		}
-		double expected_dtmc = 0;
-		double [] exp_dtmc_atom = new double[trans_distr_file.size()];
-		double [] exp_weighted = new double[trans_distr_file.size()];
-		int total_atoms = trans_distr_file.size();
-		long dtmc_timer = System.currentTimeMillis();
-		for (int i = 0; i < total_atoms; i ++){
-			double realization = trans_distr_file.get(i);
-			MDP<Double> atom_mdp;
-			atom_mdp = new MDPSimple<>(mdp,p -> p.evaluate(toBigRationalPoint(realization)).doubleValue(),Evaluator.forDouble());
-			MDStrategy strat = new MDStrategyArray(atom_mdp, choices);
-			DTMC dtmc = new DTMCFromMDPAndMDStrategy(atom_mdp, strat);
-			StateRewardsArray mcRewards = new StateRewardsArray(n);
-
-			for (int s = 0; s < n; s++) {
-				double reward = mdpRewards.getStateReward(s).evaluate(toBigRationalPoint(empty_eval_array)).doubleValue() ;
-				reward +=  mdpRewards.getTransitionReward(s, choices[s]).evaluate(toBigRationalPoint(empty_eval_array)).doubleValue();
-				mcRewards.setStateReward(s, reward);
-			}
-			DTMCModelChecker mcDTMC = new DTMCModelChecker(this);
-			timer = System.currentTimeMillis();
-			ModelCheckerResult dtmc_result = mcDTMC.computeReachRewardsDistr(dtmc, mcRewards, target, "prism/umdp_out/distr_dtmc_prob_exp_"+i+".csv", dtmc_epsilon);
-			timer = System.currentTimeMillis() - timer;
-			if (verbosity >= 1) {
-				mainLog.print("\nDTMC computation (" + (min ? "min" : "max") + ")");
-				mainLog.println(" : " + timer / 1000.0 + " seconds.");
-			}
-			TreeMap<Integer,Double> result_i = (TreeMap<Integer, Double>) dtmc_result.solnObj[dtmc.getFirstInitialState()];
-			for(Map.Entry<Integer, Double> entry : result_i.entrySet())
-				{
-					exp_dtmc_atom[i]+= entry.getKey() *entry.getValue();
-				}
-
-				// Use the joint distribution if there are multiple parameters
-			expected_dtmc += trans_prob.get(i) * exp_dtmc_atom[i];
-			exp_weighted[i] = trans_prob.get(i)*exp_dtmc_atom[i];
-				
-				
-			}
-
-			dtmc_timer = System.currentTimeMillis() - dtmc_timer;
-			if (verbosity >= 1) {
-				mainLog.print("\nTotal DTMC computation for total atoms - "+total_atoms);
-				mainLog.println(" : " + dtmc_timer / 1000.0 + " seconds.");
-			}
-			
-			writeCSV(exp_dtmc_atom, trans_prob, trans_distr_file, "/Users/khangvhuynh/prism-new/prism/tests/result/result.csv");
-			// print info for DTMC results
-			mainLog.println("Exp values: " + Arrays.toString(exp_dtmc_atom));
-			mainLog.println("After weighted: " + Arrays.toString(exp_weighted));
-			mainLog.println("DTMC weighted expected value :" + expected_dtmc);
-
-			/* int numGridPoints = 100;
-			double worstPerformance = Double.POSITIVE_INFINITY;
-    		double worstX = 0;
-			double X_max = 1.0;
-			double X_min = 0.0;
-    		double step = (X_max - X_min) / (numGridPoints - 1);
-			double performance = 0.0;
-    		for (int i = 0; i < numGridPoints; i++) {
-        		double realization = X_min + i * step;
+			double expected_dtmc = 0;
+			double [] exp_dtmc_atom = new double[trans_distr_file.size()];
+			double [] exp_weighted = new double[trans_distr_file.size()];
+			int total_atoms = trans_distr_file.size();
+			long dtmc_timer = System.currentTimeMillis();
+			for (int i = 0; i < total_atoms; i ++){
+				double realization = trans_distr_file.get(i);
 				MDP<Double> atom_mdp;
 				atom_mdp = new MDPSimple<>(mdp,p -> p.evaluate(toBigRationalPoint(realization)).doubleValue(),Evaluator.forDouble());
 				MDStrategy strat = new MDStrategyArray(atom_mdp, choices);
@@ -381,51 +294,71 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 					mcRewards.setStateReward(s, reward);
 				}
 				DTMCModelChecker mcDTMC = new DTMCModelChecker(this);
+				timer = System.currentTimeMillis();
 				ModelCheckerResult dtmc_result = mcDTMC.computeReachRewardsDistr(dtmc, mcRewards, target, "prism/umdp_out/distr_dtmc_prob_exp_"+i+".csv", dtmc_epsilon);
-    
-    	// Extract the performance (for example, by summing over the DTMC distribution).
-    			TreeMap<Integer,Double> result = (TreeMap<Integer, Double>) dtmc_result.solnObj[dtmc.getFirstInitialState()];
-    			for (Map.Entry<Integer, Double> entry : result.entrySet()) {
-        			performance += entry.getKey() * entry.getValue();
-    			}
-        		if (performance < worstPerformance) { // assuming lower reward is worse
-            		worstPerformance = performance;
-            		worstX = realization;
-        		}
-    		}
-    
-    		mainLog.println("Worst-case parameter realization: " + worstX);
-    		mainLog.println("Worst-case performance: " + worstPerformance); */
-			Double[] e_max = new Double[numParams];
-			Double[] e_min = new Double[numParams];
-			e_max[0] = 0.95;
-			e_min[0] = 0.05;
-			IMDP<Double> imdp = makeIMDP(mdp, e_max, e_min, 100);
-			imdp.findDeadlocks(true);
-			IMDPModelChecker immc = new IMDPModelChecker(null);
-			ModelCheckerResult resim;
-			MDPRewards<Double> mdpRewards2 = new MDPRewardsSimple<Double>(mdpRewards, mdp, f -> f.evaluate(toBigRationalPoint(empty_eval_array)).doubleValue(), Evaluator.forDouble());
-			resim = immc.computeReachRewards(imdp, mdpRewards2,target, MinMax.max().setMinUnc(true));
-			System.out.println("maxmin: " + resim.soln[0]);
-			resim = immc.computeReachRewards(imdp, mdpRewards2, target, MinMax.max().setMinUnc(false));
-			System.out.println("maxmax: " + resim.soln[0]);
-			float[] value = new float[n];
-			float error_thres = (float) 0.01;
-			value = lower_evaluation(mdp, mdpRewards,target, min, mcMDP, choices,trans_distr_file,error_thres);
-			value = upper_evaluation(mdp, mdpRewards, target, min, mcMDP, choices, trans_distr_file, error_thres);
-			System.out.println(value);
+				timer = System.currentTimeMillis() - timer;
+				if (verbosity >= 1) {
+					mainLog.print("\nDTMC computation (" + (min ? "min" : "max") + ")");
+					mainLog.println(" : " + timer / 1000.0 + " seconds.");
+				}
+				TreeMap<Integer,Double> result_i = (TreeMap<Integer, Double>) dtmc_result.solnObj[dtmc.getFirstInitialState()];
+				for(Map.Entry<Integer, Double> entry : result_i.entrySet())
+					{
+						exp_dtmc_atom[i]+= entry.getKey() *entry.getValue();
+					}
 
-		states = unknownStates.iterator();
-		ModelCheckerResult res = new ModelCheckerResult();
-		res.soln = Arrays.copyOf(action_exp, action_exp.length); // return the expected values for each state
-		res.numIters = iterations;
-		res.timeTaken = (System.currentTimeMillis() - total_timer) / 1000.0;
-		// Store strategy
-		if (genStrat) {
-			res.strat = new MDStrategyArray<>(mdp, choices);
-		}
+					// Use the joint distribution if there are multiple parameters
+				expected_dtmc += trans_prob.get(i) * exp_dtmc_atom[i];
+				exp_weighted[i] = trans_prob.get(i)*exp_dtmc_atom[i];
+					
+					
+				}
 
-		return res;
+				dtmc_timer = System.currentTimeMillis() - dtmc_timer;
+				if (verbosity >= 1) {
+					mainLog.print("\nTotal DTMC computation for total atoms - "+total_atoms);
+					mainLog.println(" : " + dtmc_timer / 1000.0 + " seconds.");
+				}
+				
+				writeCSV(exp_dtmc_atom, trans_prob, trans_distr_file, "/Users/khangvhuynh/prism-new/prism/tests/result/result.csv");
+				// print info for DTMC results
+				mainLog.println("Exp values: " + Arrays.toString(exp_dtmc_atom));
+				mainLog.println("After weighted: " + Arrays.toString(exp_weighted));
+				mainLog.println("DTMC weighted expected value :" + expected_dtmc);
+
+				Double[] e_max = new Double[numParams];
+				Double[] e_min = new Double[numParams];
+				e_max[0] = 0.2;
+				e_min[0] = 0.5;
+				IMDP<Double> imdp = makeIMDP(mdp, e_max, e_min, 100);
+				imdp.findDeadlocks(true);
+				IMDPModelChecker immc = new IMDPModelChecker(null);
+				ModelCheckerResult resim;
+				MDPRewards<Double> mdpRewards2 = new MDPRewardsSimple<Double>(mdpRewards, mdp, f -> f.evaluate(toBigRationalPoint(empty_eval_array)).doubleValue(), Evaluator.forDouble());
+				resim = immc.computeReachRewards(imdp, mdpRewards2,target, MinMax.min().setMinUnc(true));
+				System.out.println("minmin: " + resim.soln[0]);
+				resim = immc.computeReachRewards(imdp, mdpRewards2, target, MinMax.max().setMinUnc(false));
+				System.out.println("maxmax: " + resim.soln[0]);
+				System.out.println(resim.strat.getChoiceActionString(820, -1));
+
+				mainLog.println("Test extraction: ");
+				ExtractionResult ext = extract_value(mdp, mdpRewards, choices, trans_distr_file, trans_prob, target, unknown, min, error_thresh);
+				String directory = "betting_g_appendixB";
+				resultExtraction(directory, ext.v, ext.finalV, trans_prob, 84);
+				resultExtraction(directory, v, finalV, trans_prob, 84);
+				
+
+			states = unknownStates.iterator();
+			ModelCheckerResult res = new ModelCheckerResult();
+			res.soln = Arrays.copyOf(action_exp, action_exp.length); // return the expected values for each state
+			res.numIters = iterations;
+			res.timeTaken = (System.currentTimeMillis() - total_timer) / 1000.0;
+			// Store strategy
+			if (genStrat) {
+				res.strat = new MDStrategyArray<>(mdp, choices);
+			}
+
+			return res;
 		} else {
 			ArrayList<Double[]> jointRealization = createSegmentedCartesianProduct(trans_distr_file, index);
 			ArrayList<Double> jointProb = createSegmentedProducts(trans_prob, index);
@@ -1131,8 +1064,6 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 						Map.Entry<Integer,Double> e = transit.next();
 						Double transition_val = e.getValue();
 						int nextState = e.getKey();
-						Double upper = max.get(nextState);
-						Double lower = min.get(nextState);
 						if (transition_val > max.get(nextState)){
 							max.replace(nextState, transition_val);
 						} 
@@ -1238,246 +1169,180 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
         }
     }
 
-	public static float[] lower_evaluation(MDP<Function> mdp, MDPRewards<Function> mdpRewards, BitSet target, boolean min, MDPModelChecker mcMDP, int choices[], ArrayList<Double> trans_distr_file, float error_thres){
-		int n = mdp.getNumStates();
-		int nactions = mdp.getMaxNumChoices();
-		int numParams = trans_distr_file.size();
-		float[] value = new float[n];
+	public static class ExtractionResult {
+		private final double[][] v;
+		private final double[] finalV;
 
-
-		// Start expected reachability
-		long timer = System.currentTimeMillis();
-
-		// Precomputation (not optional)
-		long timerProb1 = System.currentTimeMillis();
-		BitSet inf = mcMDP.prob1(mdp, null, target, !min, null);
-		inf.flip(0, n);	
-
-		BitSet unknown = new BitSet();
-		unknown.set(0, n);
-		unknown.andNot(target);
-		unknown.andNot(inf);
-		IntSet unknownStates = IntSet.asIntSet(unknown);
-
-		// Initiate q_value to 0
-		PrimitiveIterator.OfInt states = unknownStates.iterator();
-		int iterations = 2000;
-		float[] preV = new float[n]; 
-		for (int s = 0; s < n; s ++){
-			preV[s] = 0;
-			value[s] = 0;
+		public ExtractionResult(double[][] v, double[] finalV) {
+			this.v = v;
+			this.finalV = finalV;
 		}
 
-		for (int iter = 1; iter < iterations; iter++){
-			System.out.println(iter);
-			for (int s = 0; s < n; s ++){
-				int nc = mdp.getNumChoices(s);
-				value[s] = 0;
-				for (int choice=0; choice < nc; choice ++){
-					for (int i = 0; i < numParams; i++){ 
-						double realization = trans_distr_file.get(i);
-						double reward = mdpRewards.getStateReward(s).evaluate(toBigRationalPoint(realization)).doubleValue();
-						reward += mdpRewards.getTransitionReward(s, choice).evaluate(toBigRationalPoint(realization)).doubleValue();
-						Iterator<Map.Entry<Integer,Double>> transit;
-						transit = mdp.getTransitionsMappedIterator(s, choice, p -> p.evaluate(toBigRationalPoint(realization)).doubleValue());
-						value[s] += reward;
-						float placeholder = Float.POSITIVE_INFINITY;
-						while (transit.hasNext()){
+		public double[][] getV() {
+			return v;
+		}
+
+		public double[] getFinalV() {
+			return finalV;
+		}
+	}
+
+	public static ExtractionResult extract_value(MDP<Function> mdp, MDPRewards<Function> mdpRewards, int[] choices, ArrayList<Double> trans_distr_file, ArrayList<Double> trans_prob, BitSet target, BitSet unknown, boolean min, double error_thres)  throws PrismException {
+
+		// Store num states
+		int n = mdp.getNumStates();
+
+		int max_iters = 1000;
+
+		Evaluator.EvaluatorFunction eval = (Evaluator.EvaluatorFunction) mdp.getEvaluator();
+		int numParams = eval.getNumParameters();
+//		timerProb1 = System.currentTimeMillis() - timerProb1;
+
+		// Print results of precomputation
+		int numTarget = target.cardinality();
+		if (numParams == 1){
+			double [][] q_value = new double[trans_distr_file.size()][n];
+			double [][] v = new double[trans_distr_file.size()][n];
+			double [][] vPrev = new double[trans_distr_file.size()][n];
+			double [] finalV = new double[n];
+			double [] action_exp = new double[n];
+			Object [] policy = new Object[n];
+			double max_v; int max_a;
+			// Initiate q_value to 0
+			IntSet unknownStates = IntSet.asIntSet(unknown);
+			PrimitiveIterator.OfInt states = unknownStates.iterator();
+			while (states.hasNext()){
+				final int s = states.nextInt();
+				for (int j = 0; j < trans_distr_file.size(); j++){
+					q_value[j][s] = 0.0;
+					v[j][s] = 0.0;
+				}
+				finalV[s] = 0.0;
+
+			}
+
+			for (int iters= 0; iters < max_iters; iters ++){	
+				states = unknownStates.iterator();
+				while (states.hasNext()){
+					final int s = states.nextInt();
+					max_v = Float.POSITIVE_INFINITY; max_a = 0;
+					int choice = choices[s];
+					for (int i = 0; i < trans_distr_file.size(); i++){ 
+						if (trans_distr_file.get(i)>0){
+							double realization = trans_distr_file.get(i);
+							double reward = mdpRewards.getStateReward(s).evaluate(toBigRationalPoint(realization)).doubleValue();
+							reward += mdpRewards.getTransitionReward(s, choice).evaluate(toBigRationalPoint(realization)).doubleValue();
+							Iterator<Map.Entry<Integer,Double>> transit;
+							transit = mdp.getTransitionsMappedIterator(s, choice, p -> p.evaluate(toBigRationalPoint(realization)).doubleValue());
+							q_value[i][s] = reward;
+							while (transit.hasNext()){
 								Map.Entry<Integer,Double> e = transit.next();
 								double transition_val = e.getValue();
 								int next_state = e.getKey();
-								if (transition_val*preV[next_state] < placeholder){
-									placeholder = (float) (transition_val*preV[next_state]);
-								}
-						}
-						value[s] += placeholder;
-					}
-				}
-			}
-
-
-			float maxDiff = 0;
-			for (int s=0; s < n; s ++){
-				if(value[s] - preV[s] > 0){
-					float diff = value[s] - preV[s];
-					if (diff > maxDiff){
-						maxDiff = diff;
-					}
-				} else if (value[s] - preV[s] > 0){
-					float diff = preV[s] - value[s];
-					if (diff > maxDiff){
-						maxDiff = diff;
-					}
-				}
-				preV[s]=value[s];
-			}
-
-			if (maxDiff < error_thres){
-				break;
-			}
-		}
-		return value;
-	}
-
-	public static float[] upper_evaluation(MDP<Function> mdp, MDPRewards<Function> mdpRewards, BitSet target, boolean min, MDPModelChecker mcMDP, int choices[], ArrayList<Double> trans_distr_file, double error_thres){
-		int n = mdp.getNumStates();
-		int nactions = mdp.getMaxNumChoices();
-		int numParams = trans_distr_file.size();
-		float[] value = new float[n];
-
-
-		// Start expected reachability
-		long timer = System.currentTimeMillis();
-
-		// Precomputation (not optional)
-		long timerProb1 = System.currentTimeMillis();
-		BitSet inf = mcMDP.prob1(mdp, null, target, !min, null);
-		inf.flip(0, n);	
-
-		BitSet unknown = new BitSet();
-		unknown.set(0, n);
-		unknown.andNot(target);
-		unknown.andNot(inf);
-		IntSet unknownStates = IntSet.asIntSet(unknown);
-
-		// Initiate q_value to 0
-		PrimitiveIterator.OfInt states = unknownStates.iterator();
-		int iterations = 2000;
-		float[] preV = new float[n]; 
-		for (int s = 0; s < n; s ++){
-			preV[s] = 0;
-			value[s] = 0;
-		}
-
-		for (int iter = 1; iter < iterations; iter++){
-			System.out.println(iter);
-			for (int s = 0; s < n; s ++){
-				int nc = mdp.getNumChoices(s);
-				value[s] = 0;
-				for (int choice=0; choice < nc; choice ++){
-					for (int i = 0; i < numParams; i++){ 
-						double realization = trans_distr_file.get(i);
-						double reward = mdpRewards.getStateReward(s).evaluate(toBigRationalPoint(realization)).doubleValue();
-						reward += mdpRewards.getTransitionReward(s, choice).evaluate(toBigRationalPoint(realization)).doubleValue();
-						Iterator<Map.Entry<Integer,Double>> transit;
-						transit = mdp.getTransitionsMappedIterator(s, choice, p -> p.evaluate(toBigRationalPoint(realization)).doubleValue());
-						value[s] += reward;
-						float placeholder = 0;
-						while (transit.hasNext()){
-							Map.Entry<Integer,Double> e = transit.next();
-							double transition_val = e.getValue();
-							int next_state = e.getKey();
-							if (transition_val*preV[next_state] > placeholder){
-								placeholder = (float) (transition_val*preV[next_state]);
+								q_value[i][s] += transition_val*v[i][next_state];
 							}
-						}
-						value[s] += placeholder;
+					}
+							
+					}
+					
+					for (int i=0; i < trans_distr_file.size(); i++){
+						v[i][s] = q_value[i][s];
 					}
 				}
-			}
-
-
-			float maxDiff = 0;
-			for (int s=0; s < n; s ++){
-				if(value[s] - preV[s] > 0){
-					float diff = value[s] - preV[s];
-					if (diff > maxDiff){
-						maxDiff = diff;
+				states = unknownStates.iterator();
+				double error = 0.0;
+				while (states.hasNext()){
+					final int s = states.nextInt();
+					double preV = finalV[s];
+					double curV = 0.0;
+					double curE = 0.0;
+					for (int j = 0; j < trans_distr_file.size(); j++){
+						curV += trans_prob.get(j)*v[j][s];
 					}
-				} else if (value[s] - preV[s] > 0){
-					float diff = preV[s] - value[s];
-					if (diff > maxDiff){
-						maxDiff = diff;
+					finalV[s] = curV;
+					if (curV - preV < 0){
+						curE = preV - curV;
+					} else {
+						curE = curV - preV;
+					}
+					if (curE > error){
+						error = curE;
 					}
 				}
-				preV[s]=value[s];
+				if (error <= error_thres){
+					break;
+				}
 			}
-
-			if (maxDiff < error_thres){
-				break;
-			}
+			ExtractionResult res = new ExtractionResult(v, finalV);
+			return new ExtractionResult(v, finalV);
+		} else {
+			return new ExtractionResult(null, null);
 		}
-		return value;
-	}
-	
-	public static float[] exp_evaluation(MDP<Function> mdp, MDPRewards<Function> mdpRewards, BitSet target, boolean min, MDPModelChecker mcMDP, int choices[], ArrayList<Double> trans_distr_file, double error_thres){
-		int n = mdp.getNumStates();
-		int nactions = mdp.getMaxNumChoices();
-		int numParams = trans_distr_file.size();
-		float[] value = new float[n];
-
-
-		// Start expected reachability
-		long timer = System.currentTimeMillis();
-
-		// Precomputation (not optional)
-		long timerProb1 = System.currentTimeMillis();
-		BitSet inf = mcMDP.prob1(mdp, null, target, !min, null);
-		inf.flip(0, n);	
-
-		BitSet unknown = new BitSet();
-		unknown.set(0, n);
-		unknown.andNot(target);
-		unknown.andNot(inf);
-		IntSet unknownStates = IntSet.asIntSet(unknown);
-
-		// Initiate q_value to 0
-		PrimitiveIterator.OfInt states = unknownStates.iterator();
-		int iterations = 2000;
-		float[] preV = new float[n]; 
-		for (int s = 0; s < n; s ++){
-			preV[s] = 0;
-			value[s] = 0;
-		}
-
-		for (int iter = 1; iter < iterations; iter++){
-			System.out.println(iter);
-			for (int s = 0; s < n; s ++){
-				int nc = mdp.getNumChoices(s);
-				value[s] = 0;
-				for (int choice=0; choice < nc; choice ++){
-					for (int i = 0; i < numParams; i++){ 
-						double realization = trans_distr_file.get(i);
-						double reward = mdpRewards.getStateReward(s).evaluate(toBigRationalPoint(realization)).doubleValue();
-						reward += mdpRewards.getTransitionReward(s, choice).evaluate(toBigRationalPoint(realization)).doubleValue();
-						Iterator<Map.Entry<Integer,Double>> transit;
-						transit = mdp.getTransitionsMappedIterator(s, choice, p -> p.evaluate(toBigRationalPoint(realization)).doubleValue());
-						value[s] += reward;
-						float placeholder = 0;
-						while (transit.hasNext()){
-							Map.Entry<Integer,Double> e = transit.next();
-							double transition_val = e.getValue();
-							int next_state = e.getKey();
-							placeholder = (float) (transition_val*preV[next_state]);
-							value[s] += placeholder;
-						}
-						
-					}
-				}
-			}
-
-
-			float maxDiff = 0;
-			for (int s=0; s < n; s ++){
-				if(value[s] - preV[s] > 0){
-					float diff = value[s] - preV[s];
-					if (diff > maxDiff){
-						maxDiff = diff;
-					}
-				} else if (value[s] - preV[s] > 0){
-					float diff = preV[s] - value[s];
-					if (diff > maxDiff){
-						maxDiff = diff;
-					}
-				}
-				preV[s]=value[s];
-			}
-
-			if (maxDiff < error_thres){
-				break;
-			}
-		}
-		return value;
 	}
 
+	public static void resultExtraction(String directoryName,double[][] v,double[] finalV,ArrayList<Double> trans_prob, int initialState) throws IOException {
+
+        // 1) Create directory if not exists
+        File dir = new File(directoryName);
+        if (!dir.exists()) {
+            boolean created = dir.mkdirs();
+            if (!created) {
+                throw new IOException("Unable to create directory: " + dir.getAbsolutePath());
+            }
+        }
+
+        // 2) Find a safe filename for the v CSV
+        File vFile = findNextAvailableFile(dir, "v", "csv");
+        // 3) Write the v data to CSV
+        try (BufferedWriter writer = Files.newBufferedWriter(vFile.toPath(), StandardCharsets.UTF_8)) {
+            // Write header
+            writer.write("Index,Value,Probs\n");
+            // Write each row: i, v[i][initialState]
+            // Note: v.length = # of "rows" in v, 
+            //       each row has length = # of states in v[row].
+            for (int i = 0; i < v.length; i++) {
+                writer.write(i + "," + v[i][initialState] + "," + trans_prob.get(i) + "\n");
+            }
+        }
+
+        // 4) Find a safe filename for the finalV CSV
+        File finalVFile = findNextAvailableFile(dir, "finalV", "csv");
+        // 5) Write finalV data to CSV
+        try (BufferedWriter writer = Files.newBufferedWriter(finalVFile.toPath(), StandardCharsets.UTF_8)) {
+            // Write header
+            writer.write("Index,Value\n");
+            // Write each row: i, finalV[i]
+            for (int i = 0; i < finalV.length; i++) {
+                writer.write(i + "," + finalV[i] + "\n");
+            }
+        }
+
+    }
+
+    /**
+     * Helper method to find the next available file:  
+     *   - Tries baseName.csv  
+     *   - If it exists, tries baseName1.csv, baseName2.csv, etc.  
+     *
+     * @param directory The directory to place the file in
+     * @param baseName  The filename base (e.g., "v", "finalV")
+     * @param extension The filename extension (e.g., "csv")
+     * @return A File object that does not exist yet
+     */
+    private static File findNextAvailableFile(File directory,
+                                              String baseName,
+                                              String extension) {
+        int counter = 0;
+        File candidate;
+        while (true) {
+            String suffix = (counter == 0) ? "" : String.valueOf(counter);
+            String filename = baseName + suffix + "." + extension;
+            candidate = new File(directory, filename);
+            if (!candidate.exists()) {
+                break;
+            }
+            counter++;
+        }
+        return candidate;
+    }
 }

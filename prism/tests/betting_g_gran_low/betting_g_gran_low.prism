@@ -24,8 +24,8 @@ module game
 endmodule
 
 label "goal" = (s=STAGES+1);
-label "obs" = (m=0);
+//label "obs" = (m=0);
 
 rewards
-    [end] s=STAGES : m;
+    [end] s=STAGES : MAX_MONEY - m;
 endrewards

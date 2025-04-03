@@ -14,9 +14,9 @@ module chain
 endmodule
 
 rewards
-	[a] true : 1;
-	[b] true : 1;
-	[c] true : 1;
+	[a] true : allowance - 1;
+	[b] true : allowance - 1;
+	[c] true : allowance - 1;
 endrewards
 
 label "goal" = (s=10);
