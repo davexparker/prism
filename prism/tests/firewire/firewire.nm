@@ -13,7 +13,7 @@ const int rc_fast_min = 76;
 const int rc_slow_max = 167;
 const int rc_slow_min = 159;
 // delay caused by the wire length
-const int delay;
+const int delay=3;
 // probability of choosing fast
 const double p; // 0.5 - original value
 const double slow=1-p;
@@ -109,10 +109,10 @@ module node1
 	// added resets to x1 when not considered again until after rest
 	// removed root and child (using almost root and almost child)
 	
-	// root contention immediate state)
+	// root contention immediate state
 	[snd_idle12] s1=0 -> p : (s1'=2) & (x1'=0) +  slow : (s1'=3) & (x1'=0);
 	[rec_idle21] s1=0 -> (s1'=1);
-	// rec_idle immediate state)
+	// rec_idle immediate state
 	[snd_idle12] s1=1 -> p : (s1'=4) & (x1'=0) +  slow : (s1'=5) & (x1'=0);
 	[rec_req21]  s1=1 -> (s1'=0);
 	// rec_req_fast

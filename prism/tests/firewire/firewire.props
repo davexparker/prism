@@ -1,4 +1,5 @@
 // time
+Rmax=?[F "done"]
 R(dist){"time"}min=?[F "done"]
 R(cvar){"time"}min=?[F "done"]
 R{"time"}min=?[F "done"]

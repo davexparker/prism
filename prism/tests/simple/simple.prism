@@ -1,0 +1,33 @@
+mdp
+
+const double p;
+
+module simple
+    // s is the state variable:
+    //   0 = initial state,
+    //   1 = intermediate state,
+    //   2 = target state,
+    //   3 = failure (absorbing) state.
+    s : [0..3] init 0;
+
+    // From state 0, there is a 50% chance to go to state 1 (where you may eventually reach the target)
+    // and a 50% chance to go directly to the failure state (state 3).
+    [from0] s=0 -> 0.5:(s'=1) + 0.5:(s'=3);
+    
+    // From state 1, there is a 50% chance to reach the target (state 2)
+    // and a 50% chance to go to failure (state 3).
+    [from1] s=1 -> 0.5:(s'=2) + 0.5:(s'=3);
+    
+    // State 2 is the target and is absorbing.
+    [done] s=2 -> (s'=2);
+    
+    // State 3 is the failure state and is absorbing.
+    [] s=3 -> (s'=3);
+endmodule
+
+rewards "time"	
+	[] true : 1;
+endrewards
+
+// The target label is defined for state 2.
+label "target" = (s=2);

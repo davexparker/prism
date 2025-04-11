@@ -16,11 +16,7 @@ module basketball
 
     // Betting transitions
     [dribble] s < STAGES & dr < max_dribble -> (dr'=min(dr+1, max_dribble)) & (poi' = poi);
-    //[shoot_two] s < STAGES & dr < max_dribble -> (p_two*p_two - 1.2*p_two + 1.2):(s'=min(s+1, STAGES)) & (poi'=min(poi+2, max_point)) & (dr'=min(1,max_dribble)) + (1 - (p_two*p_two - 1.2*p_two + 1.2)):(s'=min(s+1, STAGES)) & (dr'=min(1,max_dribble));
-    //[shoot_two] s < STAGES & dr < max_dribble -> (p_two+0.1+0.05*(p_two - 0.4)*(p_two - 0.8)):(s'=min(s+1, STAGES)) & (poi'=min(poi+2, max_point)) & (dr'=min(1,max_dribble)) + (1 - (p_two+0.1+0.05*(p_two - 0.4)*(p_two - 0.8))):(s'=min(s+1, STAGES)) & (dr'=min(1,max_dribble));
     [shoot_two] s < STAGES & dr < max_dribble -> p_two:(s'=min(s+1, STAGES)) & (poi'=min(poi+2, max_point)) & (dr'=min(1,max_dribble)) + (1 - p_two):(s'=min(s+1, STAGES)) & (dr'=min(1,max_dribble));
-    //[shoot_three] s < STAGES & dr < max_dribble -> (p_three+0.1+0.05*(p_three - 0.4)*(p_three - 0.8)):(s'=min(s+1, STAGES)) & (poi'=min(poi+3, max_point)) & (dr'=min(1,max_dribble)) + (1 - (p_three+0.1+0.05*(p_three - 0.4)*(p_three - 0.8))):(s'=min(s+1, STAGES)) & (dr'=min(1,max_dribble));
-    //[shoot_three] s < STAGES & dr < max_dribble -> p_three:(s'=min(s+1, STAGES)) & (poi'=min(poi+3, max_point)) & (dr'=min(1,max_dribble)) + (1 - p_three):(s'=min(s+1, STAGES)) & (dr'=min(1,max_dribble));
     [shoot_three] s < STAGES & dr < max_dribble -> 0.5*(p_three*p_three - 1.2*p_three + 1.2):(s'=min(s+1, STAGES)) & (poi'=min(poi+3, max_point)) & (dr'=min(1,max_dribble)) + (1 -0.5*(p_three*p_three - 1.2*p_three + 1.2)):(s'=min(s+1, STAGES)) & (dr'=min(1,max_dribble));
     [inside] s < STAGES & dr < max_dribble -> 1 - 1/dr + p_layd/(1+p_layd):(s'=min(s+1, STAGES)) & (poi'=min(poi+1, max_point)) & (dr'=min(1,max_dribble)) + (-p_layd/(1+p_layd) + 1/dr):(s'=min(s+1, STAGES)) & (dr'=min(1,max_dribble));
     [force] dr = max_dribble -> 0.1:(s'=min(s+1, STAGES)) & (poi'=min(poi+2, max_point)) & (dr'=min(1,max_dribble)) +  0.1:(s'=min(s+1, STAGES)) & (poi'=min(poi+3, max_point)) & (dr'=min(1,max_dribble)) +  0.1:(s'=min(s+1, STAGES)) & (poi'=min(poi+1, max_point)) & (dr'=min(1,max_dribble)) + 0.7:(s'=min(s+1, STAGES)) & (dr'=min(1,max_dribble));

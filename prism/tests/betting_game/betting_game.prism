@@ -26,5 +26,5 @@ label "goal" = (s=STAGES+1);
 label "obs" = (m=0);
 
 rewards
-    [end] s=STAGES :    m;
+    [end] s=STAGES : m;
 endrewards

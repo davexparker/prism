@@ -110,7 +110,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 		int numTarget = target.cardinality();
 		int numInf = inf.cardinality();
 		mainLog.println("target=" + numTarget + ", inf=" + numInf + ", rest=" + (n - (numTarget + numInf)));
-
+		System.out.println("num states: " + n);
 		// Timers
 		timer = System.currentTimeMillis();
 		long total_timer = System.currentTimeMillis();
@@ -128,24 +128,10 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 		String distr_type = settings.getString(PrismSettings.PRISM_DISTR_SOLN_METHOD);
 		int uncertain_atoms=3;double  u_vmax; double u_vmin;
 
-		int atoms=101;
-		double v_max = 100;
-		double v_min = 0;
-		distr_type = "C51";
-		uncertain_atoms = 11;
-		u_vmin =0.0; u_vmax = 1.0;
 		int iterations = 3000;
 		int min_iter = 8;
 		double error_thresh = 0.01;
-		double gamma =1;
-		double alpha=0.5;
 		Double dtmc_epsilon = null;
-		boolean check_dtmc_distr = true;
-		mainLog.println("Using default parameters - Distr type: "+ distr_type);
-		mainLog.println("----- Parameters:\natoms:"+atoms+" - vmax:"+v_max+" - vmin:"+v_min);
-		mainLog.println("alpha:"+alpha+" - discount:"+gamma+" - max iterations:"+iterations+
-					" - error thresh:"+error_thresh+ " - epsilon:"+dtmc_epsilon);
-		mainLog.println("u_atoms:"+uncertain_atoms+" - u_vmax:"+u_vmax+" - u_vmin:"+u_vmin);
 
 		Evaluator.EvaluatorFunction eval = (Evaluator.EvaluatorFunction) mdp.getEvaluator();
 		int numParams = eval.getNumParameters();
@@ -178,7 +164,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 
 
 		if (numParams == 1){
-			DiscreteDistribution m = null;
+			/* DiscreteDistribution m = null;
 			double [][][] q_value = new double[trans_distr_file.size()][n][nactions];
 			double [][] v = new double[trans_distr_file.size()][n];
 			double [][] vPrev = new double[trans_distr_file.size()][n];
@@ -189,7 +175,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 			int[] choices = new int[n];
 			double max_v; int max_a;
 			int numChoices;
-			int iters; boolean isUncertain;
+			int iters;
 
 			// Initiate q_value to 0
 			PrimitiveIterator.OfInt states = unknownStates.iterator();
@@ -202,8 +188,9 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 						v[j][s] = 0.0;
 					}
 				finalV[s] = 0.0;
-
 			}
+
+			
 
 			for (iters= 0; iters < iterations; iters ++){	
 				states = unknownStates.iterator();
@@ -225,7 +212,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 										Map.Entry<Integer,Double> e = transit.next();
 										double transition_val = e.getValue();
 										int next_state = e.getKey();
-										q_value[i][s][choice] += gamma*transition_val*v[i][next_state];
+										q_value[i][s][choice] += transition_val*v[i][next_state];
 									}
 								}
 							}
@@ -328,25 +315,35 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 
 				Double[] e_max = new Double[numParams];
 				Double[] e_min = new Double[numParams];
-				e_max[0] = 0.2;
-				e_min[0] = 0.5;
-				IMDP<Double> imdp = makeIMDP(mdp, e_max, e_min, 100);
+				String directory1 = "our";
+				String directory2 = "robust";
+				String directory3 = "optimistic";
+				e_max[0] = 0.65;
+				e_min[0] = 0.35;
+				IMDP<Double> imdp = makeIMDP(mdp, e_max, e_min, 1000);
 				imdp.findDeadlocks(true);
 				IMDPModelChecker immc = new IMDPModelChecker(null);
+				immc.setGenStrat(true);
 				ModelCheckerResult resim;
 				MDPRewards<Double> mdpRewards2 = new MDPRewardsSimple<Double>(mdpRewards, mdp, f -> f.evaluate(toBigRationalPoint(empty_eval_array)).doubleValue(), Evaluator.forDouble());
-				resim = immc.computeReachRewards(imdp, mdpRewards2,target, MinMax.min().setMinUnc(true));
-				System.out.println("minmin: " + resim.soln[0]);
+				resim = immc.computeReachRewards(imdp, mdpRewards2,target, MinMax.max().setMinUnc(true));
+				int[] robust = new int[n];
+				for (int s = 0; s < n; s++){
+					robust[s] = resim.strat.getChoiceIndex(s, -1);
+				}
+				ExtractionResult rob = extract_value(mdp, mdpRewards, robust, trans_distr_file, trans_prob, target, unknown, min, error_thresh);
+				resultExtraction(directory2, rob.v, rob.finalV, trans_prob, 0);
 				resim = immc.computeReachRewards(imdp, mdpRewards2, target, MinMax.max().setMinUnc(false));
-				System.out.println("maxmax: " + resim.soln[0]);
-				System.out.println(resim.strat.getChoiceActionString(820, -1));
-
-				mainLog.println("Test extraction: ");
-				ExtractionResult ext = extract_value(mdp, mdpRewards, choices, trans_distr_file, trans_prob, target, unknown, min, error_thresh);
-				String directory = "betting_g_appendixB";
-				resultExtraction(directory, ext.v, ext.finalV, trans_prob, 84);
-				resultExtraction(directory, v, finalV, trans_prob, 84);
-				
+				int[] optimistic = new int[n];
+				for (int s = 0; s < n; s++){
+					optimistic[s] = resim.strat.getChoiceIndex(s, -1);
+				}
+				ExtractionResult opt = extract_value(mdp, mdpRewards, optimistic, trans_distr_file, trans_prob, target, unknown, min, error_thresh);
+				resultExtraction(directory3, opt.v, opt.finalV, trans_prob, 0);
+				mainLog.println("Robust strat");
+				mainLog.println(robust.toString());
+				mainLog.println("Optimistic strat");
+				mainLog.println(optimistic.toString());
 
 			states = unknownStates.iterator();
 			ModelCheckerResult res = new ModelCheckerResult();
@@ -356,7 +353,12 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 			// Store strategy
 			if (genStrat) {
 				res.strat = new MDStrategyArray<>(mdp, choices);
-			}
+			} */
+
+			System.out.println("Here");
+
+			ModelCheckerResult res = new ModelCheckerResult();
+			res = computeReachProbs1(mdp, target, min, trans_distr_file, trans_prob);
 
 			return res;
 		} else {
@@ -365,18 +367,16 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 			DiscreteDistribution m = null;
 			double [][][] q_value = new double[jointRealization.size()][n][nactions];
 			double [][] v = new double[jointRealization.size()][n];
-			double [][] vPrev = new double[jointProb.size()][n];
 			double [] finalV = new double[n];
-			double [] action_val = new double[nactions];
 			double [] action_exp = new double[n];
 			Object [] policy = new Object[n];
 			int[] choices = new int[n];
-			double max_v; int max_a;
-			double max_dist ; int numChoices;
-			int iters; boolean isUncertain;
-
+			int max_a; float max_v;
+			int numChoices;
+			int iters;
 			// Initiate q_value to 0
 			PrimitiveIterator.OfInt states = unknownStates.iterator();
+			mainLog.println("bobo");
 			while (states.hasNext()){
 				final int s = states.nextInt();
 				numChoices = mdp.getNumChoices(s);
@@ -409,7 +409,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
             						double transition_val = e.getValue();
 									int next_state = e.getKey();
 								
-									q_value[i][s][choice] += gamma*transition_val*v[i][next_state];
+									q_value[i][s][choice] += transition_val*v[i][next_state];
 				
 								}
 							}
@@ -507,65 +507,43 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 			mainLog.println("Exp values: " + Arrays.toString(exp_dtmc_atom));
 			mainLog.println("DTMC weighted expected value :" + expected_dtmc);
 
-			int numGridPoints = 10;
-			double worstPerformance = Double.POSITIVE_INFINITY;
-    		Double[] worstX = new Double[numParams];
-			Double[] X_max = new Double[numParams];
-			Double[] X_min = new Double[numParams];
-			Double[] step = new Double[numParams];
-			X_max[0] = 0.6;
-			X_max[1] = 0.2;
-			X_min[0] = 0.4;
-			X_min[1] = 0.05;
-    		step[0] = (X_max[0] - X_min[0]) / (numGridPoints - 1);
-			step[1] = (X_max[1] - X_min[1]) / (numGridPoints - 1);
-			int[] indices = new int[numParams];
-			double performance = 0.0;
-			int cur = 0;
-			int numPa = (int) Math.pow(numGridPoints, numParams) - 1;
-			ArrayList<Double> longPa = new ArrayList<>(numPa);
-			while (cur < numParams){
-				int i = 0;
-				while (i < numGridPoints){
-					Double x;
-					x = X_min[cur] + i * step[cur];
-					longPa.add(x);
-					i = i + 1; 
+			
+    			Double[] e_max = new Double[numParams];
+				Double[] e_min = new Double[numParams];
+				String directory1 = "our";
+				String directory2 = "robust";
+				String directory3 = "optimistic";
+				e_max[0] = 0.65;
+				e_max[1] = 0.25;
+				e_min[0] = 0.35;
+				e_min[1] = 0.05;
+				IMDP<Double> imdp = makeIMDP(mdp, e_max, e_min, 10);
+				imdp.findDeadlocks(true);
+				IMDPModelChecker immc = new IMDPModelChecker(null);
+				immc.setGenStrat(true);
+				ModelCheckerResult resim;
+				MDPRewards<Double> mdpRewards2 = new MDPRewardsSimple<Double>(mdpRewards, mdp, f -> f.evaluate(toBigRationalPoint(empty_eval_array)).doubleValue(), Evaluator.forDouble());
+				resim = immc.computeReachRewards(imdp, mdpRewards2,target, MinMax.max().setMinUnc(true));
+				int[] robust = new int[n];
+				for (int s = 0; s < n; s++){
+					robust[s] = resim.strat.getChoiceIndex(s, -1);
 				}
-				indices[cur] = numGridPoints*(cur+1) - 1;
-				cur = cur + 1;
-			}
-			ArrayList<Double[]> gridRealization = createSegmentedCartesianProduct(longPa, indices);
-    		for (int i = 0; i < gridRealization.size(); i++) {
-				
-        		Double[] realization = gridRealization.get(i);
-				MDP<Double> atom_mdp;
-				atom_mdp = new MDPSimple<>(mdp,p -> p.evaluate(toBigRationalPoint(realization)).doubleValue(),Evaluator.forDouble());
-				MDStrategy strat = new MDStrategyArray(atom_mdp, choices);
-				DTMC dtmc = new DTMCFromMDPAndMDStrategy(atom_mdp, strat);
-				StateRewardsArray mcRewards = new StateRewardsArray(n);
-
-				for (int s = 0; s < n; s++) {
-					double reward = mdpRewards.getStateReward(s).evaluate(toBigRationalPoint(realization)).doubleValue() ;
-					reward +=  mdpRewards.getTransitionReward(s, choices[s]).evaluate(toBigRationalPoint(realization)).doubleValue();
-					mcRewards.setStateReward(s, reward);
+				System.out.println(mdp.getInitialStates().toString());
+				ExtractionResult our = extract_valueM(mdp, mdpRewards, choices, jointRealization, jointProb, target, unknown, min, error_thresh);
+				resultExtractionM(directory1, our.v, our.finalV, jointProb, 50);
+				ExtractionResult rob = extract_valueM(mdp, mdpRewards, robust, jointRealization, jointProb, target, unknown, min, error_thresh);
+				resultExtractionM(directory2, rob.v, rob.finalV, jointProb, 50);
+				resim = immc.computeReachRewards(imdp, mdpRewards2, target, MinMax.max().setMinUnc(false));
+				int[] optimistic = new int[n];
+				for (int s = 0; s < n; s++){
+					optimistic[s] = resim.strat.getChoiceIndex(s, -1);
 				}
-				DTMCModelChecker mcDTMC = new DTMCModelChecker(this);
-				ModelCheckerResult dtmc_result = mcDTMC.computeReachRewardsDistr(dtmc, mcRewards, target, "prism/umdp_out/distr_dtmc_prob_exp_"+i+".csv", dtmc_epsilon);
-    
-    	// Extract the performance (for example, by summing over the DTMC distribution).
-    			TreeMap<Integer,Double> result = (TreeMap<Integer, Double>) dtmc_result.solnObj[dtmc.getFirstInitialState()];
-    			for (Map.Entry<Integer, Double> entry : result.entrySet()) {
-        			performance += entry.getKey() * entry.getValue();
-    			}
-        		if (performance < worstPerformance) { // assuming lower reward is worse
-            		worstPerformance = performance;
-            		worstX = realization;
-        		}
-    		}
-    
-    		//mainLog.println("Worst-case parameter realization: " + Arrays.toString(worstX));
-    		//mainLog.println("Worst-case performance: " + worstPerformance);
+				ExtractionResult opt = extract_valueM(mdp, mdpRewards, optimistic, jointRealization, jointProb, target, unknown, min, error_thresh);
+				resultExtractionM(directory3, opt.v, opt.finalV, jointProb, 50);
+				mainLog.println("Robust strat");
+				mainLog.println(robust.toString());
+				mainLog.println("Optimistic strat");
+				mainLog.println(optimistic.toString());
 
 
 
@@ -790,123 +768,6 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 		return res;
 	}
 
-	/**
-	 * Computes the aggregated performance for a concrete MDP instantiated at a given parameter vector.
-	 * For example, this may be the average reachability probability.
-	 *
-	 * @param uncertainMDP The uncertain (parametric) MDP of type MDP<Function>.
-	 * @param target       The set of target states.
-	 * @param min          If true, we compute worst-case (minimum) probabilities; else, best-case (maximum).
-	 * @param params       The parameter vector at which to instantiate the MDP.
-	 * @return The aggregated performance metric.
-	 * @throws PrismException if an error occurs.
-	 */
-	public double computeAggregatedPerformance(MDP<Function> uncertainMDP, MDPRewards<Function> mdpRewards, int[] choices, BitSet target, boolean min, Double[] params)
-			throws PrismException {
-
-		int n = uncertainMDP.getNumStates();
-		Double dtmc_epsilon = null;
-		double performance;
-		performance = 0.0;
-
-		// Instantiate a concrete MDP by evaluating the functions at the given parameter vector.
-		MDP<Double> atom_mdp;
-
-		// Compute reachability probabilities for the concrete MDP using your fixed-parameter method.
-		// Here, computeReachProbs is assumed to return a ModelCheckerResult whose 'soln' field is a double[].
-		// Convert the Double[] to a Point with BigRational values.
-		BigRational[] brParams = new BigRational[params.length];
-		for (int i = 0; i < params.length; i++) {
-			brParams[i] = new BigRational(Double.toString(params[i]));
-		}
-		Point paramPoint = new Point(brParams);
-		atom_mdp = new MDPSimple<>(uncertainMDP,p -> p.evaluate(paramPoint).doubleValue(),Evaluator.forDouble());
-		MDStrategy strat = new MDStrategyArray(atom_mdp, choices);
-		DTMC dtmc = new DTMCFromMDPAndMDStrategy(atom_mdp, strat);
-		StateRewardsArray mcRewards = new StateRewardsArray(n);
-		Double [] empty_eval_array = new Double[params.length];
-		for (int j = 0; j < params.length; j++){
-			empty_eval_array[j] = 0.0;
-		}
-		for (int s = 0; s < n; s++) {
-			double reward = mdpRewards.getStateReward(s).evaluate(paramPoint).doubleValue() ;
-			reward +=  mdpRewards.getTransitionReward(s, choices[s]).evaluate(paramPoint).doubleValue();
-			mcRewards.setStateReward(s, reward);
-		}
-		DTMCModelChecker mcDTMC = new DTMCModelChecker(this);
-		ModelCheckerResult dtmc_result = mcDTMC.computeReachRewardsDistr(dtmc, mcRewards, target, "prism/umdp_out/distr_dtmc_prob_exp_agg.csv", dtmc_epsilon);
-    
-    	// Extract the performance (for example, by summing over the DTMC distribution).
-    	TreeMap<Integer,Double> result = (TreeMap<Integer, Double>) dtmc_result.solnObj[dtmc.getFirstInitialState()];
-    	for (Map.Entry<Integer, Double> entry : result.entrySet()) {
-        	performance += entry.getKey() * entry.getValue();
-    	}
-		return performance;
-	}
-
-	/**
-	 * Computes the global sensitivity indices (first-order and total) for the uncertain parametric MDP.
-	 * Uses a variance-based (Sobol) method.
-	 *
-	 * @param uncertainMDP The uncertain (parametric) MDP.
-	 * @param target       The set of target states.
-	 * @param min          If true, we consider worst-case (min) performance; else, best-case (max).
-	 * @param X_min        An array of minimum values for each parameter.
-	 * @param X_max        An array of maximum values for each parameter.
-	 * @param N            The number of random samples for each sample matrix.
-	 * @return A two-dimensional array of sensitivity indices:
-	 *         indices[0] contains the first-order (main effect) Sobol indices,
-	 *         indices[1] contains the total effect Sobol indices.
-	 * @throws PrismException if an error occurs.
-	 */
-	public double[][] computeGlobalSensitivity(MDP<Function> uncertainMDP, MDPRewards<Function> mdpRewards,int[] choices, BitSet target, boolean min,
-											Double[] X_min, Double[] X_max, int N) throws PrismException {
-		int k = X_min.length;  // number of parameters
-		// Generate two independent sample matrices A and B (size: N x k).
-		Double[][] A = generateRandomSamples(X_min, X_max, N, k);
-		Double[][] B = generateRandomSamples(X_min, X_max, N, k);
-		Evaluator.EvaluatorFunction eval = (Evaluator.EvaluatorFunction) uncertainMDP.getEvaluator();
-		mainLog.println("Generated sample matrices A and B with N = " + N);
-
-		Double[] Y_A = new Double[N];
-		Double[] Y_B = new Double[N];
-		// Compute performance for each sample in A and B.
-		for (int j = 0; j < N; j++) {
-			Y_A[j] = computeAggregatedPerformance(uncertainMDP, mdpRewards, choices, target, min, A[j]);
-			Y_B[j] = computeAggregatedPerformance(uncertainMDP, mdpRewards, choices, target, min, B[j]);
-			mainLog.println("Sample " + j + ": Y_A = " + Y_A[j] + ", Y_B = " + Y_B[j]);
-		}
-		double V_Y = variance(Y_A);
-		mainLog.println("Total variance V_Y = " + V_Y);
-
-		double[] S = new double[k];       // First-order (main effect) indices.
-		double[] S_total = new double[k];   // Total effect indices.
-
-		// For each parameter i, form matrix A_B(i) and compute corresponding performance.
-		for (int i = 0; i < k; i++) {
-			Double[][] A_B = formMatrix_AB(A, B, i);
-			Double[] Y_A_B = new Double[N];
-			for (int j = 0; j < N; j++) {
-				Y_A_B[j] = computeAggregatedPerformance(uncertainMDP, mdpRewards, choices, target, min, A_B[j]);
-			}
-			Double sumFirst = 0.0;
-			Double sumTotal = 0.0;
-			for (int j = 0; j < N; j++) {
-				sumFirst += Y_A[j] * (Y_A_B[j] - Y_B[j]);
-				double diff = Y_A[j] - Y_A_B[j];
-				sumTotal += diff * diff;
-			}
-			S[i] = sumFirst / (N * V_Y);
-			S_total[i] = sumTotal / (2 * N * V_Y);
-			mainLog.println("Parameter " + eval.getParameterName(i) + ": First-order index S[" + i + "] = " + S[i]
-					+ ", Total index S_total[" + i + "] = " + S_total[i]);
-		}
-
-		double[][] globalSensitivityIndices = new double[2][k];
-		globalSensitivityIndices[0] = S;
-		globalSensitivityIndices[1] = S_total;
-		return globalSensitivityIndices;
-	}
 
 	/**
 	 * Generates an array of N random samples, each being a k-dimensional vector,
@@ -984,24 +845,180 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 	 * Note: if 'known' is specified (i.e. is non-null, 'init' must also be given and is used for the exact values).
 	 * Also, 'known' values cannot be passed for some solution methods, e.g. policy iteration.  
 	 */
-	public ModelCheckerResult computeReachProbs(MDP<Double> mdp, BitSet remain, BitSet target, boolean min, double init[], BitSet known) throws PrismException
+	public ModelCheckerResult computeReachProbs1(MDP<Function> mdp, BitSet target, boolean min, ArrayList<Double> trans_distr_file, ArrayList<Double> trans_prob) throws PrismException
 	{
-		MDPModelChecker mc = new MDPModelChecker(null);
-		return mc.computeReachProbs(mdp, remain, target, min, init, known);
-	}
+		System.out.println("Here");
+		MDPModelChecker mcMDP = new MDPModelChecker(this);
+		mcMDP.inheritSettings(this);
 
-	/**
-	 * Compute reachability probabilities.
-	 * i.e. compute the min/max probability of reaching a state in {@code target}.
-	 * @param mdp The MDP
-	 * @param target Target states
-	 * @param min Min or max probabilities (true=min, false=max)
-	 */
-	public ModelCheckerResult computeReachProbs(MDP<Double> mdp, BitSet target, boolean min) throws PrismException
-	{
-		return computeReachProbs(mdp, null, target, min, null, null);
-	}
+		// Start expected reachability
+		long timer = System.currentTimeMillis();
+		mainLog.println("\nStarting expected reachability (" + (min ? "min" : "max") + ")...");
 
+		// Check for deadlocks in non-target state (because breaks e.g. prob1)
+		mdp.checkForDeadlocks(target);
+
+		// Store num states
+		int n = mdp.getNumStates();
+
+		// Precomputation (not optional)
+		long timerProb1 = System.currentTimeMillis();
+		BitSet inf = mcMDP.prob1(mdp, null, target, !min, null);
+		inf.flip(0, n);
+//		timerProb1 = System.currentTimeMillis() - timerProb1;
+
+		// Print results of precomputation
+		int numTarget = target.cardinality();
+		int numInf = inf.cardinality();
+		mainLog.println("target=" + numTarget + ", inf=" + numInf + ", rest=" + (n - (numTarget + numInf)));
+
+		// Timers
+		timer = System.currentTimeMillis();
+		long total_timer = System.currentTimeMillis();
+		int nactions = mdp.getMaxNumChoices();
+		// Determine set of states actually need to compute values for
+		BitSet nonTarget = new BitSet();
+		nonTarget.set(0, n);
+		nonTarget.andNot(target);
+		nonTarget.andNot(inf);
+		IntSet nonTargetStates = IntSet.asIntSet(nonTarget);
+		IntSet targetStates = IntSet.asIntSet(target);
+		BitSet total = new BitSet();
+		total.set(0, n);
+		IntSet totalStates = IntSet.asIntSet(total);
+		int iterations = 3000;
+		double error_thresh = 0.01;
+		double [][][] q_value = new double[trans_distr_file.size()][n][nactions];
+		double [][] v = new double[trans_distr_file.size()][n];
+		double [] finalV = new double[n];
+		double [] action_exp = new double[n];
+		Object [] policy = new Object[n];
+		int[] choices = new int[n];
+		int minimum_iter = 10;
+		int max_a; float max_v;
+		int numChoices;
+		int iters;
+		// Initiate q_value to 0 for nonTarget
+		PrimitiveIterator.OfInt states = nonTargetStates.iterator();
+		while (states.hasNext()){
+			final int s = states.nextInt();
+			numChoices = mdp.getNumChoices(s);
+			for (int i = 0; i < numChoices; i++)
+				for (int j = 0; j < trans_distr_file.size(); j++){
+					q_value[j][s][i] = 0.0;
+					v[j][s] = 0.0;
+				}
+			finalV[s] = 0.0;
+		}
+
+		// Initiate q_value to 1 for Target
+		states = targetStates.iterator();
+		double count = 0;
+		System.out.println(mdp.getInitialStates().toString());
+		while (states.hasNext()){
+			final int s = states.nextInt();
+			System.out.println(s);
+			numChoices = mdp.getNumChoices(s);
+			for (int i = 0; i < numChoices; i++)
+				for (int j = 0; j < trans_distr_file.size(); j++){
+					q_value[j][s][i] = 1.0;
+					v[j][s] = 1.0;
+				}
+			finalV[s] = 1.0;
+			count += 1;
+		}
+		System.out.println("Target state: " + count);
+
+
+		
+
+		for (iters= 0; iters < iterations; iters ++){	
+			System.out.println(iters);
+			states = nonTargetStates.iterator();
+			while (states.hasNext()){
+				final int s = states.nextInt();
+				max_v = Float.POSITIVE_INFINITY; max_a = 0;
+				numChoices = mdp.getNumChoices(s);
+				for (int choice = 0; choice < numChoices; choice ++){
+					for (int i = 0; i < trans_distr_file.size(); i++){ 
+						if (trans_distr_file.get(i)>0){
+							double realization = trans_distr_file.get(i);
+							Iterator<Map.Entry<Integer,Double>> transit;
+							transit = mdp.getTransitionsMappedIterator(s, choice, p -> p.evaluate(toBigRationalPoint(realization)).doubleValue());
+							q_value[i][s][choice] = 0;
+							while (transit.hasNext()){
+								Map.Entry<Integer,Double> e = transit.next();
+								double transition_val = e.getValue();
+								int next_state = e.getKey();
+								q_value[i][s][choice] += transition_val*v[i][next_state];
+							}
+						}
+					}
+				}
+
+
+				double prev = 0.0;
+				for (int choice = 0; choice < numChoices; choice ++){
+					double tmpV = 0.0;
+					for (int i=0; i < trans_distr_file.size(); i++){
+						if (trans_distr_file.get(i) > 0){
+							tmpV += trans_prob.get(i)*q_value[i][s][choice];
+						}
+					}
+					if (tmpV > prev){
+						prev = tmpV;
+						choices[s] = choice;
+						action_exp[s] = prev;
+						max_a = choice;
+					}
+					for (int i=0; i < trans_distr_file.size(); i++){
+						v[i][s] = q_value[i][s][max_a];
+					}
+				}
+				policy[s] = mdp.getAction(s, max_a);
+			}
+			
+			states = nonTargetStates.iterator();
+			double error = 0.0;
+			while (states.hasNext()){
+				final int s = states.nextInt();
+				double preV = finalV[s];
+				double curV = 0.0;
+				double curE = 0.0;
+				for (int j = 0; j < trans_distr_file.size(); j++){
+					curV += trans_prob.get(j)*v[j][s];
+				}
+				finalV[s] = curV;
+				if (curV - preV < 0){
+					curE = preV - curV;
+				} else {
+					curE = curV - preV;
+				}
+				if (curE > error){
+					error = curE;
+				}
+			}
+			states = totalStates.iterator();
+			while (states.hasNext()){
+				final int s = states.nextInt();
+				numChoices = mdp.getNumChoices(s);
+				mainLog.println("State: " + s + ", final probability: " + finalV[s]);
+			}
+			if (error <= error_thresh && iters > minimum_iter){
+				break;
+			}
+		}
+
+		ModelCheckerResult res = new ModelCheckerResult();
+		res.soln = Arrays.copyOf(action_exp, action_exp.length); // return the expected values for each state
+		res.numIters = iterations;
+		res.timeTaken = (System.currentTimeMillis() - total_timer) / 1000.0;
+		// Store strategy
+		if (genStrat) {
+			res.strat = new MDStrategyArray<>(mdp, choices);
+		}
+		return res;
+	}
 	/**
 	 * Make IMDP from upMPD with a range
 	**/
@@ -1042,6 +1059,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 				while(point < gridRealization.size()){
 					Double[] realization;
 					realization = gridRealization.get(point);
+					System.out.println(point);
 					Iterator<Map.Entry<Integer,Double>> transit;
         			transit = mdp.getTransitionsMappedIterator(s, choice, p -> p.evaluate(toBigRationalPoint(realization)).doubleValue());
 					while(transit.hasNext()){
@@ -1344,5 +1362,214 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
             counter++;
         }
         return candidate;
+    }
+
+
+	/* For two paramaters or more */
+	public static ExtractionResult extract_valueM(MDP<Function> mdp, MDPRewards<Function> mdpRewards, int[] choices, ArrayList<Double[]> trans_distr_file, ArrayList<Double> trans_prob, BitSet target, BitSet unknown, boolean min, double error_thres)  throws PrismException {
+
+		// Store num states
+		int n = mdp.getNumStates();
+
+		int max_iters = 1000;
+
+		Evaluator.EvaluatorFunction eval = (Evaluator.EvaluatorFunction) mdp.getEvaluator();
+		int numParams = eval.getNumParameters();
+//		timerProb1 = System.currentTimeMillis() - timerProb1;
+
+		// Print results of precomputation
+		int numTarget = target.cardinality();
+		if (numParams == 1){
+			double [][] q_value = new double[trans_distr_file.size()][n];
+			double [][] v = new double[trans_distr_file.size()][n];
+			double [][] vPrev = new double[trans_distr_file.size()][n];
+			double [] finalV = new double[n];
+			double [] action_exp = new double[n];
+			Object [] policy = new Object[n];
+			double max_v; int max_a;
+			// Initiate q_value to 0
+			IntSet unknownStates = IntSet.asIntSet(unknown);
+			PrimitiveIterator.OfInt states = unknownStates.iterator();
+			while (states.hasNext()){
+				final int s = states.nextInt();
+				for (int j = 0; j < trans_distr_file.size(); j++){
+					q_value[j][s] = 0.0;
+					v[j][s] = 0.0;
+				}
+				finalV[s] = 0.0;
+
+			}
+
+			for (int iters= 0; iters < max_iters; iters ++){	
+				states = unknownStates.iterator();
+				while (states.hasNext()){
+					final int s = states.nextInt();
+					max_v = Float.POSITIVE_INFINITY; max_a = 0;
+					int choice = choices[s];
+					for (int i = 0; i < trans_distr_file.size(); i++){ 
+						
+						Double[] realization = trans_distr_file.get(i);
+						double reward = mdpRewards.getStateReward(s).evaluate(toBigRationalPoint(realization)).doubleValue();
+						reward += mdpRewards.getTransitionReward(s, choice).evaluate(toBigRationalPoint(realization)).doubleValue();
+						Iterator<Map.Entry<Integer,Double>> transit;
+						transit = mdp.getTransitionsMappedIterator(s, choice, p -> p.evaluate(toBigRationalPoint(realization)).doubleValue());
+						q_value[i][s] = reward;
+						while (transit.hasNext()){
+							Map.Entry<Integer,Double> e = transit.next();
+							double transition_val = e.getValue();
+							int next_state = e.getKey();
+							q_value[i][s] += transition_val*v[i][next_state];
+						}
+				
+							
+					}
+					
+					for (int i=0; i < trans_distr_file.size(); i++){
+						v[i][s] = q_value[i][s];
+					}
+				}
+				states = unknownStates.iterator();
+				double error = 0.0;
+				while (states.hasNext()){
+					final int s = states.nextInt();
+					double preV = finalV[s];
+					double curV = 0.0;
+					double curE = 0.0;
+					for (int j = 0; j < trans_distr_file.size(); j++){
+						curV += trans_prob.get(j)*v[j][s];
+					}
+					finalV[s] = curV;
+					if (curV - preV < 0){
+						curE = preV - curV;
+					} else {
+						curE = curV - preV;
+					}
+					if (curE > error){
+						error = curE;
+					}
+				}
+				if (error <= error_thres){
+					break;
+				}
+			}
+			ExtractionResult res = new ExtractionResult(v, finalV);
+			return new ExtractionResult(v, finalV);
+		} else {
+			System.out.println(trans_distr_file.size());
+			double [][] q_value = new double[trans_distr_file.size()][n];
+			double [][] v = new double[trans_distr_file.size()][n];
+			double [][] vPrev = new double[trans_distr_file.size()][n];
+			double [] finalV = new double[n];
+			double [] action_exp = new double[n];
+			Object [] policy = new Object[n];
+			double max_v; int max_a;
+			// Initiate q_value to 0
+			IntSet unknownStates = IntSet.asIntSet(unknown);
+			PrimitiveIterator.OfInt states = unknownStates.iterator();
+			while (states.hasNext()){
+				final int s = states.nextInt();
+				for (int j = 0; j < trans_distr_file.size(); j++){
+					q_value[j][s] = 0.0;
+					v[j][s] = 0.0;
+				}
+				finalV[s] = 0.0;
+
+			}
+
+			for (int iters= 0; iters < max_iters; iters ++){	
+				states = unknownStates.iterator();
+				while (states.hasNext()){
+					final int s = states.nextInt();
+					max_v = Float.POSITIVE_INFINITY; max_a = 0;
+					int choice = choices[s];
+					for (int i = 0; i < trans_distr_file.size(); i++){ 
+						
+						Double[] realization = trans_distr_file.get(i);
+						double reward = mdpRewards.getStateReward(s).evaluate(toBigRationalPoint(realization)).doubleValue();
+						reward += mdpRewards.getTransitionReward(s, choice).evaluate(toBigRationalPoint(realization)).doubleValue();
+						Iterator<Map.Entry<Integer,Double>> transit;
+						transit = mdp.getTransitionsMappedIterator(s, choice, p -> p.evaluate(toBigRationalPoint(realization)).doubleValue());
+						q_value[i][s] = reward;
+						while (transit.hasNext()){
+							Map.Entry<Integer,Double> e = transit.next();
+							double transition_val = e.getValue();
+							int next_state = e.getKey();
+							q_value[i][s] += transition_val*v[i][next_state];
+						}
+				
+							
+					}
+					
+					for (int i=0; i < trans_distr_file.size(); i++){
+						v[i][s] = q_value[i][s];
+					}
+				}
+				states = unknownStates.iterator();
+				double error = 0.0;
+				while (states.hasNext()){
+					final int s = states.nextInt();
+					double preV = finalV[s];
+					double curV = 0.0;
+					double curE = 0.0;
+					for (int j = 0; j < trans_distr_file.size(); j++){
+						curV += trans_prob.get(j)*v[j][s];
+					}
+					finalV[s] = curV;
+					if (curV - preV < 0){
+						curE = preV - curV;
+					} else {
+						curE = curV - preV;
+					}
+					if (curE > error){
+						error = curE;
+					}
+				}
+				if (error <= error_thres){
+					break;
+				}
+			}
+			System.out.println("Hi");
+			ExtractionResult res = new ExtractionResult(v, finalV);
+			return new ExtractionResult(v, finalV);
+		}
+	}
+
+	public static void resultExtractionM(String directoryName,double[][] v,double[] finalV,ArrayList<Double> trans_prob, int initialState) throws IOException {
+		System.out.println(v);
+        // 1) Create directory if not exists
+        File dir = new File(directoryName);
+        if (!dir.exists()) {
+            boolean created = dir.mkdirs();
+            if (!created) {
+                throw new IOException("Unable to create directory: " + dir.getAbsolutePath());
+            }
+        }
+
+        // 2) Find a safe filename for the v CSV
+        File vFile = findNextAvailableFile(dir, "v", "csv");
+        // 3) Write the v data to CSV
+        try (BufferedWriter writer = Files.newBufferedWriter(vFile.toPath(), StandardCharsets.UTF_8)) {
+            // Write header
+            writer.write("Index,Value,Probs\n");
+            // Write each row: i, v[i][initialState]
+            // Note: v.length = # of "rows" in v, 
+            //       each row has length = # of states in v[row].
+            for (int i = 0; i < v.length; i++) {
+                writer.write(i + "," + v[i][initialState] + "," + trans_prob.get(i) + "\n");
+            }
+        }
+
+        // 4) Find a safe filename for the finalV CSV
+        File finalVFile = findNextAvailableFile(dir, "finalV", "csv");
+        // 5) Write finalV data to CSV
+        try (BufferedWriter writer = Files.newBufferedWriter(finalVFile.toPath(), StandardCharsets.UTF_8)) {
+            // Write header
+            writer.write("Index,Value\n");
+            // Write each row: i, finalV[i]
+            for (int i = 0; i < finalV.length; i++) {
+                writer.write(i + "," + finalV[i] + "\n");
+            }
+        }
+
     }
 }
