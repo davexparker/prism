@@ -1,0 +1,4 @@
+R(dist)min=? [ F "dest" ];
+R(dist)max=? [ F "dest" ];
+R(risk)min=? [ F "dest" ];
+R(risk)max=? [ F "dest" ];

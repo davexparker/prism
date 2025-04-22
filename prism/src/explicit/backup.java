@@ -164,7 +164,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 
 
 		if (numParams == 1){
-			/* DiscreteDistribution m = null;
+			DiscreteDistribution m = null;
 			double [][][] q_value = new double[trans_distr_file.size()][n][nactions];
 			double [][] v = new double[trans_distr_file.size()][n];
 			double [][] vPrev = new double[trans_distr_file.size()][n];
@@ -219,6 +219,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 					}
 					
 					double prev = 0.0;
+					//double prev = Double.POSITIVE_INFINITY;
 					for (int choice = 0; choice < numChoices; choice ++){
 						double tmpV = 0.0;
 						for (int i=0; i < trans_distr_file.size(); i++){
@@ -232,6 +233,12 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 							action_exp[s] = prev;
 							max_a = choice;
 						}
+						/*if (tmpV < prev){
+							prev = tmpV;
+							choices[s] = choice;
+							action_exp[s] = prev;
+							max_a = choice;
+						}*/
 						for (int i=0; i < trans_distr_file.size(); i++){
 							v[i][s] = q_value[i][s][max_a];
 						}
@@ -318,8 +325,8 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 				String directory1 = "our";
 				String directory2 = "robust";
 				String directory3 = "optimistic";
-				e_max[0] = 0.65;
-				e_min[0] = 0.35;
+				e_max[0] = 0.01;
+				e_min[0] = 0.99;
 				IMDP<Double> imdp = makeIMDP(mdp, e_max, e_min, 1000);
 				imdp.findDeadlocks(true);
 				IMDPModelChecker immc = new IMDPModelChecker(null);
@@ -331,20 +338,20 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 				for (int s = 0; s < n; s++){
 					robust[s] = resim.strat.getChoiceIndex(s, -1);
 				}
+				System.out.println(mdp.getInitialStates().toString());
+				resultExtraction(directory1, v, finalV, trans_prob,73);
 				ExtractionResult rob = extract_value(mdp, mdpRewards, robust, trans_distr_file, trans_prob, target, unknown, min, error_thresh);
-				resultExtraction(directory2, rob.v, rob.finalV, trans_prob, 0);
+				resultExtraction(directory2, rob.v, rob.finalV, trans_prob, 73);
 				resim = immc.computeReachRewards(imdp, mdpRewards2, target, MinMax.max().setMinUnc(false));
 				int[] optimistic = new int[n];
 				for (int s = 0; s < n; s++){
 					optimistic[s] = resim.strat.getChoiceIndex(s, -1);
 				}
 				ExtractionResult opt = extract_value(mdp, mdpRewards, optimistic, trans_distr_file, trans_prob, target, unknown, min, error_thresh);
-				resultExtraction(directory3, opt.v, opt.finalV, trans_prob, 0);
-				mainLog.println("Robust strat");
-				mainLog.println(robust.toString());
-				mainLog.println("Optimistic strat");
-				mainLog.println(optimistic.toString());
-
+				resultExtraction(directory3, opt.v, opt.finalV, trans_prob, 73);
+				
+				
+            System.out.println("wtf");
 			states = unknownStates.iterator();
 			ModelCheckerResult res = new ModelCheckerResult();
 			res.soln = Arrays.copyOf(action_exp, action_exp.length); // return the expected values for each state
@@ -353,13 +360,12 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 			// Store strategy
 			if (genStrat) {
 				res.strat = new MDStrategyArray<>(mdp, choices);
-			} */
+			}
 
-			System.out.println("Here");
+ 			/* System.out.println("Here");
 
 			ModelCheckerResult res = new ModelCheckerResult();
-			res = computeReachProbs1(mdp, target, min, trans_distr_file, trans_prob);
-
+			res = computeReachProbs1(mdp, target, min, trans_distr_file, trans_prob); */
 			return res;
 		} else {
 			ArrayList<Double[]> jointRealization = createSegmentedCartesianProduct(trans_distr_file, index);
@@ -374,6 +380,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 			int max_a; float max_v;
 			int numChoices;
 			int iters;
+			/*
 			// Initiate q_value to 0
 			PrimitiveIterator.OfInt states = unknownStates.iterator();
 			mainLog.println("bobo");
@@ -528,7 +535,6 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 				for (int s = 0; s < n; s++){
 					robust[s] = resim.strat.getChoiceIndex(s, -1);
 				}
-				System.out.println(mdp.getInitialStates().toString());
 				ExtractionResult our = extract_valueM(mdp, mdpRewards, choices, jointRealization, jointProb, target, unknown, min, error_thresh);
 				resultExtractionM(directory1, our.v, our.finalV, jointProb, 50);
 				ExtractionResult rob = extract_valueM(mdp, mdpRewards, robust, jointRealization, jointProb, target, unknown, min, error_thresh);
@@ -554,8 +560,14 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 		// Store strategy
 		if (genStrat) {
 			res.strat = new MDStrategyArray<>(mdp, choices);
-		}
+		} */
+		System.out.println("Here");
 
+		ModelCheckerResult res = new ModelCheckerResult();
+		res = computeReachProbsM(mdp, target, min, jointRealization, jointProb);
+		//ModelCheckerResult res = new ModelCheckerResult();
+		//MDPModelChecker mdpmc = new MDPModelChecker(null);
+		//res = mdpmc.computeReachProbs(mdp, target, false);
 		return res;
 		}
 	
@@ -853,7 +865,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 
 		// Start expected reachability
 		long timer = System.currentTimeMillis();
-		mainLog.println("\nStarting expected reachability (" + (min ? "min" : "max") + ")...");
+		mainLog.println("\nStarting expected reachability probability (" + (min ? "min" : "max") + ")...");
 
 		// Check for deadlocks in non-target state (because breaks e.g. prob1)
 		mdp.checkForDeadlocks(target);
@@ -880,7 +892,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 		BitSet nonTarget = new BitSet();
 		nonTarget.set(0, n);
 		nonTarget.andNot(target);
-		nonTarget.andNot(inf);
+		//nonTarget.andNot(inf);
 		IntSet nonTargetStates = IntSet.asIntSet(nonTarget);
 		IntSet targetStates = IntSet.asIntSet(target);
 		BitSet total = new BitSet();
@@ -917,7 +929,6 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 		System.out.println(mdp.getInitialStates().toString());
 		while (states.hasNext()){
 			final int s = states.nextInt();
-			System.out.println(s);
 			numChoices = mdp.getNumChoices(s);
 			for (int i = 0; i < numChoices; i++)
 				for (int j = 0; j < trans_distr_file.size(); j++){
@@ -927,13 +938,10 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 			finalV[s] = 1.0;
 			count += 1;
 		}
-		System.out.println("Target state: " + count);
-
 
 		
 
 		for (iters= 0; iters < iterations; iters ++){	
-			System.out.println(iters);
 			states = nonTargetStates.iterator();
 			while (states.hasNext()){
 				final int s = states.nextInt();
@@ -945,7 +953,7 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 							double realization = trans_distr_file.get(i);
 							Iterator<Map.Entry<Integer,Double>> transit;
 							transit = mdp.getTransitionsMappedIterator(s, choice, p -> p.evaluate(toBigRationalPoint(realization)).doubleValue());
-							q_value[i][s][choice] = 0;
+							q_value[i][s][choice] = 0.0;
 							while (transit.hasNext()){
 								Map.Entry<Integer,Double> e = transit.next();
 								double transition_val = e.getValue();
@@ -1001,10 +1009,203 @@ public int sampleIndexFromDistribution(DiscreteDistribution param_dist) {
 			states = totalStates.iterator();
 			while (states.hasNext()){
 				final int s = states.nextInt();
+				System.out.println("Iteration: " + iters + ", states: "+ s + ", reachability: "+finalV[s]);
+			}
+			states = totalStates.iterator();
+			while (states.hasNext()){
+				final int s = states.nextInt();
 				numChoices = mdp.getNumChoices(s);
 				mainLog.println("State: " + s + ", final probability: " + finalV[s]);
 			}
-			if (error <= error_thresh && iters > minimum_iter){
+			if (error <= error_thresh & iters >= minimum_iter){
+				break;
+			}
+		}
+
+		ModelCheckerResult res = new ModelCheckerResult();
+		res.soln = Arrays.copyOf(action_exp, action_exp.length); // return the expected values for each state
+		res.numIters = iterations;
+		res.timeTaken = (System.currentTimeMillis() - total_timer) / 1000.0;
+		// Store strategy
+		if (genStrat) {
+			res.strat = new MDStrategyArray<>(mdp, choices);
+		}
+		return res;
+	}
+
+	/**
+	 * Compute reachability/until probabilities.
+	 * i.e. compute the min/max probability of reaching a state in {@code target},
+	 * while remaining in those in {@code remain}.
+	 * @param mdp The MDP
+	 * @param remain Remain in these states (optional: null means "all")
+	 * @param target Target states
+	 * @param min Min or max probabilities (true=min, false=max)
+	 * @param init Optionally, an initial solution vector (may be overwritten) 
+	 * @param known Optionally, a set of states for which the exact answer is known
+	 * Note: if 'known' is specified (i.e. is non-null, 'init' must also be given and is used for the exact values).
+	 * Also, 'known' values cannot be passed for some solution methods, e.g. policy iteration.  
+	 */
+	public ModelCheckerResult computeReachProbsM(MDP<Function> mdp, BitSet target, boolean min, ArrayList<Double[]> trans_distr_file, ArrayList<Double> trans_prob) throws PrismException
+	{
+		System.out.println("Here");
+		MDPModelChecker mcMDP = new MDPModelChecker(this);
+		mcMDP.inheritSettings(this);
+
+		// Start expected reachability
+		long timer = System.currentTimeMillis();
+		mainLog.println("\nStarting expected reachability probability (" + (min ? "min" : "max") + ")...");
+
+		// Check for deadlocks in non-target state (because breaks e.g. prob1)
+		mdp.checkForDeadlocks(target);
+
+		// Store num states
+		int n = mdp.getNumStates();
+
+		// Precomputation (not optional)
+		long timerProb1 = System.currentTimeMillis();
+		BitSet inf = mcMDP.prob1(mdp, null, target, !min, null);
+		inf.flip(0, n);
+//		timerProb1 = System.currentTimeMillis() - timerProb1;
+
+		// Print results of precomputation
+		int numTarget = target.cardinality();
+		int numInf = inf.cardinality();
+		mainLog.println("target=" + numTarget + ", inf=" + numInf + ", rest=" + (n - (numTarget + numInf)));
+
+		// Timers
+		timer = System.currentTimeMillis();
+		long total_timer = System.currentTimeMillis();
+		int nactions = mdp.getMaxNumChoices();
+		// Determine set of states actually need to compute values for
+		BitSet nonTarget = new BitSet();
+		nonTarget.set(0, n);
+		nonTarget.andNot(target);
+		//nonTarget.andNot(inf);
+		IntSet nonTargetStates = IntSet.asIntSet(nonTarget);
+		IntSet targetStates = IntSet.asIntSet(target);
+		BitSet total = new BitSet();
+		total.set(0, n);
+		IntSet totalStates = IntSet.asIntSet(total);
+		int iterations = 3000;
+		double error_thresh = 0.01;
+		double [][][] q_value = new double[trans_distr_file.size()][n][nactions];
+		double [][] v = new double[trans_distr_file.size()][n];
+		double [] finalV = new double[n];
+		double [] action_exp = new double[n];
+		Object [] policy = new Object[n];
+		int[] choices = new int[n];
+		int minimum_iter = 10;
+		int max_a; float max_v;
+		int numChoices;
+		int iters;
+		// Initiate q_value to 0 for nonTarget
+		PrimitiveIterator.OfInt states = nonTargetStates.iterator();
+		while (states.hasNext()){
+			final int s = states.nextInt();
+			numChoices = mdp.getNumChoices(s);
+			for (int i = 0; i < numChoices; i++)
+				for (int j = 0; j < trans_distr_file.size(); j++){
+					q_value[j][s][i] = 0.0;
+					v[j][s] = 0.0;
+				}
+			finalV[s] = 0.0;
+		}
+
+		// Initiate q_value to 1 for Target
+		states = targetStates.iterator();
+		double count = 0;
+		while (states.hasNext()){
+			final int s = states.nextInt();
+			numChoices = mdp.getNumChoices(s);
+			for (int i = 0; i < numChoices; i++)
+				for (int j = 0; j < trans_distr_file.size(); j++){
+					q_value[j][s][i] = 0.0;
+					v[j][s] = 1.0;
+				}
+			finalV[s] = 0.0;
+			count += 1;
+		}
+		System.out.println("Target state: " + count);
+
+
+		
+
+		for (iters= 0; iters < iterations; iters ++){	
+			System.out.println(iters);
+			states = nonTargetStates.iterator();
+			while (states.hasNext()){
+				final int s = states.nextInt();
+				max_v = Float.POSITIVE_INFINITY; max_a = 0;
+				numChoices = mdp.getNumChoices(s);
+				for (int choice = 0; choice < numChoices; choice ++){
+					for (int i = 0; i < trans_distr_file.size(); i++){ 
+							Double[] realization = trans_distr_file.get(i);
+							Iterator<Map.Entry<Integer,Double>> transit;
+							transit = mdp.getTransitionsMappedIterator(s, choice, p -> p.evaluate(toBigRationalPoint(realization)).doubleValue());
+							q_value[i][s][choice] = 0;
+							while (transit.hasNext()){
+								Map.Entry<Integer,Double> e = transit.next();
+								double transition_val = e.getValue();
+								int next_state = e.getKey();
+								q_value[i][s][choice] += transition_val*v[i][next_state];
+							}
+						}
+					}
+
+
+				double prev = 0.0;
+				for (int choice = 0; choice < numChoices; choice ++){
+					double tmpV = 0.0;
+					for (int i=0; i < trans_distr_file.size(); i++){
+						tmpV += trans_prob.get(i)*q_value[i][s][choice];
+					}
+					if (tmpV > prev){
+						prev = tmpV;
+						choices[s] = choice;
+						action_exp[s] = prev;
+						max_a = choice;
+					}
+					for (int i=0; i < trans_distr_file.size(); i++){
+						v[i][s] = q_value[i][s][max_a];
+					}
+				}
+				policy[s] = mdp.getAction(s, max_a);
+			}
+			
+			states = nonTargetStates.iterator();
+			double error = 0.0;
+			while (states.hasNext()){
+				final int s = states.nextInt();
+				double preV = finalV[s];
+				double curV = 0.0;
+				double curE = 0.0;
+				for (int j = 0; j < trans_distr_file.size(); j++){
+					System.out.println(trans_prob.get(j));
+					curV += trans_prob.get(j)*v[j][s];
+				}
+				finalV[s] = curV;
+				if (curV - preV < 0){
+					curE = preV - curV;
+				} else {
+					curE = curV - preV;
+				}
+				if (curE > error){
+					error = curE;
+				}
+			}
+			states = totalStates.iterator();
+			while (states.hasNext()){
+				final int s = states.nextInt();
+				System.out.println("Iteration: " + iters + ", states: "+ s + ", reachability: "+finalV[s]);
+			}
+			states = totalStates.iterator();
+			while (states.hasNext()){
+				final int s = states.nextInt();
+				numChoices = mdp.getNumChoices(s);
+				mainLog.println("State: " + s + ", final probability: " + finalV[s]);
+			}
+			if (error <= error_thresh){
 				break;
 			}
 		}

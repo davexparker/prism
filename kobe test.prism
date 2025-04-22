@@ -1,0 +1,45 @@
+mdp
+
+module  robot
+
+	// define grid
+	s:[0..10] init 0;  
+
+	// move
+	[west] (s=0) -> 0.9:(s'=1)+0.1:true;
+	[south] (s=0) -> 0.9:(s'=3)+0.1:true;
+	[south] (s=1) -> 0.9:(s'=2)+0.1:true;
+	[east] (s=2) -> 0.9:(s'=3)+0.1:true;
+	[south] (s=2) -> 0.9:(s'=5)+0.1:true;
+	[east] (s=3) -> 0.9:(s'=4)+0.1:true;
+	[south] (s=3) -> 0.9:(s'=6)+0.1:true;
+	[south] (s=4) -> 0.9:(s'=7)+0.1:true;
+	[east] (s=5) -> 0.9:(s'=6)+0.1:true;
+	[east] (s=6) -> 0.9:(s'=7)+0.1:true;
+	[south] (s=6) -> 0.9:(s'=8)+0.1:true;
+	[east] (s=7) -> 0.9:(s'=10)+0.1:true;
+	[east] (s=8) -> 0.9:(s'=9)+0.1:true;
+	[north] (s=9) -> 0.9:(s'=7)+0.1:true;
+
+	// stop when reaching the destination
+	[stop] (s=10) -> true;
+
+endmodule
+
+
+// label start and destination states
+label "dest" = (s=10);
+
+// count total steps
+rewards  "dist"
+ 	[east] true: 1;
+ 	[south] true: 1;
+ 	[west] true: 1;
+ 	[north] true: 1;
+endrewards
+
+// count total risky steps
+rewards  "risk"
+	[south] (s=0) | (s=3) | (s=4): 1;
+	[east] (s=2) | (s=3) | (s=6): 1;
+endrewards

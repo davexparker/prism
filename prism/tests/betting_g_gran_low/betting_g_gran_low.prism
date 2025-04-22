@@ -1,13 +1,11 @@
 mdp
 
-const int M = 5; // represents starting amount
+const int M = 10; // represents starting amount
 const int MAX_MONEY = 100;
-const int STAGES = 10; // number of stages
+const int STAGES = 8; // number of stages
 
 // Uncertain parameters
 const double p_11; // original 0.7 - low p_win
-// const double p_41; // original 0.7 - high fidelity p_win
-const double p_jackpot=0.05;
 
 module game
     m:[0..MAX_MONEY] init M; // represents current money
@@ -15,18 +13,16 @@ module game
 
     // Betting transitions
     [zero] m <= 0 & (s < STAGES) ->  (s'=min(s+1, STAGES)) & (m'=m);
-    [one] m > 0 & (s < STAGES)-> p_11:(s'=min(s+1, STAGES)) & (m'=min(m+1, MAX_MONEY)) + p_jackpot: (s'=min(s+1, STAGES)) & (m'=min(m+10, MAX_MONEY)) + (1-(p_11+p_jackpot)): (s'=min(s+1, STAGES)) & (m'=max(m-1,0));
-    [two] m > 1 & (s < STAGES)-> p_11:(s'=min(s+1, STAGES)) & (m'=min(m+2, MAX_MONEY)) + p_jackpot: (s'=min(s+1, STAGES)) & (m'=min(m+2*10, MAX_MONEY)) + (1-(p_11+p_jackpot)): (s'=min(s+1, STAGES)) & (m'=max(m-2,0));
-    [three] m > 2 & (s < STAGES)-> p_11:(s'=min(s+1, STAGES)) & (m'=min(m+3, MAX_MONEY)) + p_jackpot: (s'=min(s+1, STAGES)) & (m'=min(m+3*10, MAX_MONEY)) + (1-(p_11+p_jackpot)): (s'=min(s+1, STAGES)) & (m'=max(m-3,0));
-    [four] m > 3 & (s < STAGES)-> p_11:(s'=min(s+1, STAGES)) & (m'=min(m+4, MAX_MONEY)) + p_jackpot: (s'=min(s+1, STAGES)) & (m'=min(m+4*10, MAX_MONEY)) + (1-(p_11+p_jackpot)): (s'=min(s+1, STAGES)) & (m'=max(m-4,0));
-    [five] m > 4 & (s < STAGES)-> p_11:(s'=min(s+1, STAGES)) & (m'=min(m+5, MAX_MONEY)) + p_jackpot: (s'=min(s+1, STAGES)) & (m'=min(m+5*10, MAX_MONEY)) + (1-(p_11+p_jackpot)): (s'=min(s+1, STAGES)) & (m'=max(m-5,0));
+    [one] m > 0 & (s < STAGES)-> p_11:(s'=min(s+1, STAGES)) & (m'=min(m+1, MAX_MONEY)) + (1-p_11): (s'=min(s+1, STAGES)) & (m'=max(m-1,0));
+    [two] m > 1 & (s < STAGES)-> p_11:(s'=min(s+1, STAGES)) & (m'=min(m+2, MAX_MONEY)) + (1-p_11): (s'=min(s+1, STAGES)) & (m'=max(m-2,0));
+    [five] m > 4 & (s < STAGES)-> p_11:(s'=min(s+1, STAGES)) & (m'=min(m+5, MAX_MONEY)) + (1-p_11): (s'=min(s+1, STAGES)) & (m'=max(m-5,0));
+    [ten] m > 10 & (s < STAGES)-> p_11:(s'=min(s+1, STAGES)) & (m'=min(m+10, MAX_MONEY)) + (1-p_11): (s'=min(s+1, STAGES)) & (m'=max(m-10,0));
     [end] s=(STAGES) -> (s'=s+1);
 endmodule
 
-label "goal" = (s=STAGES+1) & (m=50);
-//label "obs" = (m=0);
+label "goal" = (s=STAGES+1);
+label "obs" = (m=0);
 
 rewards
-    //[end] s=STAGES : m;
-    [] true : 1;
+    [end] s=STAGES : m;
 endrewards

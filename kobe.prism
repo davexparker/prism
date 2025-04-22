@@ -1,0 +1,35 @@
+mdp
+
+module robot
+    // abstracted 5 states: 0=start, 4=dest
+    s : [0..4] init 0;
+
+    // primary moves
+    [west]  (s=0) -> 0.9:(s'=1) + 0.1:(s'=0);
+    [south] (s=0) -> 0.9:(s'=2) + 0.1:(s'=0);
+    [east]  (s=1) -> 0.9:(s'=3) + 0.1:(s'=1);
+    [south] (s=2) -> 0.9:(s'=3) + 0.1:(s'=2);
+    [east]  (s=3) -> 0.9:(s'=4) + 0.1:(s'=3);
+
+    // now “north” is a real action
+    [north] (s=2) -> 0.9:(s'=0) + 0.1:(s'=2);
+    [north] (s=3) -> 0.9:(s'=1) + 0.1:(s'=3);
+
+    // stopping at the destination
+    [stop] (s=4) -> true;
+endmodule
+
+label "dest" = (s=4);
+
+rewards "dist"
+    [west]  true : 1;
+    [south] true : 1;
+    [east]  true : 1;
+    [north] true : 1;   // north now costs one step, too
+endrewards
+
+rewards "risk"
+    [south] (s=0)|(s=2) : 1;
+    [east]  (s=1)|(s=3) : 1;
+    // north has no risk cost here
+endrewards

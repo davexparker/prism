@@ -15,7 +15,7 @@ const int rc_slow_min = 159;
 // delay caused by the wire length
 const int delay=3;
 // probability of choosing fast
-const double p; // 0.5 - original value
+const double p=0.5; // 0.5 - original value
 const double slow=1-p;
 
 module wire12

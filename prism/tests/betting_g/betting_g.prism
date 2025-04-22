@@ -8,7 +8,7 @@ module bet
 	money : [0..(n+1)*10] init 10;
 	steps : [0..n+1] init 0; // +1 for terminal state
  
-	[bet0]  steps < n & money <= 0 -> 1 : (money'=money) & (steps'=steps+1);
+	[bet0]  steps < n & money >= 0 -> 1 : (money'=money) & (steps'=steps+1);
 	[bet1]  steps < n & money >= 1 & money <= n*10 -> p : (money'=money+1) & (steps'=steps+1) + 1-p : (money'=money-1) & (steps'=steps+1);
 	[bet2]  steps < n & money >= 2 & money <= n*10 -> p : (money'=money+2) & (steps'=steps+1) + 1-p : (money'=money-2) & (steps'=steps+1);
 	[bet5]  steps < n & money >= 5 & money <= n*10 -> p : (money'=money+5) & (steps'=steps+1) + 1-p : (money'=money-5) & (steps'=steps+1);
@@ -16,13 +16,14 @@ module bet
 
 	[end] steps = n -> 1: (steps'=n+1);
 	[end] steps = n+1 -> 1: true;
-	
 
 endmodule
 
 rewards
-	[end] steps = n+1 : money;
+	steps < n : 0;
+	steps = n : money;
+	steps = n+1 : 0;	
 
 endrewards
 
-label "done" = (steps = n+1);
+label "done" = steps = n+1;

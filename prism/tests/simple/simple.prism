@@ -1,33 +1,62 @@
 mdp
 
-const double p;
+// Environment Dimensions
+const int MAXX = 8;
+const int MAXY = 8;
+const int MAXZ = 8;
 
-module simple
-    // s is the state variable:
-    //   0 = initial state,
-    //   1 = intermediate state,
-    //   2 = target state,
-    //   3 = failure (absorbing) state.
-    s : [0..3] init 0;
+// Disturbance Probability Parameter
+const double p; // must be less than 1/3
 
-    // From state 0, there is a 50% chance to go to state 1 (where you may eventually reach the target)
-    // and a 50% chance to go directly to the failure state (state 3).
-    [from0] s=0 -> 0.5:(s'=1) + 0.5:(s'=3);
-    
-    // From state 1, there is a 50% chance to reach the target (state 2)
-    // and a 50% chance to go to failure (state 3).
-    [from1] s=1 -> 0.5:(s'=2) + 0.5:(s'=3);
-    
-    // State 2 is the target and is absorbing.
-    [done] s=2 -> (s'=2);
-    
-    // State 3 is the failure state and is absorbing.
-    [] s=3 -> (s'=3);
-endmodule
+// Regions
 
-rewards "time"	
-	[] true : 1;
+// Target Region
+formula target = x > MAXX - 2 & y < 2 & z > MAXZ - 2;
+
+// Obstacle Regions
+formula crash = obstacle1 | obstacle2 | obstacle3 | obstacle4;
+formula obstacle1 = x >= 3 & x <= 4 & z >= 1 & z <= 2;
+formula obstacle2 = x >= 3 & x <= 4 & y >= 1 & y <= 2;
+formula obstacle3 = x >= 3 & x <= 4 & y >= 3 & y <= 5;
+formula obstacle4 = x >= 3 & x <= 4 & z >= 7 & z <= 8;
+
+module drone
+	x : [1..MAXX] init 1;
+	y : [1..MAXY] init 1;
+	z : [1..MAXZ] init 1;
+
+	[front] true -> 1 - 3 * p: (x' = min(x + 1, MAXX))
+				+ p : (x' = min(x + 1, MAXX)) & (y' = max(y - 1,1))
+				+ p : (x' = min(x + 1, MAXX)) & (y' = min(y + 1, MAXY))
+				+ p : (x' = x) & (y' = max(y - 2, 1));
+
+	[back] true -> 1 - 3 * p: (x' = max(x - 1, 1))
+				+ p : (x' = max(x - 1, 1)) & (y' = max(y - 1,1))
+				+ p : (x' = max(x - 1, 1)) & (y' = min(y + 1, MAXY))
+				+ p : (x' = x) & (y' = max(y - 2, 1));
+
+	[right] true -> 1 - 2 * p: (y' = min(y + 1, MAXY))
+				+ p: (y' = min(y + 2, MAXY))
+				+ p: (y' = max(y - 1, 1));
+
+	[left] true -> 1 - 2 * p: (y' = max(y - 1, 1))
+				+ p: (y' = max(y - 2, 1))
+				+ p: (y' = min(y + 1, MAXY));
+
+	[up] true -> 1 - 3 * p: (z' = min(z + 1, MAXZ))
+				+ p : (z' = min(z + 1, MAXZ)) & (y' = max(y - 1,1))
+				+ p : (z' = min(z + 1, MAXZ)) & (y' = min(y + 1, MAXY))
+				+ p : (z' = z) & (y' = max(y - 2, 1));
+
+	[down] true -> 1 - 3 * p: (z' = max(z - 1,1))
+				+ p : (z' = max(z - 1,1)) & (y' = max(y - 1,1))
+				+ p : (z' = max(z - 1,1)) & (y' = min(y + 1, MAXY))
+				+ p : (z' = z) & (y' = max(y - 2, 1));
+
+endmodule 
+
+rewards
+    [] true: 1;
 endrewards
 
-// The target label is defined for state 2.
-label "target" = (s=2);
+label "target" = (x=6 & y =6 & z=6);
