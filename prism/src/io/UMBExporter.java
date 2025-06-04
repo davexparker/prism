@@ -120,6 +120,8 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 		Evaluator<Value> evalRewards = getRewardEvaluator();
 		ModelType modelType = model.getModelType();
 		int numStates = model.getNumStates();
+		boolean showActions = modelExportOptions.getShowActions();
+		boolean showStates = modelExportOptions.getShowStates();
 
 		// Check for currently unsupported cases
 		if (modelType.uncertain() || modelType.partiallyObservable()) {
@@ -159,14 +161,18 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 			umbWriter.addInitialStates(modelAccess.getInitialStates());
 
 			// Add action labelling info
-			umbWriter.addActionStrings(modelAccess.getActionStrings());
-			// Only store choice/transition-to-action mapping if there are multiple actions
-			if (model.getActions().size() > 1) {
-				if (modelType.nondeterministic()) {
-					umbWriter.addChoiceActionIndices(modelAccess.getChoiceActionIndices());
-				} else {
-					umbWriter.addBranchActionIndices(modelAccess.getTransitionActionIndices());
+			if (showActions) {
+				umbWriter.addActionStrings(modelAccess.getActionStrings());
+				// Only store choice/transition-to-action mapping if there are multiple actions
+				if (model.getActions().size() > 1) {
+					if (modelType.nondeterministic()) {
+						umbWriter.addChoiceActionIndices(modelAccess.getChoiceActionIndices());
+					} else {
+						umbWriter.addBranchActionIndices(modelAccess.getTransitionActionIndices());
+					}
 				}
+			} else {
+				umbWriter.addActionStrings(Collections.singletonList(""));
 			}
 
 			// Add label info
@@ -199,7 +205,7 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 			// Add variable info
 			ModelInfo modelInfo = getModelInfo();
 			List<State> statesList = model.getStatesList();
-			if (modelInfo != null && statesList != null) {
+			if (showStates && modelInfo != null && statesList != null) {
 				int numVars = modelInfo.getNumVars();
 				for (int i = 0; i < numVars; i++) {
 					int finalI = i;

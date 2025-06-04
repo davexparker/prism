@@ -2205,6 +2205,18 @@ public class PrismCL implements PrismModelListener
 				else
 					throw new PrismException("Unknown value \"" + optVal + "\" provided for \"actions\" option of -exportmodel");
 			}
+			else if (opt.startsWith("states")) {
+				if (!opt.startsWith("states="))
+					throw new PrismException("No value provided for \"states\" option of -exportmodel");
+				String optVal = opt.substring(7);
+				if (optVal.equals("true")) {
+					exportOptions.setShowStates(true);
+				} else if (optVal.equals("false")) {
+					exportOptions.setShowStates(false);
+				}
+				else
+					throw new PrismException("Unknown value \"" + optVal + "\" provided for \"states\" option of -exportmodel");
+			}
 			// Unknown option
 			else {
 				throw new PrismException("Unknown option \"" + opt + "\" for -exportmodel switch");
