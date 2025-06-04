@@ -65,6 +65,16 @@ public class ModelExportOptions implements Cloneable
 	 */
 	private Optional<Boolean> explicitRows = Optional.empty();
 
+	/**
+	 * For binary formats, whether to show in textual form
+	 */
+	private Optional<Boolean> binaryAsText = Optional.empty();
+
+	/**
+	 * For formats that support it, whether to zip
+	 */
+	private Optional<Boolean> zipped = Optional.empty();
+
 	// Constructors
 
 	/**
@@ -147,6 +157,24 @@ public class ModelExportOptions implements Cloneable
 	}
 
 	/**
+	 * Set whether to show binary formats in textual form
+	 */
+	public ModelExportOptions setBinaryAsText(boolean binaryAsText)
+	{
+		this.binaryAsText = Optional.of(binaryAsText);
+		return this;
+	}
+
+	/**
+	 * Set whether to zip the output file (for formats that support it)
+	 */
+	public ModelExportOptions setZipped(boolean zipped)
+	{
+		this.zipped = Optional.of(zipped);
+		return this;
+	}
+
+	/**
 	 * Apply any options that have been set in another {@link ModelExportOptions} to this one.
 	 */
 	public void apply(ModelExportOptions other)
@@ -168,6 +196,12 @@ public class ModelExportOptions implements Cloneable
 		}
 		if (other.explicitRows.isPresent()) {
 			setExplicitRows(other.getExplicitRows());
+		}
+		if (other.binaryAsText.isPresent()) {
+			setBinaryAsText(other.getBinaryAsText());
+		}
+		if (other.zipped.isPresent()) {
+			setZipped(other.getZipped());
 		}
 	}
 
@@ -239,6 +273,23 @@ public class ModelExportOptions implements Cloneable
 	public boolean getExplicitRows()
 	{
 		return explicitRows.orElse(false);
+	}
+
+	/**
+	 * Whether to show binary formats in textual form.
+	 */
+	public boolean getBinaryAsText()
+	{
+		return binaryAsText.orElse(false);
+	}
+
+	/**
+	 * Whether to zip the output file (for formats that support it)
+	 */
+	public boolean getZipped()
+	{
+		// Only UMB defaults to zipped
+		return zipped.orElse(getFormat() == ModelExportFormat.UMB);
 	}
 
 	/**

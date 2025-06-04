@@ -46,6 +46,7 @@ import explicit.FastAdaptiveUniformisation;
 import explicit.FastAdaptiveUniformisationModelChecker;
 import explicit.ModelModelGenerator;
 import hybrid.PrismHybrid;
+import io.UMBImporter;
 import io.ExplicitModelImporter;
 import io.ModelExportOptions;
 import io.ModelExportTask;
@@ -1846,6 +1847,16 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 	}
 
 	/**
+	 * Load a UMB file for subsequent model building.
+	 * @param umbFile The UMB file
+	 */
+	public void loadModelFromUMBFile(File umbFile) throws PrismException
+	{
+		UMBImporter importer = new UMBImporter(umbFile);
+		loadModelFromExplicitFiles(importer);
+	}
+
+	/**
 	 * Load an explicit file model importer for subsequent model building.
 	 */
 	public void loadModelFromExplicitFiles(ExplicitModelImporter importer) throws PrismException
@@ -2224,7 +2235,7 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 
 			// Build model
 			l = System.currentTimeMillis();
-			
+
 			switch (getCurrentEngine()) {
 			case SYMBOLIC:
 				symbolic.model.Model newModelSymb;
@@ -2286,7 +2297,7 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 			default:
 				throw new PrismException("Unknown engine " + getCurrentEngine());
 			}
-			
+
 			l = System.currentTimeMillis() - l;
 			mainLog.println("\nTime for model construction: " + l / 1000.0 + " seconds.");
 
@@ -2734,7 +2745,7 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 		// Export via either symbolic/explicit model checker
 		if (getBuiltModelType() == ModelBuildType.SYMBOLIC) {
 			// In some cases, we need to convert to an explicit model first
-			if (exportTask.getExportOptions().getFormat() == ModelExportFormat.DRN) {
+			if (exportTask.getExportOptions().getFormat() == ModelExportFormat.DRN || exportTask.getExportOptions().getFormat() == ModelExportFormat.UMB) {
 				MTBDD2ExplicitModel m2m = new MTBDD2ExplicitModel(this);
 				explicit.Model<Double> modelExpl = m2m.convertModel(getBuiltModelSymbolic());
 				explicit.StateModelChecker mcExpl = explicit.StateModelChecker.createModelChecker(getModelType(), this);
