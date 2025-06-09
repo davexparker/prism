@@ -114,7 +114,7 @@ public class UMBImporter extends ExplicitModelImporter
 	@Override
 	public String sourceString()
 	{
-		return umbFile.getName();
+		return "\"" + umbFile.getName() + "\"";
 	}
 
 	@Override
