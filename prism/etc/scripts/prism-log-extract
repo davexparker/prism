@@ -25,8 +25,10 @@ all_fields_details = [\
     {'name': 'log_file', 'descr': 'Name of log file', 'type': 'string'}, \
     {'name': 'model_file', 'descr': 'Name of PRISM model file', 'type': 'file', 'regexp': 'Parsing model file "(.+)"...'}, \
     {'name': 'model_consts', 'descr': 'Constants defined for model', 'type': 'string', 'regexp': 'Model constants: (.+)'}, \
+    {'name': 'import_model_file', 'descr': 'Name of PRISM model import file', 'type': 'file', 'regexp': 'Importing model from "?(.+)"?...'}, \
     {'name': 'model_type', 'descr': 'Model type', 'regexp': 'Type: *(.+)'}, \
     {'name': 'states', 'descr': 'Number of states in model', 'regexp': 'States: *(.+) \((.+) initial\)'}, \
+    {'name': 'transitions', 'descr': 'Number of transitions in model', 'regexp': 'Transitions: *(.+)'}, \
     {'name': 'dd_nodes', 'descr': 'Number of nodes in the DD for the model', 'regexp': 'Transition matrix: *(.+) nodes'}, \
     {'name': 'time_constr', 'descr': 'Time to construct the model', 'regexp': 'Time for model construction: *(.+) sec'}, \
     {'name': 'prop_file', 'descr': 'Name of PRISM property file', 'type': 'file', 'regexp': 'Parsing properties file "(.+)"...'}, \
