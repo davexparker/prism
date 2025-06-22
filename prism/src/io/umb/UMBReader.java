@@ -127,10 +127,12 @@ public class UMBReader
 
 	/**
 	 * Extract the branch probabilities.
+	 * For an interval model, this will extract two values (lower/upper bound, successively) for each branch.
 	 */
 	public void extractBranchProbabilities(DoubleConsumer doubleConsumer) throws UMBException
 	{
-		extractDoubleArray(UMBFormat.BRANCH_PROBABILITIES_FILE, umbIndex.getNumBranches(), doubleConsumer);
+		long numProbs = umbIndex.transitionSystem.branchProbabilityType.intervals() ? umbIndex.getNumBranches() * 2 : umbIndex.getNumBranches();
+		extractDoubleArray(UMBFormat.BRANCH_PROBABILITIES_FILE, numProbs, doubleConsumer);
 	}
 
 	/**

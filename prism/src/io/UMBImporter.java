@@ -26,6 +26,7 @@
 
 package io;
 
+import common.Interval;
 import common.SafeCast;
 import io.umb.UMBException;
 import io.umb.UMBIndex;
@@ -403,19 +404,23 @@ public class UMBImporter extends ExplicitModelImporter
 
 			// Convert sparse storage to transitions and store
 			// (assume doubles for now)
-			IOUtils.MCTransitionConsumer<Double> storeTransitionDoubles = (IOUtils.MCTransitionConsumer<Double>) storeTransition;
 			int jLo = 0, jHi = 0;
 			for (int s = 0; s < numStates; s++) {
 				jLo = jHi;
 				jHi = choiceTransitionOffsets.getInt(s + 1);
 				for (int j = jLo; j < jHi; j++) {
-					double d = transitionProbabilities.getDouble(j);
-					if (ctmc) {
-						d *= exitRates.getDouble(s);
-					}
 					//Value v = eval.fromString(Double.toString(d));
 					Object action = hasActions ? actionStrings.get(transitionActionIndices.getInt(j)) : firstAction;
-					storeTransitionDoubles.accept(s, transitionSuccessors.getInt(j), d, action);
+					if (getModelInfo().getModelType() == ModelType.IDTMC) {
+						Interval<Double> dIntv = new Interval<>(transitionProbabilities.getDouble(2 * j), transitionProbabilities.getDouble(2 * j + 1));
+						((IOUtils.MCTransitionConsumer<Interval<Double>>) storeTransition).accept(s, transitionSuccessors.getInt(j), dIntv, action);
+					} else {
+						double d = transitionProbabilities.getDouble(j);
+						if (ctmc) {
+							d *= exitRates.getDouble(s);
+						}
+						((IOUtils.MCTransitionConsumer<Double>) storeTransition).accept(s, transitionSuccessors.getInt(j), d, action);
+					}
 				}
 			}
 
@@ -456,7 +461,6 @@ public class UMBImporter extends ExplicitModelImporter
 
 			// Convert sparse storage to transitions and store
 			// (assume doubles for now)
-			IOUtils.MDPTransitionConsumer<Double> storeTransitionDoubles = (IOUtils.MDPTransitionConsumer<Double>) storeTransition;
 			int iLo = 0, iHi = 0;
 			int jLo = 0, jHi = 0;
 			for (int s = 0; s < numStates; s++) {
@@ -467,9 +471,15 @@ public class UMBImporter extends ExplicitModelImporter
 					jLo = jHi;
 					jHi = choiceTransitionOffsets.getInt(i + 1);
 					for (int j = jLo; j < jHi; j++) {
-						double d = transitionProbabilities.getDouble(j);
 						Object action = hasActions ? actionStrings.get(choiceActionIndices.getInt(i)) : firstAction;
-						storeTransitionDoubles.accept(s, iCount, transitionSuccessors.getInt(j), d, action);
+						if (getModelInfo().getModelType() == ModelType.IMDP) {
+							Interval<Double> dIntv = new Interval<>(transitionProbabilities.getDouble(2 * j), transitionProbabilities.getDouble(2 * j + 1));
+							((IOUtils.MDPTransitionConsumer<Interval<Double>>) storeTransition).accept(s, iCount, transitionSuccessors.getInt(j), dIntv, action);
+						} else {
+							double d = transitionProbabilities.getDouble(j);
+							((IOUtils.MDPTransitionConsumer<Double>) storeTransition).accept(s, iCount, transitionSuccessors.getInt(j), d, action);
+						}
+
 					}
 					iCount++;
 				}

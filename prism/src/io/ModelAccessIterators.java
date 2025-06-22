@@ -26,6 +26,8 @@
 
 package io;
 
+import common.Interval;
+
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -448,6 +450,41 @@ public class ModelAccessIterators
 				skipEmpty();
 			}
 			return intValue;
+		}
+	}
+
+	/**
+	 * Class to unpack intervals of values, supplied as an iterator, and return
+	 * as an iterator over all values, i.e., both the lower and upper bounds.
+	 */
+	public static class UnpackIntervals<V> implements Iterator<V>
+	{
+		Iterator<Interval<V>> iter;
+		Interval<V> next;
+		boolean first = true;
+
+		public UnpackIntervals(Iterator<Interval<V>> iter)
+		{
+			this.iter = iter;
+		}
+
+		@Override
+		public boolean hasNext()
+		{
+			return !first || iter.hasNext();
+		}
+
+		@Override
+		public V next()
+		{
+			if (first) {
+				next = iter.next();
+				first = false;
+				return next.getLower();
+			} else {
+				first = true;
+				return next.getUpper();
+			}
 		}
 	}
 }

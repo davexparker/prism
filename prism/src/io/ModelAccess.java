@@ -26,9 +26,13 @@
 
 package io;
 
+import common.Interval;
 import common.iterable.SingletonIterator;
 import explicit.CTMC;
 import explicit.DTMC;
+import explicit.IDTMC;
+import explicit.IMDP;
+import explicit.IntervalModel;
 import explicit.LTS;
 import explicit.MDP;
 import explicit.Model;
@@ -132,7 +136,9 @@ public interface ModelAccess<Value>
 
 	/**
 	 * Get an iterator over the transitions from choice {@code i} of state {@code s}.
-	 * Note: For CTMCs, this returns the embedded DTMC transitions
+	 * For CTMCs, this returns the embedded DTMC transitions.
+	 * For interval models, this returns just the lower bound of each probability interval.
+	 * For LTSs, this returns a singleton iterator with a null probability value.
 	 */
 	Iterator<Map.Entry<Integer, Value>> getTransitionsIterator(int s, int i);
 
@@ -179,6 +185,11 @@ public interface ModelAccess<Value>
 	 * Get the initial states.
 	 */
 	PrimitiveIterator.OfInt getInitialStates();
+
+	/**
+	 * For interval models, Get the underlying model over {@code Interval<Value>}.
+	 */
+	ModelAccess<Interval<Value>> getIntervalModel();
 
 	// Wrapper around existing model classes (for now)
 
@@ -273,8 +284,14 @@ public interface ModelAccess<Value>
 				} else if (model instanceof DTMC) {
 					// assume i==0
 					return ((DTMC<Value>) model).getTransitionsIterator(s);
-				} else {
+				} else if (model instanceof LTS) {
 					return new SingletonIterator.Of<>(new AbstractMap.SimpleImmutableEntry<>(((LTS<Value>) model).getSuccessor(s, i), (Value) null));
+				} else if (model instanceof IMDP) {
+					return ((IMDP<Value>) model).getIntervalModel().getTransitionsMappedIterator(s, i, Interval::getLower);
+				} else if (model instanceof IDTMC) {
+					return ((IDTMC<Value>) model).getIntervalModel().getTransitionsMappedIterator(s, Interval::getLower);
+				} else {
+					return null;
 				}
 			}
 
@@ -304,6 +321,9 @@ public interface ModelAccess<Value>
 				if (model instanceof DTMC) {
 					// assume i==0
 					return ((DTMC<Value>) model).getActionsIterator(s);
+				} else if (model instanceof IDTMC) {
+						// assume i==0
+						return ((IDTMC<Value>) model).getIntervalModel().getActionsIterator(s);
 				} else {
 					return Collections.nCopies(getNumTransitions(s, i), null).iterator();
 				}
@@ -315,6 +335,9 @@ public interface ModelAccess<Value>
 				if (model instanceof DTMC) {
 					// assume i==0
 					return ((DTMC<Value>) model).getActionIndicesIterator(s);
+				} else if (model instanceof IDTMC) {
+					// assume i==0
+					return ((IDTMC<Value>) model).getIntervalModel().getActionIndicesIterator(s);
 				} else {
 					return Utils.nCopiesIntIterator(getNumTransitions(s, i), -1);
 				}
@@ -331,6 +354,17 @@ public interface ModelAccess<Value>
 			{
 				return IntIterators.asIntIterator(model.getInitialStates().iterator());
 			}
+
+			@Override
+			public ModelAccess<Interval<Value>> getIntervalModel()
+			{
+				if (model instanceof IntervalModel){
+					return ModelAccess.wrap(((IntervalModel<Value>) model).getIntervalModel());
+				} else {
+					return null;
+				}
+			}
+
 		};
 	}
 
@@ -413,17 +447,22 @@ public interface ModelAccess<Value>
 
 	/**
 	 * Get the probabilities for all transitions, as an iterator.
+	 * For interval models, this returns two probabilities (lower then upper bound) for each transition.
 	 */
 	default Iterator<Value> getTransitionProbabilities()
 	{
-		return new ModelAccessIterators.GetTransitionValues<>(this)
-		{
-			@Override
-			public Value getValue()
+		if (getModelType().intervals()) {
+			return new ModelAccessIterators.UnpackIntervals<>(getIntervalModel().getTransitionProbabilities());
+		} else {
+			return new ModelAccessIterators.GetTransitionValues<>(this)
 			{
-				return transition.getValue();
-			}
-		};
+				@Override
+				public Value getValue()
+				{
+					return transition.getValue();
+				}
+			};
+		}
 	}
 
 	/**

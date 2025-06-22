@@ -124,7 +124,7 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 		boolean showStates = modelExportOptions.getShowStates();
 
 		// Check for currently unsupported cases
-		if (modelType.uncertain() || modelType.partiallyObservable()) {
+		if (modelType.partiallyObservable() || (modelType.uncertain() && !modelType.intervals())) {
 			throw new PrismNotSupportedException(modelType + "s cannot yet be exported to UMB");
 		}
 		if (!(model.getEvaluator().one() instanceof Double)) {
@@ -256,7 +256,7 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 		ModelType modelType = model.getModelType();
 		umbIndex.setTime(modelType.continuousTime() ? UMBIndex.Time.STOCHASTIC : UMBIndex.Time.DISCRETE);
 		umbIndex.setNumPlayers(model.getNumPlayers());
-		if (modelType.uncertain()) {
+		if (modelType.intervals()) {
 			umbIndex.setBranchProbabilityType(UMBIndex.BranchProbabilityType.DOUBLE_INTERVAL);
 		} else if (modelType.isProbabilistic()) {
 			umbIndex.setBranchProbabilityType(UMBIndex.BranchProbabilityType.DOUBLE);

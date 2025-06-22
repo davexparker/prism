@@ -133,10 +133,12 @@ public class UMBWriter
 
 	/**
 	 * Add the branch targets, as an iterator of doubles
+	 * For an interval model, two values (lower/upper bound, successively) should be supplied for each branch.
 	 */
 	public void addBranchProbabilities(PrimitiveIterator.OfDouble branchValues)
 	{
-		addDoubleArray(UMBFormat.BRANCH_PROBABILITIES_FILE, branchValues, umbIndex.getNumBranches());
+		long numProbs = umbIndex.transitionSystem.branchProbabilityType.intervals() ? umbIndex.getNumBranches() * 2 : umbIndex.getNumBranches();
+		addDoubleArray(UMBFormat.BRANCH_PROBABILITIES_FILE, branchValues, numProbs);
 	}
 
 	/**

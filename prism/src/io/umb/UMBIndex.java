@@ -116,7 +116,15 @@ public class UMBIndex
 	/** Types of branch probabilities */
 	public enum BranchProbabilityType implements UMBField
 	{
-		NONE, DOUBLE, RATIONAL, DOUBLE_INTERVAL, RATIONAL_INTERVAL
+		NONE, DOUBLE, RATIONAL, DOUBLE_INTERVAL, RATIONAL_INTERVAL;
+
+		/**
+		 * Returns true if branch probabilities are defined as intervals.
+		 */
+		public boolean intervals()
+		{
+			return this == DOUBLE_INTERVAL || this == RATIONAL_INTERVAL;
+		}
 	}
 
 	// Index contents
