@@ -232,10 +232,9 @@ public class ConstructModel extends PrismComponent
 				throw new PrismNotSupportedException("Model construction not supported for " + modelType + "s");
 			}
 			// Attach evaluator and variable info
-			if (!modelType.uncertain()) {
-				((ModelExplicit<Value>) modelSimple).setEvaluator(modelGen.getEvaluator());
-			} else {
-				((ModelExplicit<Interval<Value>>) modelSimple).setEvaluator(modelGen.getIntervalEvaluator());
+			((ModelExplicit<Value>) modelSimple).setEvaluator(modelGen.getEvaluator());
+			if (modelSimple instanceof IntervalModelExplicit) {
+				((IntervalModelExplicit<Value>) modelSimple).setIntervalEvaluator(modelGen.getIntervalEvaluator());
 			}
 	        ((ModelExplicit<Value>) modelSimple).setVarList(varList);
 		}
@@ -367,9 +366,9 @@ public class ConstructModel extends PrismComponent
 				}
 				// For interval models, we delimit the constructed distributions
 				if (modelType == ModelType.IDTMC) {
-					((IDTMCSimple<Value>) idtmc).delimit(src, modelGen.getEvaluator());
+					idtmc.delimit(src);
 				} else if (modelType == ModelType.IMDP) {
-					((IMDPSimple<Value>) imdp).delimit(src, ch, modelGen.getEvaluator());
+					imdp.delimit(src, ch);
 				}
 			}
 			// For partially observable models, add observation info to state
@@ -439,10 +438,10 @@ public class ConstructModel extends PrismComponent
 				model = sortStates ? new CTMDPSimple<>(ctmdp, permut) : ctmdp;
 				break;
 			case IDTMC:
-				model = (ModelExplicit<Value>) (sortStates ? new IDTMCSimple<>(idtmc, permut) : idtmc);
+				model = sortStates ? new IDTMCSimple<>(idtmc, permut) : idtmc;
 				break;
 			case IMDP:
-				model = (ModelExplicit<Value>) (sortStates ? new IMDPSimple<>(imdp, permut) : imdp);
+				model = sortStates ? new IMDPSimple<>(imdp, permut) : imdp;
 				break;
 			case LTS:
 				model = sortStates ? new LTSSimple<>(lts, permut) : lts;

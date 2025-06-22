@@ -37,6 +37,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.Vector;
 
+import common.Interval;
 import explicit.rewards.ConstructRewards;
 import explicit.rewards.Rewards;
 import io.DotExporter;
@@ -216,10 +217,10 @@ public class StateModelChecker extends PrismComponent
 			mc = new STPGModelChecker(parent);
 			break;
 		case IDTMC:
-			mc = new IDTMCModelChecker(parent);
+			mc = new UDTMCModelChecker(parent);
 			break;
 		case IMDP:
-			mc = new IMDPModelChecker(parent);
+			mc = new UMDPModelChecker(parent);
 			break;
 		case LTS:
 			mc = new NonProbModelChecker(parent);
