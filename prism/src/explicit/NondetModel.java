@@ -37,6 +37,9 @@ import java.util.PrimitiveIterator;
 import java.util.function.IntPredicate;
 
 import common.IterableStateSet;
+import explicit.graphviz.Decoration;
+import explicit.graphviz.Decorator;
+import io.ModelExportOptions;
 import prism.PrismException;
 import prism.PrismLog;
 import strat.MDStrategy;
@@ -71,7 +74,7 @@ public interface NondetModel<Value> extends Model<Value>
 	/**
 	 * Get the number of nondeterministic choices in state s.
 	 */
-	public int getNumChoices(int s);
+	int getNumChoices(int s);
 
 	/**
 	 * Get the maximum number of nondeterministic choices in any state.
@@ -101,7 +104,7 @@ public interface NondetModel<Value> extends Model<Value>
 	 * Get the action label for choice {@code i} of state {@code s}.
 	 * The action is null for an unlabelled choice.
 	 */
-	public Object getAction(int s, int i);
+	Object getAction(int s, int i);
 
 	/**
 	 * Get the index of the action label for choice {@code i} of state {@code s}.
@@ -109,7 +112,7 @@ public interface NondetModel<Value> extends Model<Value>
 	 * which includes null if there are unlabelled choices,
 	 * so this method should always return a value >= 0.
 	 */
-	public default int getActionIndex(int s, int i)
+	default int getActionIndex(int s, int i)
 	{
 		return actionIndex(getAction(s, i));
 	}
@@ -117,7 +120,7 @@ public interface NondetModel<Value> extends Model<Value>
 	/**
 	 * Get a list of the actions labelling the choices of state {@code s}.
 	 */
-	public default List<Object> getAvailableActions(int s)
+	default List<Object> getAvailableActions(int s)
 	{
 		List<Object> actions = new ArrayList<>();
 		int numChoices = getNumChoices(s);
@@ -129,10 +132,10 @@ public interface NondetModel<Value> extends Model<Value>
 
 	/**
 	 * Get the index of the (first) choice in state {@code s} with action label {@code action}.
-	 * Action labels (which are {@link Object}s) are tested for equality using {@link Object#equals()}.
+	 * Action labels (which are {@link Object}s) are tested for equality using {@link Object#equals(Object)}.
 	 * Returns -1 if there is no matching action.
 	 */
-	public default int getChoiceByAction(int s, Object action)
+	default int getChoiceByAction(int s, Object action)
 	{
 		int numChoices = getNumChoices(s);
 		for (int i = 0; i < numChoices; i++) {
@@ -149,16 +152,16 @@ public interface NondetModel<Value> extends Model<Value>
 	}
 
 	/**
-	 * Do all choices in in each state have a unique action label?
+	 * Do all choices in each state have a unique action label?
 	 * <br><br>
 	 * NB: "true" does not imply that all choices are labelled,
 	 * e.g., an a-labelled choice and an unlabelled one _are_ considered unique;
 	 * multiple unlabelled choices are _not_ considered unique.
 	 */
-	public default boolean areAllChoiceActionsUnique()
+	default boolean areAllChoiceActionsUnique()
 	{
 		int numStates = getNumStates();
-		HashSet<Object> sActions = new HashSet<Object>();
+		HashSet<Object> sActions = new HashSet<>();
 		for (int s = 0; s < numStates; s++) {
 			int n = getNumChoices(s);
 			if (n > 1) {
@@ -175,9 +178,9 @@ public interface NondetModel<Value> extends Model<Value>
 
 	/**
 	 * Check that the available actions and their ordering
-	 * in states {@code s1} and {@copde s2} match, and throw an exception if not.
+	 * in states {@code s1} and {@code s2} match, and throw an exception if not.
 	 */
-	public default void checkActionsMatchExactly(int s1, int s2) throws PrismException
+	default void checkActionsMatchExactly(int s1, int s2) throws PrismException
 	{
 		int numChoices = getNumChoices(s1);
 		if (numChoices != getNumChoices(s2)) {
@@ -199,10 +202,10 @@ public interface NondetModel<Value> extends Model<Value>
 	}
 
 	/**
-	 * Check that the *sets* of available actions in states {@code s1} and {@copde s2} match,
+	 * Check that the *sets* of available actions in states {@code s1} and {@code s2} match,
 	 * and throw an exception if not.
 	 */
-	public default void checkActionsMatch(int s1, int s2) throws PrismException
+	default void checkActionsMatch(int s1, int s2) throws PrismException
 	{
 		// Get and sort action strings for s1
 		List<String> s1Actions = new ArrayList<>();
@@ -229,10 +232,10 @@ public interface NondetModel<Value> extends Model<Value>
 	/**
 	 * Get the number of transitions from choice {@code i} of state {@code s}.
 	 */
-	public int getNumTransitions(int s, int i);
+	int getNumTransitions(int s, int i);
 
 	@Override
-	public default int getNumTransitions(int s)
+	default int getNumTransitions(int s)
 	{
 		// Re-implement this because the method in the superclass (Model)
 		// would not count successors duplicated across choices
@@ -250,7 +253,7 @@ public interface NondetModel<Value> extends Model<Value>
 	 * @param i Choice index
 	 * @param set The set to test for inclusion
 	 */
-	public default boolean allSuccessorsInSet(int s, int i, BitSet set)
+	default boolean allSuccessorsInSet(int s, int i, BitSet set)
 	{
 		return allSuccessorsMatch(s, i, set::get);
 	}
@@ -261,7 +264,7 @@ public interface NondetModel<Value> extends Model<Value>
 	 * @param i Choice index
 	 * @param set The set to test for inclusion
 	 */
-	public default boolean someSuccessorsInSet(int s, int i, BitSet set)
+	default boolean someSuccessorsInSet(int s, int i, BitSet set)
 	{
 		return someSuccessorsMatch(s, i, set::get);
 	}
@@ -276,7 +279,7 @@ public interface NondetModel<Value> extends Model<Value>
 	 * @param u The BitSet that all successors have to be in
 	 * @param v The BitSet that some successors have to be in
 	 */
-	public default boolean successorsSafeAndCanReach(int s, int i, BitSet u, BitSet v)
+	default boolean successorsSafeAndCanReach(int s, int i, BitSet u, BitSet v)
 	{
 		return successorsSafeAndCanReach(s, i, u::get, v::get);
 	}
@@ -287,7 +290,7 @@ public interface NondetModel<Value> extends Model<Value>
 	 * @param i Choice index
 	 * @param p The predicate
 	 */
-	public default boolean allSuccessorsMatch(int s, int i, IntPredicate p)
+	default boolean allSuccessorsMatch(int s, int i, IntPredicate p)
 	{
 		// the code for this method is equivalent to the following stream expression,
 		// but kept explicit for performance
@@ -309,7 +312,7 @@ public interface NondetModel<Value> extends Model<Value>
 	 * @param i Choice index
 	 * @param p The predicate
 	 */
-	public default boolean someSuccessorsMatch(int s, int i, IntPredicate p)
+	default boolean someSuccessorsMatch(int s, int i, IntPredicate p)
 	{
 		// the code for this method is equivalent to the following stream expression,
 		// but kept explicit for performance
@@ -335,7 +338,7 @@ public interface NondetModel<Value> extends Model<Value>
 	 * @param u The first predicate (all successors have to match)
 	 * @param v The second predicate (some successors have to match)
 	 */
-	public default boolean successorsSafeAndCanReach(int s, int i, IntPredicate u, IntPredicate v)
+	default boolean successorsSafeAndCanReach(int s, int i, IntPredicate u, IntPredicate v)
 	{
 		SuccessorsIterator it = getSuccessors(s, i);
 		boolean hadTransitionToV = false;
@@ -355,7 +358,7 @@ public interface NondetModel<Value> extends Model<Value>
 	 * @param s The state
 	 * @param i Choice index
 	 */
-	public default Iterator<Integer> getSuccessorsIterator(int s, int i)
+	default Iterator<Integer> getSuccessorsIterator(int s, int i)
 	{
 		SuccessorsIterator successors = getSuccessors(s, i);
 		return successors.distinct();
@@ -366,14 +369,14 @@ public interface NondetModel<Value> extends Model<Value>
 	 * @param s The state
 	 * @param i Choice index
 	 */
-	public SuccessorsIterator getSuccessors(int s, int i);
+	SuccessorsIterator getSuccessors(int s, int i);
 
 	@Override
-	public default SuccessorsIterator getSuccessors(final int s)
+	default SuccessorsIterator getSuccessors(final int s)
 	{
-		return SuccessorsIterator.chain(new Iterator<SuccessorsIterator>() {
+		return SuccessorsIterator.chain(new Iterator<>() {
 			private int choice = 0;
-			private int choices = getNumChoices(s);
+			private final int choices = getNumChoices(s);
 
 			@Override
 			public boolean hasNext()
@@ -399,7 +402,7 @@ public interface NondetModel<Value> extends Model<Value>
 	 * @param forall For-all or there-exists (true=for-all, false=there-exists)
 	 * @param result Store results here
 	 */
-	public default void prob0step(final BitSet subset, final BitSet u, final boolean forall, final BitSet result)
+	default void prob0step(final BitSet subset, final BitSet u, final boolean forall, final BitSet result)
 	{
 		for (PrimitiveIterator.OfInt it = new IterableStateSet(subset, getNumStates()).iterator(); it.hasNext();) {
 			final int s = it.nextInt();
@@ -431,7 +434,7 @@ public interface NondetModel<Value> extends Model<Value>
 	 * @param v Set of states {@code v}
 	 * @param result Store results here
 	 */
-	public default void prob1Astep(BitSet subset, BitSet u, BitSet v, BitSet result)
+	default void prob1Astep(BitSet subset, BitSet u, BitSet v, BitSet result)
 	{
 		boolean b1;
 		for (PrimitiveIterator.OfInt it = new IterableStateSet(subset, getNumStates()).iterator(); it.hasNext();) {
@@ -458,7 +461,7 @@ public interface NondetModel<Value> extends Model<Value>
 	 * @param result Store results here
 	 * @param strat Storage for (memoryless) strategy choice indices (ignored if null)
 	 */
-	public default void prob1Estep(BitSet subset, BitSet u, BitSet v, BitSet result, int strat[])
+	default void prob1Estep(BitSet subset, BitSet u, BitSet v, BitSet result, int[] strat)
 	{
 		int stratCh = -1;
 		boolean b1;
@@ -495,7 +498,7 @@ public interface NondetModel<Value> extends Model<Value>
 	 * @param forall For-all or there-exists (true=for-all, false=there-exists)
 	 * @param result Store results here
 	 */
-	public default void prob1step(BitSet subset, BitSet u, BitSet v, boolean forall, BitSet result)
+	default void prob1step(BitSet subset, BitSet u, BitSet v, boolean forall, BitSet result)
 	{
 		boolean b1, b2;
 		for (PrimitiveIterator.OfInt it = new IterableStateSet(subset, getNumStates()).iterator(); it.hasNext();) {
@@ -527,7 +530,7 @@ public interface NondetModel<Value> extends Model<Value>
 	 * @param u Set of states {@code u}
 	 * @param v Set of states {@code v}
 	 */
-	public default boolean prob1stepSingle(int s, int i, BitSet u, BitSet v)
+	default boolean prob1stepSingle(int s, int i, BitSet u, BitSet v)
 	{
 		return successorsSafeAndCanReach(s, i, u, v);
 	}
@@ -537,19 +540,52 @@ public interface NondetModel<Value> extends Model<Value>
 	 * Note that the "new" model may be just an implicit (read-only) representation. 
 	 * @param strat (Memoryless) strategy to use
 	 */
-	public Model<Value> constructInducedModel(MDStrategy<Value> strat);
+	Model<Value> constructInducedModel(MDStrategy<Value> strat);
 
 	/**
 	 * Export to a dot file, highlighting states in 'mark' and choices for a (memoryless) strategy.
 	 */
-	default void exportToDotFileWithStrat(PrismLog out, BitSet mark, int strat[])
+	default void exportToDotFileWithStrat(PrismLog out, BitSet mark, int[] strat) throws PrismException
 	{
 		exportToDotFileWithStrat(out, mark, strat, DEFAULT_EXPORT_MODEL_PRECISION);
 	}
 
 	/**
 	 * Export to a dot file, highlighting states in 'mark' and choices for a (memoryless) strategy.
+	 *
 	 * @param precision number of significant digits >= 1
 	 */
-	public void exportToDotFileWithStrat(PrismLog out, BitSet mark, int strat[], int precision);
+	default void exportToDotFileWithStrat(PrismLog out, BitSet mark, int[] strat, int precision) throws PrismException
+	{
+		List<Decorator> decorators = new ArrayList<>();
+		if (mark != null) {
+			decorators.add(new Decorator()
+			{
+				@Override
+				public Decoration decorateState(int state, Decoration d)
+				{
+					if (mark.get(state)) {
+						d.attributes().put("style", "filled");
+						d.attributes().put("fillcolor", "#cccccc");
+					}
+					return d;
+				}
+			});
+		}
+		if (strat != null) {
+			decorators.add(new Decorator()
+			{
+				@Override
+				public Decoration decorateTransition(int state, int choice, Decoration d)
+				{
+					if (strat[state] == choice) {
+						d.attributes().put("color", "#ff0000");
+						d.attributes().put("fontcolor", "#ff0000");
+					}
+					return d;
+				}
+			});
+		}
+		exportToDotFile(out, new ModelExportOptions().setModelPrecision(precision), decorators);
+	}
 }

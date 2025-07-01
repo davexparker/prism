@@ -1,24 +1,27 @@
 This file contains details of the changes in each new version of PRISM.
 
 -----------------------------------------------------------------------------
-Changes since last release (up to 4fc1eaed3)
+Changes since last release (up to 609b68709)
 -----------------------------------------------------------------------------
 
 * Explicit engine improvements
-  - support for transition rewards in Markov chains
-  - storage (and export) of actions for Markov chains
+  - support for actions and transition rewards in Markov chains
 
-* Model export functionality
+* Export functionality
   - export of exact and parametric models
   - preliminary DRN (Storm) output
-  - actions=true/false option (explicit engine)
-  - multiple -exportmodel allowed and format=x option
+  - multiple -exportmodel switches allowed
+  - options for -exportmodel: format/actions/header/precision
+  - export of Markov chain actions
   - remove old options (MRMC format, unordered, spy)
+  - align -exportstrat and -exportadv switches
 
 * Model import functionality (from explicit files)
   - import of transition rewards
   - import for exact mode, LTSs
   - import progress display (symbolic engine)
+  - import directly to sparse classes in explicit engine
+    (now assume ascending states/choices in .tra files)
 
 * Minor modelling language updates
   - new power operator a^b, equivalent to pow(a,b)
@@ -42,6 +45,7 @@ Changes since last release (up to 4fc1eaed3)
   - refactoring of explicit engine model import/export code
     (centralised in io package, export moved from model classes)
   - parametric engine refactored to use explicit models/rewards
+  - refactoring of (explicit engine) interval model storage
   - symbolic code rearranged (new symbolic package)
   - symbolic model storage refactored, simplified, documented
   - extension of strategy classes, especially for induced models
