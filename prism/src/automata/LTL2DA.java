@@ -27,12 +27,13 @@
 
 package automata;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
@@ -99,231 +100,334 @@ public class LTL2DA extends PrismComponent
 	public DA<BitSet, ? extends AcceptanceOmega> convertLTLFormulaToDA(Expression ltl, Values constants, AcceptanceType... allowedAcceptance)
 			throws PrismException
 	{
-		DA<BitSet, ? extends AcceptanceOmega> result = null;
-
 		boolean useExternal = useExternal();
 		boolean containsTemporalBounds = Expression.containsTemporalTimeBounds(ltl);
-		if (containsTemporalBounds) {
-			useExternal = false;
-		}
+		DA<BitSet, ? extends AcceptanceOmega> da;
 
-		if (!useExternal) {
+		// First (unless we are using an external tool), check whether the library can provide a DA
+		if (!useExternal || containsTemporalBounds) {
 			try {
-				// checking the library first
-				result = LTL2RabinLibrary.getDAforLTL(ltl, constants, allowedAcceptance);
-				if (result != null) {
-					getLog().println("Taking "+result.getAutomataType()+" from library...");
-				}
-			} catch (Exception e) {
-				if (containsTemporalBounds) {
-					// there is (currently) no other way to translate LTL with temporal bounds,
-					// so treat an exception as a "real" one
-					throw e;
-				} else {
-					// there is the possibility that we might be able to construct
-					// an automaton below, just issue a warning
-					getLog().println("Warning: Exception during attempt to construct DRA using the LTL2RabinLibrary:");
-					getLog().println(" " + e.getMessage());
-				}
+				return convertLTLFormulaToDAWithLibrary(ltl, constants, allowedAcceptance);
+			} catch (PrismException e) {
+				// Fail silently, try something else
 			}
 		}
 
-		if (result == null) {
-			if (!containsTemporalBounds) {
-				if (useExternal) {
-					result = convertLTLFormulaToDAWithExternalTool(ltl, constants, allowedAcceptance);
-				} else {
-					SimpleLTL simpleLTL = ltl.convertForJltl2ba();
-
-					// don't use LTL2WDBA translation yet
-					boolean allowLTL2WDBA = false;
-					if (allowLTL2WDBA) {
-						LTLFragments fragments = LTLFragments.analyse(simpleLTL);
-						mainLog.println(fragments);
-
-						if (fragments.isSyntacticGuarantee() && AcceptanceType.contains(allowedAcceptance, AcceptanceType.REACH)) {
-							// a co-safety property
-							mainLog.println("Generating DFA for co-safety property...");
-							LTL2WDBA ltl2wdba = new LTL2WDBA(this);
-							result = ltl2wdba.cosafeltl2dfa(simpleLTL);
-						} else if (allowLTL2WDBA && fragments.isSyntacticObligation() && AcceptanceType.contains(allowedAcceptance, AcceptanceType.BUCHI)) {
-							// an obligation property
-							mainLog.println("Generating DBA for obligation property...");
-							LTL2WDBA ltl2wdba = new LTL2WDBA(this);
-							result = ltl2wdba.obligation2wdba(simpleLTL);
-						}
-					}
-					if (result == null) {
-						// use jltl2dstar LTL2DA
-						result = LTL2Rabin.ltl2da(simpleLTL, allowedAcceptance);
-					}
-				}
-			} else {
-				throw new PrismNotSupportedException("Could not convert LTL formula to deterministic automaton, formula had time-bounds");
-			}
+		// There is (currently) no other way to translate LTL with temporal bounds,
+		if (containsTemporalBounds) {
+			throw new PrismNotSupportedException("Could not convert LTL formula to deterministic automaton, formula had time-bounds");
 		}
 
-		if (result == null) {
-			throw new PrismNotSupportedException("Could not convert LTL formula to deterministic automaton");
+		// Use either external tool or built-in conversion
+		if (useExternal) {
+			da = convertLTLFormulaToDAWithExternalTool(ltl, constants, allowedAcceptance);
+		} else {
+			da = convertLTLFormulaToDAWithBuiltIn(ltl, constants, allowedAcceptance);
 		}
-
-		if (!getSettings().getBoolean(PrismSettings.PRISM_NO_DA_SIMPLIFY)) {
-			result = DASimplifyAcceptance.simplifyAcceptance(this, result, allowedAcceptance);
-		}
-
-		return result;
+		return da;
 	}
 
-	public DA<BitSet, ? extends AcceptanceOmega> convertLTLFormulaToDAWithExternalTool(Expression ltl, Values constants, AcceptanceType... allowedAcceptance)
-			throws PrismException
+	/**
+	 * Convert an LTL formula into a DA using a specified conversion process.
+	 * Perform any requested simplifications of the acceptance condition
+	 * and check that the acceptance condition is suitable.
+	 */
+	public DA<BitSet, ? extends AcceptanceOmega> convertLTLFormulaToDA(LTL2DAProcess l2ltda, Expression ltl, Values constants, AcceptanceType... allowedAcceptance) throws PrismException
 	{
-		String ltl2daTool = getSettings().getString(PrismSettings.PRISM_LTL2DA_TOOL);
-
-		SimpleLTL ltlFormula = ltl.convertForJltl2ba();
-
-		// switch from the L0, L1, ... APs of PRISM to the
-		// safer p0, p1, ... APs for the external tool
-		SimpleLTL ltlFormulaSafeAP = ltlFormula.clone();
-		ltlFormulaSafeAP.renameAP("L", "p");
-
-		DA<BitSet, ? extends AcceptanceOmega> result = null;
-
-		try {
-
-			String syntax = getSettings().getString(PrismSettings.PRISM_LTL2DA_SYNTAX);
-			if (syntax == null || syntax.isEmpty()) {
-				throw new PrismException("No LTL syntax option provided");
-			}
-			String ltlOutput;
-			switch (syntax) {
-			case "LBT":
-				ltlOutput = ltlFormulaSafeAP.toStringLBT();
-				break;
-			case "Spin":
-				ltlOutput = ltlFormulaSafeAP.toStringSpin();
-				break;
-			case "Spot":
-				ltlOutput = ltlFormulaSafeAP.toStringSpot();
-				break;
-			case "Rabinizer":
-				ltlFormulaSafeAP = ltlFormulaSafeAP.toBasicOperators();
-				ltlOutput = ltlFormulaSafeAP.toStringSpot();
-				break;
-			default:
-				throw new PrismException("Unknown LTL syntax option \"" + syntax + "\"");
-			}
-
-			File ltl_file = File.createTempFile("prism-ltl-external-", ".ltl", null);
-			File da_file = File.createTempFile("prism-ltl-external-", ".hoa", null);
-			File tool_output = File.createTempFile("prism-ltl-external-", ".output", null);
-
-			FileWriter ltlWriter = new FileWriter(ltl_file);
-			ltlWriter.write(ltlOutput);
-			ltlWriter.close();
-
-			List<String> arguments = new ArrayList<String>();
-			arguments.add(ltl2daTool);
-
-			getLog().print("Calling external LTL->DA tool: ");
-			for (String s : arguments) {
-				getLog().print(" " + s);
-			}
-			getLog().println();
-
-			getLog().print("LTL formula (in " + syntax + " syntax):  ");
-			getLog().println(ltlOutput);
-
-			arguments.add(ltl_file.getAbsolutePath());
-			arguments.add(da_file.getAbsolutePath());
-
-			ProcessBuilder builder = new ProcessBuilder(arguments);
-			builder.redirectOutput(tool_output);
-			builder.redirectErrorStream(true);
-
-			// if we are running under the Nailgun environment, setup the
-			// environment to include the environment variables of the Nailgun client
-			prism.PrismNG.setupChildProcessEnvironment(builder);
-
-			Process p = builder.start();
-			p.getInputStream().close();
-
-			int rv;
-			while (true) {
-				try {
-					rv = p.waitFor();
-					break;
-				} catch (InterruptedException e) {
-				}
-			}
-			if (rv != 0) {
-				throw new PrismException("Call to external LTL->DA tool failed, return value = " + rv + ".\n"
-						+ "To investigate, please consult the following files:" + "\n LTL formula:                     " + ltl_file.getAbsolutePath()
-						+ "\n Automaton output:                " + da_file.getAbsolutePath() + "\n Tool output (stdout and stderr): "
-						+ tool_output.getAbsolutePath() + "\n");
-			}
-
-			tool_output.delete();
-
-			try {
-				try {
-					HOAF2DA consumerDA = new HOAF2DA();
-
-					InputStream input = new FileInputStream(da_file);
-					HOAFParser.parseHOA(input, consumerDA);
-					result = consumerDA.getDA();
-				} catch (HOAF2DA.TransitionBasedAcceptanceException e) {
-					// try again, this time transforming to state acceptance
-					getLog().println("Automaton with transition-based acceptance, automatically converting to state-based acceptance...");
-					HOAF2DA consumerDA = new HOAF2DA();
-					HOAIntermediateStoreAndManipulate consumerTransform = new HOAIntermediateStoreAndManipulate(consumerDA, new ToStateAcceptance());
-
-					InputStream input = new FileInputStream(da_file);
-					HOAFParser.parseHOA(input, consumerTransform);
-					result = consumerDA.getDA();
-				}
-
-				if (result == null) {
-					throw new PrismException("Could not construct DA");
-				}
-				checkAPs(ltlFormulaSafeAP, result.getAPList());
-
-				// rename back from safe APs, i.e., p0, p1, ... to L0, L1, ...
-				List<String> automatonAPList = result.getAPList();
-				for (int i = 0; i < automatonAPList.size(); i++) {
-					if (automatonAPList.get(i).startsWith("p")) {
-						String renamed = "L" + automatonAPList.get(i).substring("p".length());
-						automatonAPList.set(i, renamed);
-					}
-				}
-			} catch (ParseException e) {
-				throw new PrismException("Parse error: " + e.getMessage() + ".\n" + "To investigate, please consult the following files:\n"
-						+ " LTL formula:        " + ltl_file.getAbsolutePath() + "\n Automaton output: " + da_file.getAbsolutePath() + "\n");
-			} catch (PrismException e) {
-				throw new PrismException(e.getMessage() + ".\n" + "To investigate, please consult the following files:" + "\n LTL formula: "
-						+ ltl_file.getAbsolutePath() + "\n Automaton output: " + da_file.getAbsolutePath() + "\n");
-			}
-
-			da_file.delete();
-			ltl_file.delete();
-		} catch (IOException e) {
-			throw new PrismException(e.getMessage());
-		}
-
+		// Do the LTL-to-DA conversion
+		DA<BitSet, ? extends AcceptanceOmega> da = l2ltda.convert(ltl, constants, allowedAcceptance);
+		// Simplify the acceptance condition if requested
 		if (!getSettings().getBoolean(PrismSettings.PRISM_NO_DA_SIMPLIFY)) {
-			result = DASimplifyAcceptance.simplifyAcceptance(this, result, allowedAcceptance);
+			da = DASimplifyAcceptance.simplifyAcceptance(this, da, allowedAcceptance);
 		}
-
-		AcceptanceOmega acceptance = result.getAcceptance();
+		// Check the acceptance condition is correct
+		AcceptanceOmega acceptance = da.getAcceptance();
 		if (AcceptanceType.contains(allowedAcceptance, acceptance.getType())) {
-			return result;
+			return da;
 		} else if (AcceptanceType.contains(allowedAcceptance, AcceptanceType.GENERIC)) {
 			// The specific acceptance type is not allowed, but GENERIC is allowed
 			//   -> transform to generic acceptance and switch acceptance condition
-			DA.switchAcceptance(result, acceptance.toAcceptanceGeneric());
-			return result;
+			DA.switchAcceptance(da, acceptance.toAcceptanceGeneric());
+			return da;
 		} else {
-			throw new PrismException("The external LTL->DA tool returned an automaton with " + acceptance.getType()
-					+ " acceptance, which is not yet supported for model checking this model / property");
+			throw new PrismException("Generated DA had " + acceptance.getType() + " acceptance, which is not suitable");
+		}
+	}
+
+	// Convenience functions for calling specific LTL-to-DA conversion processes
+
+	/**
+	 * LTL-to-DA conversion via an external tool.
+	 */
+	public DA<BitSet, ? extends AcceptanceOmega> convertLTLFormulaToDAWithLibrary(Expression ltl, Values constants, AcceptanceType... allowedAcceptance) throws PrismException
+	{
+		return convertLTLFormulaToDA(new ConvertLTLFormulaToDAWithLibrary(), ltl, constants, allowedAcceptance);
+	}
+
+	/**
+	 * LTL-to-DA conversion via built-in.
+	 */
+	public DA<BitSet, ? extends AcceptanceOmega> convertLTLFormulaToDAWithBuiltIn(Expression ltl, Values constants, AcceptanceType... allowedAcceptance) throws PrismException
+	{
+		return convertLTLFormulaToDA(new ConvertLTLFormulaToDAWithBuiltIn(), ltl, constants, allowedAcceptance);
+	}
+
+	/**
+	 * LTL-to-DA conversion via an external tool.
+	 */
+	public DA<BitSet, ? extends AcceptanceOmega> convertLTLFormulaToDAWithExternalTool(Expression ltl, Values constants, AcceptanceType... allowedAcceptance) throws PrismException
+	{
+		return convertLTLFormulaToDA(new ConvertLTLFormulaToDAWithExternalTool(), ltl, constants, allowedAcceptance);
+	}
+
+	// Various LTL-to-DA conversion processes
+
+	/**
+	 * Interface for LTL-to-DA conversion processes.
+	 */
+	public interface LTL2DAProcess
+	{
+		/**
+		 * Convert an LTL formula into a DA of one of the specified acceptance types.
+		 * Throws an exception if the conversion fails.
+		 */
+		DA<BitSet, ? extends AcceptanceOmega> convert(Expression ltl, Values constants, AcceptanceType... allowedAcceptance) throws PrismException;
+	}
+
+	/**
+	 * LTL-to-DA conversion using the built-in library
+	 */
+	private class ConvertLTLFormulaToDAWithLibrary implements LTL2DAProcess
+	{
+		public DA<BitSet, ? extends AcceptanceOmega> convert(Expression ltl, Values constants, AcceptanceType... allowedAcceptance) throws PrismException
+		{
+			DA<BitSet, ? extends AcceptanceOmega> da = LTL2RabinLibrary.getDAforLTL(ltl, constants, allowedAcceptance);
+			if (da != null) {
+				mainLog.println("Taking " + da.getAutomataType()+" from library...");
+				return da;
+			} else {
+				throw new PrismException("DA not found in library");
+			}
+		}
+	}
+
+	/**
+	 * LTL-to-DA conversion using the built-in converters
+	 */
+	private class ConvertLTLFormulaToDAWithBuiltIn implements LTL2DAProcess
+	{
+		public DA<BitSet, ? extends AcceptanceOmega> convert(Expression ltl, Values constants, AcceptanceType... allowedAcceptance) throws PrismException
+		{
+			SimpleLTL simpleLTL = ltl.convertForJltl2ba();
+			DA<BitSet, ? extends AcceptanceOmega> da = null;
+			// Don't use LTL2WDBA translation yet
+			boolean allowLTL2WDBA = false;
+			if (allowLTL2WDBA) {
+				LTLFragments fragments = LTLFragments.analyse(simpleLTL);
+				mainLog.println(fragments);
+				if (fragments.isSyntacticGuarantee() && AcceptanceType.contains(allowedAcceptance, AcceptanceType.REACH)) {
+					// A co-safety property
+					mainLog.println("Generating DFA for co-safety property...");
+					LTL2WDBA ltl2wdba = new LTL2WDBA(LTL2DA.this);
+					da = ltl2wdba.cosafeltl2dfa(simpleLTL);
+				} else if (allowLTL2WDBA && fragments.isSyntacticObligation() && AcceptanceType.contains(allowedAcceptance, AcceptanceType.BUCHI)) {
+					// An obligation property
+					mainLog.println("Generating DBA for obligation property...");
+					LTL2WDBA ltl2wdba = new LTL2WDBA(LTL2DA.this);
+					da = ltl2wdba.obligation2wdba(simpleLTL);
+				}
+			}
+			if (da == null) {
+				// Use jltl2dstar LTL2DA
+				da = LTL2Rabin.ltl2da(simpleLTL, allowedAcceptance);
+			}
+			if (da != null) {
+				return da;
+			} else {
+				throw new PrismException("Built-in converters failed to build DA");
+			}
+		}
+	}
+
+	/**
+	 * LTL-to-DA conversion via an external tool.
+	 */
+	private class ConvertLTLFormulaToDAWithExternalTool implements LTL2DAProcess
+	{
+		public DA<BitSet, ? extends AcceptanceOmega> convert(Expression ltl, Values constants, AcceptanceType... allowedAcceptance) throws PrismException
+		{
+			File ltl_file = null;
+			File da_file = null;
+			File tool_output = null;
+			try {
+				// Convert LTL formula to required format
+				SimpleLTL ltlFormula = prepareLTLFormulaForExternalTool(ltl);
+				String syntax = getSettings().getString(PrismSettings.PRISM_LTL2DA_SYNTAX);
+				String ltlString = convertLTLToExternalSyntax(ltlFormula, syntax);
+
+				// Create temporary files for communicating with the external tool; write input
+				ltl_file = File.createTempFile("prism-ltl-external-", ".ltl", null);
+				da_file = File.createTempFile("prism-ltl-external-", ".hoa", null);
+				tool_output = File.createTempFile("prism-ltl-external-", ".output", null);
+				FileWriter ltlWriter = new FileWriter(ltl_file);
+				ltlWriter.write(ltlString);
+				ltlWriter.close();
+
+				// Set up call to external tool
+				String ltl2daTool = getSettings().getString(PrismSettings.PRISM_LTL2DA_TOOL);
+				mainLog.println("Calling external LTL->DA tool: " + ltl2daTool);
+				List<String> arguments = new ArrayList<>();
+				arguments.add(ltl2daTool);
+				//mainLog.print("LTL formula (in " + syntax + " syntax): " + ltlString);
+				arguments.add(ltl_file.getAbsolutePath());
+				arguments.add(da_file.getAbsolutePath());
+
+				// Execute call to external tool
+				// If we are running under the Nailgun environment, setup the
+				// environment to include the environment variables of the Nailgun client
+				ProcessBuilder builder = new ProcessBuilder(arguments);
+				builder.redirectOutput(tool_output);
+				builder.redirectErrorStream(true);
+				prism.PrismNG.setupChildProcessEnvironment(builder);
+				Process p = builder.start();
+				p.getInputStream().close();
+				int rv;
+				while (true) {
+					try {
+						rv = p.waitFor();
+						break;
+					} catch (InterruptedException e) {
+					}
+				}
+				if (rv != 0) {
+					throw new PrismException("Tool return value=" + rv);
+				}
+
+				// Extract result and convert HOA
+				DA<BitSet, ? extends AcceptanceOmega> da = constructDAFromHOA(da_file);
+				checkAPs(ltlFormula, da.getAPList());
+				revertDAForExternalTool(da);
+
+				// Tidy up
+				tool_output.delete();
+				da_file.delete();
+				ltl_file.delete();
+
+				return da;
+
+			} catch (IOException | PrismException e) {
+				// In case of error, print temporary file info for debugging
+				mainLog.println("LTL formula: " + (ltl_file == null ? "?" : ltl_file.getAbsolutePath()));
+				mainLog.println("Automaton output: " + (da_file == null ? "?" : da_file.getAbsolutePath()));
+				mainLog.println("Tool output (stdout and stderr): " + (tool_output == null ? "?" : tool_output.getAbsolutePath()));
+				throw new PrismException("External LTL->DA tool failed: " + e.getMessage());
+			}
+		}
+	}
+
+	// Helper functions for LTL-to-DA conversion processes
+
+	/**
+	 * Prepare an LTL formula for use in an external tool/library,
+	 * by switching APs L0, L1, etc. t the safer p0, p1, etc.
+	 */
+	private SimpleLTL prepareLTLFormulaForExternalTool(Expression ltl) throws PrismException
+	{
+		SimpleLTL ltlFormula = ltl.convertForJltl2ba();
+		SimpleLTL ltlFormulaSafeAP = ltlFormula.clone();
+		ltlFormulaSafeAP.renameAP("L", "p");
+		return ltlFormulaSafeAP;
+	}
+
+	/**
+	 * Convert an LTL formula into the syntax of an external tool/library.
+	 * {@code syntax} is one of: "LBT", "Spin", "Spot", "Rabinizer".
+	 */
+	private String convertLTLToExternalSyntax(SimpleLTL ltlFormula, String syntax) throws PrismException
+	{
+		if (syntax == null) {
+			syntax = "";
+		}
+		String ltlString;
+		switch (syntax) {
+			case "LBT":
+				ltlString = ltlFormula.toStringLBT();
+				break;
+			case "Spin":
+				ltlString = ltlFormula.toStringSpin();
+				break;
+			case "Spot":
+				ltlString = ltlFormula.toStringSpot();
+				break;
+			case "Rabinizer":
+				ltlFormula = ltlFormula.toBasicOperators();
+				ltlString = ltlFormula.toStringSpot();
+				break;
+			default:
+				throw new PrismException("Unknown LTL syntax option \"" + syntax + "\"");
+		}
+		return ltlString;
+	}
+
+	/**
+	 * Construct a DA by parsing an HOA file, represented as a string.
+	 */
+	private DA<BitSet, ? extends AcceptanceOmega> constructDAFromHOA(String hoaString) throws PrismException
+	{
+		return constructDAFromHOA(() -> new ByteArrayInputStream(hoaString.getBytes()), "HOA string");
+	}
+
+	/**
+	 * Construct a DA by parsing an HOA file.
+	 */
+	private DA<BitSet, ? extends AcceptanceOmega> constructDAFromHOA(File hoaFile) throws PrismException
+	{
+		return constructDAFromHOA(() -> Files.newInputStream(hoaFile.toPath()), "HOA file " + hoaFile.getAbsoluteFile());
+	}
+
+	interface HOAStreamSupplier { InputStream get() throws IOException; }
+
+	/**
+	 * Construct a DA by parsing an HOA file, supplied as an InputStream.
+	 * The InputStream may need to be recreated multiple times in case of failure.
+	 */
+	private DA<BitSet, ? extends AcceptanceOmega> constructDAFromHOA(HOAStreamSupplier hoaStreamSupplier, String hoaSourceDescription) throws PrismException
+	{
+		DA<BitSet, ? extends AcceptanceOmega> da;
+		try {
+			try {
+				HOAF2DA consumerDA = new HOAF2DA();
+				HOAFParser.parseHOA(hoaStreamSupplier.get(), consumerDA);
+				da = consumerDA.getDA();
+			} catch (HOAF2DA.TransitionBasedAcceptanceException e) {
+				// Try again, this time transforming to state acceptance
+				mainLog.println("Automaton with transition-based acceptance, automatically converting to state-based acceptance...");
+				HOAF2DA consumerDA = new HOAF2DA();
+				HOAIntermediateStoreAndManipulate consumerTransform = new HOAIntermediateStoreAndManipulate(consumerDA, new ToStateAcceptance());
+				HOAFParser.parseHOA(hoaStreamSupplier.get(), consumerTransform);
+				da = consumerDA.getDA();
+			}
+		} catch (IOException e) {
+			throw new PrismException("Unable to read " + hoaSourceDescription);
+		} catch (ParseException e) {
+			throw new PrismException("Parse error: " + e.getMessage() + " reading " + hoaSourceDescription);
+		}
+
+		return da;
+	}
+
+	/**
+	 * Revert the APs in an externally generated DA, i.e., the reverse of
+	 * what is done in {@link #prepareLTLFormulaForExternalTool(Expression)}.
+	 */
+	private void revertDAForExternalTool(DA<BitSet, ? extends AcceptanceOmega> da)
+	{
+		List<String> automatonAPList = da.getAPList();
+		for (int i = 0; i < automatonAPList.size(); i++) {
+			if (automatonAPList.get(i).startsWith("p")) {
+				String renamed = "L" + automatonAPList.get(i).substring("p".length());
+				automatonAPList.set(i, renamed);
+			}
 		}
 	}
 
