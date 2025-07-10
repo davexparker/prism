@@ -47,6 +47,18 @@ import jltl2ba.APSet;
 import jltl2ba.SimpleLTL;
 import jltl2ba.LTLFragments;
 import jltl2dstar.LTL2Rabin;
+import owl.automaton.Automaton;
+import owl.automaton.MutableAutomaton;
+import owl.automaton.acceptance.GeneralizedRabinAcceptance;
+import owl.automaton.acceptance.RabinAcceptance;
+import owl.automaton.acceptance.degeneralization.RabinDegeneralization;
+import owl.automaton.acceptance.optimization.AcceptanceOptimizations;
+import owl.automaton.hoa.HoaWriter;
+import owl.ltl.LabelledFormula;
+import owl.ltl.parser.LtlParser;
+import owl.translations.rabinizer.RabinizerBuilder;
+import owl.translations.rabinizer.RabinizerConfiguration;
+import owl.translations.rabinizer.RabinizerState;
 import parser.Values;
 import parser.ast.Expression;
 import prism.PrismComponent;
@@ -122,7 +134,8 @@ public class LTL2DA extends PrismComponent
 		if (useExternal) {
 			da = convertLTLFormulaToDAWithExternalTool(ltl, constants, allowedAcceptance);
 		} else {
-			da = convertLTLFormulaToDAWithBuiltIn(ltl, constants, allowedAcceptance);
+			//da = convertLTLFormulaToDAWithBuiltIn(ltl, constants, allowedAcceptance);
+			da = convertLTLFormulaToDAWithOwl(ltl, constants, allowedAcceptance);
 		}
 		return da;
 	}
@@ -170,6 +183,14 @@ public class LTL2DA extends PrismComponent
 	public DA<BitSet, ? extends AcceptanceOmega> convertLTLFormulaToDAWithBuiltIn(Expression ltl, Values constants, AcceptanceType... allowedAcceptance) throws PrismException
 	{
 		return convertLTLFormulaToDA(new ConvertLTLFormulaToDAWithBuiltIn(), ltl, constants, allowedAcceptance);
+	}
+
+	/**
+	 * LTL-to-DA conversion via Owl.
+	 */
+	public DA<BitSet, ? extends AcceptanceOmega> convertLTLFormulaToDAWithOwl(Expression ltl, Values constants, AcceptanceType... allowedAcceptance) throws PrismException
+	{
+		return convertLTLFormulaToDA(new ConvertLTLFormulaToDAWithOwl(), ltl, constants, allowedAcceptance);
 	}
 
 	/**
@@ -246,6 +267,32 @@ public class LTL2DA extends PrismComponent
 			} else {
 				throw new PrismException("Built-in converters failed to build DA");
 			}
+		}
+	}
+
+	/**
+	 * LTL-to-DA conversion via Owl
+	 */
+	private class ConvertLTLFormulaToDAWithOwl implements LTL2DAProcess
+	{
+		public DA<BitSet, ? extends AcceptanceOmega> convert(Expression ltl, Values constants, AcceptanceType... allowedAcceptance) throws PrismException
+		{
+			// Convert LTL formula to required format
+			SimpleLTL ltlFormula = prepareLTLFormulaForExternalTool(ltl);
+			String ltlString = convertLTLToExternalSyntax(ltlFormula, "Spot");
+
+			// Parse and convert with Owl
+			LabelledFormula formula = LtlParser.parse(ltlString);
+			MutableAutomaton<RabinizerState, GeneralizedRabinAcceptance> dra = RabinizerBuilder.build(formula, RabinizerConfiguration.of(true, true, true));
+			Automaton<?, ? extends RabinAcceptance> draOwl = RabinDegeneralization.degeneralize(AcceptanceOptimizations.transform(dra));
+			String hoaString = HoaWriter.toString(draOwl);
+
+			// Extract result and convert HOA
+			DA<BitSet, ? extends AcceptanceOmega> da = constructDAFromHOA(hoaString);
+			checkAPs(ltlFormula, da.getAPList());
+			revertDAForExternalTool(da);
+
+			return da;
 		}
 	}
 
