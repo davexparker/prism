@@ -48,8 +48,9 @@ import jltl2ba.SimpleLTL;
 import jltl2ba.LTLFragments;
 import jltl2dstar.LTL2Rabin;
 import owl.automaton.Automaton;
-import owl.automaton.MutableAutomaton;
+import owl.automaton.Views;
 import owl.automaton.acceptance.GeneralizedRabinAcceptance;
+import owl.automaton.acceptance.OmegaAcceptanceCast;
 import owl.automaton.acceptance.RabinAcceptance;
 import owl.automaton.acceptance.degeneralization.RabinDegeneralization;
 import owl.automaton.acceptance.optimization.AcceptanceOptimizations;
@@ -58,7 +59,6 @@ import owl.ltl.LabelledFormula;
 import owl.ltl.parser.LtlParser;
 import owl.translations.rabinizer.RabinizerBuilder;
 import owl.translations.rabinizer.RabinizerConfiguration;
-import owl.translations.rabinizer.RabinizerState;
 import parser.Values;
 import parser.ast.Expression;
 import prism.PrismComponent;
@@ -283,9 +283,13 @@ public class LTL2DA extends PrismComponent
 
 			// Parse and convert with Owl
 			LabelledFormula formula = LtlParser.parse(ltlString);
-			MutableAutomaton<RabinizerState, GeneralizedRabinAcceptance> dra = RabinizerBuilder.build(formula, RabinizerConfiguration.of(true, true, true));
-			Automaton<?, ? extends RabinAcceptance> draOwl = RabinDegeneralization.degeneralize(AcceptanceOptimizations.transform(dra));
-			String hoaString = HoaWriter.toString(draOwl);
+			RabinizerConfiguration config = RabinizerConfiguration.of(true, true, true);
+			Automaton<?, ? extends GeneralizedRabinAcceptance> dgra = RabinizerBuilder.build(formula, config);
+			dgra = OmegaAcceptanceCast.cast(AcceptanceOptimizations.transform(dgra), GeneralizedRabinAcceptance.class);
+			Automaton<?, ? extends RabinAcceptance> dra = RabinDegeneralization.degeneralize(AcceptanceOptimizations.transform(dgra));
+			dra = OmegaAcceptanceCast.cast(AcceptanceOptimizations.transform(dra), RabinAcceptance.class);
+			dra = OmegaAcceptanceCast.cast(Views.complete(dra), RabinAcceptance.class);
+			String hoaString = HoaWriter.toString(dra);
 
 			// Extract result and convert HOA
 			DA<BitSet, ? extends AcceptanceOmega> da = constructDAFromHOA(hoaString);
