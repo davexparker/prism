@@ -28,14 +28,21 @@ package io;
 
 import explicit.Model;
 import explicit.rewards.Rewards;
+import io.umb.UMBBitString;
 import io.umb.UMBException;
 import io.umb.UMBWriter;
 import io.umb.UMBIndex;
 import it.unimi.dsi.fastutil.doubles.DoubleIterators;
-import it.unimi.dsi.fastutil.ints.IntIterators;
 import parser.State;
+import parser.VarList;
+import parser.ast.DeclarationBool;
+import parser.ast.DeclarationDoubleUnbounded;
+import parser.ast.DeclarationInt;
+import parser.ast.DeclarationIntUnbounded;
+import parser.ast.DeclarationType;
 import parser.type.Type;
 import parser.type.TypeBool;
+import parser.type.TypeDouble;
 import parser.type.TypeInt;
 import prism.Evaluator;
 import prism.ModelInfo;
@@ -45,10 +52,11 @@ import prism.PrismException;
 import prism.PrismFileLog;
 import prism.PrismLog;
 import prism.PrismNotSupportedException;
+import prism.PrismUtils;
 
 import java.io.File;
-import java.util.BitSet;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -206,24 +214,77 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 			ModelInfo modelInfo = getModelInfo();
 			List<State> statesList = model.getStatesList();
 			if (showStates && modelInfo != null && statesList != null) {
+				VarList varList = modelInfo.createVarList();
 				int numVars = modelInfo.getNumVars();
+
+				// Create bit-packing for state variable values, store metadata in index
+				boolean storeOffsets = false;
+				UMBBitPacking bitPacking = new UMBBitPacking();
 				for (int i = 0; i < numVars; i++) {
-					int finalI = i;
-					Type varType = modelInfo.getVarType(i);
-					if (varType instanceof TypeBool) {
-						BitSet bitset = new BitSet();
-						for (int s = 0; s < numStates; s++) {
-							if ((boolean) statesList.get(s).varValues[i]) {
-								bitset.set(s);
+					DeclarationType varDecl = modelInfo.getVarDeclarationType(i);
+					String varTypeUMB;
+					int varSize;
+					if (varDecl instanceof DeclarationBool) {
+						varTypeUMB = "bool";
+						varSize = 1;
+					} else if (varDecl instanceof DeclarationInt) {
+						if (storeOffsets) {
+							varTypeUMB = "int";
+							varSize = varList.getRangeLogTwo(i); // TODO
+						} else {
+							int varLow = varList.getLow(i);
+							int varHigh = varList.getHigh(i);
+							if (varLow < 0) {
+								varTypeUMB = "int";
+								int varMaxAbs = Math.abs(varLow);
+								if (varHigh > 0) {
+									varMaxAbs = Math.max(varMaxAbs, varHigh + 1);
+								}
+								varSize = (int) Math.ceil(PrismUtils.log2(varMaxAbs)) + 1;
+							} else {
+								varTypeUMB = "uint";
+								varSize = (int) Math.ceil(PrismUtils.log2(varHigh + 1));
 							}
 						}
-						umbWriter.addBooleanVariableDefinition(modelInfo.getVarName(i), bitset);
-					} else if (varType instanceof TypeInt) {
-						umbWriter.addIntVariableDefinition(modelInfo.getVarName(i), IntIterators.asIntIterator(statesList.stream().map(s -> (int) s.varValues[finalI]).iterator()));
+					} else if (varDecl instanceof DeclarationIntUnbounded) {
+						varTypeUMB = "int";
+						varSize = 32;
+					} else if (varDecl instanceof DeclarationDoubleUnbounded) {
+						varTypeUMB = "double";
+						varSize = 64;
 					} else {
-						throw new PrismException("Unsupported variable type in UMB export: " + varType);
+						throw new PrismException("Unsupported variable type in UMB export: " + varDecl);
 					}
+					bitPacking.addVariable(modelInfo.getVarName(i), varSize, varTypeUMB);
 				}
+				bitPacking.padToByteBoundary();
+				umbWriter.getUmbIndex().setStateValuationsFromBitPacking(bitPacking);
+
+				// Build an iterator to supply the bit-packed state variable values, add data
+				Iterator<UMBBitString> iter = statesList.stream()
+						.map(s -> {
+							UMBBitString bitString = bitPacking.newBitString();
+							try {
+								for (int i = 0; i < numVars; i++) {
+									Type varType = null;
+									varType = modelInfo.getVarType(i);
+									if (varType instanceof TypeBool) {
+										bitPacking.setBooleanVariableValue(bitString, i, (boolean) s.varValues[i]);
+									} else if (varType instanceof TypeInt) {
+										bitPacking.setUIntVariableValue(bitString, i, (int) s.varValues[i]);
+									} else if (varType instanceof TypeDouble) {
+										bitPacking.setDoubleVariableValue(bitString, i, (double) s.varValues[i]);
+									} else {
+										throw new PrismException("Unsupported variable type in UMB export: " + varType);
+									}
+								}
+							} catch (UMBException | PrismException e) {
+								throw new RuntimeException(e);
+							}
+							return bitString;
+						})
+						.iterator();
+				umbWriter.addStateValuations(iter, bitPacking);
 			}
 
 			return umbWriter;

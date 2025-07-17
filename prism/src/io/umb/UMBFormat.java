@@ -65,7 +65,11 @@ public class UMBFormat
 
 	public static final String AP_ANNOTATIONS_GROUP = "aps";
 	public static final String REWARD_ANNOTATIONS_GROUP = "rewards";
-	public static final String VARIABLE_ANNOTATIONS_GROUP = "variables";
+
+	// Variable valuations
+
+	/** Filename for storing state variable valuations */
+	public static final String STATE_VALUATIONS_FILE = "state-valuations" + BIN_FILE_EXT;
 
 	// Allowable compression formats
 

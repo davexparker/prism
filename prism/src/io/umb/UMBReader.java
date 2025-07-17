@@ -26,12 +26,14 @@
 
 package io.umb;
 
+import io.UMBBitPacking;
 import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorInputStream;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
+import prism.PrismException;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -362,6 +364,47 @@ public class UMBReader
 		extractDoubleArray(filename, getUMBIndex().getAnnotationDataSize(appliesTo), doubleConsumer);
 	}
 
+	/**
+	 * Extract the state valuations (variable values), one bitstring per state.
+	 * @param bitstringConsumer Bitstring consumer
+	 */
+	public void extractStateValuations(Consumer<UMBBitString> bitstringConsumer) throws UMBException
+	{
+		UMBBitPacking bitPacking = umbIndex.getStateValuationBitPacking();
+		extractBitStringArray(UMBFormat.STATE_VALUATIONS_FILE, umbIndex.getNumStates(), bitPacking.getTotalNumBytes(), bitstringConsumer);
+	}
+
+	/**
+	 * Compute the range of a (signed or unsigned) integer variable, from the values stored for it in state valuations.
+	 * @param bitPacking The bit-packing for state valuations
+	 * @param i Index of the variable (in the bit-packing)
+	 */
+	public UMBReader.IntRange getStateValuationIntRange(UMBBitPacking bitPacking, int i) throws PrismException
+	{
+		UMBReader.IntRangeComputer varRange = new UMBReader.IntRangeComputer();
+		try {
+			extractStateValuations(bitString -> {
+				try {
+					switch (bitPacking.getVariable(i).type) {
+						case "int":
+							varRange.accept(bitPacking.getIntVariableValue(bitString, i));
+							break;
+						case "uint":
+							varRange.accept(bitPacking.getUIntVariableValue(bitString, i));
+							break;
+						default:
+							throw new UMBException("Cannot compute the integer range of a " + bitPacking.getVariable(i).type);
+					}
+				} catch (UMBException e) {
+					throw new RuntimeException(e.getMessage());
+				}
+			});
+		} catch (UMBException | RuntimeException e) {
+			throw new PrismException("UMB import problem: " + e.getMessage());
+		}
+		return varRange;
+	}
+
 	// Local methods for extracting data
 
 	private boolean fileExists(String filename) throws UMBException
@@ -458,6 +501,22 @@ public class UMBReader
 		ByteBuffer bytes;
 		while ((bytes = umbIn.readBytes(Double.BYTES)) != null) {
 			doubleConsumer.accept(bytes.getDouble());
+		}
+		umbIn.close();
+	}
+
+	private void extractBitStringArray(String filename, long size, int numBytes, Consumer<UMBBitString> bitstringConsumer) throws UMBException
+	{
+		UMBIn umbIn = open();
+		long entrySize = umbIn.findArchiveEntry(filename);
+		if (entrySize != size * numBytes) {
+			throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes, not " + (size * numBytes) + ")");
+		}
+		ByteBuffer bytes;
+		UMBBitString bitstring = new UMBBitString(numBytes);
+		while ((bytes = umbIn.readBytes(numBytes)) != null) {
+			bytes.get(bitstring.bytes);
+			bitstringConsumer.accept(bitstring);
 		}
 		umbIn.close();
 	}
@@ -731,9 +790,9 @@ public class UMBReader
 	}
 
 	/**
-	 * Class to compute the minimum/maximum value of a sequence of ints, provided via a consumer.
+	 * Class to represent the minimum/maximum value of a set of ints.
 	 */
-	public static class IntRange implements IntConsumer
+	public static class IntRange
 	{
 		int min = Integer.MAX_VALUE;
 		int max = Integer.MIN_VALUE;
@@ -747,7 +806,13 @@ public class UMBReader
 		{
 			return max;
 		}
+	}
 
+	/**
+	 * Class to compute the minimum/maximum value of a sequence of ints, provided via a consumer.
+	 */
+	public static class IntRangeComputer extends IntRange implements IntConsumer
+	{
 		@Override
 		public void accept(int i)
 		{

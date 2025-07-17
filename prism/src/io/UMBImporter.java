@@ -37,6 +37,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import parser.VarList;
 import parser.ast.DeclarationBool;
+import parser.ast.DeclarationDoubleUnbounded;
 import parser.ast.DeclarationInt;
 import parser.ast.DeclarationType;
 import parser.ast.Expression;
@@ -53,6 +54,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
@@ -103,7 +105,7 @@ public class UMBImporter extends ExplicitModelImporter
 	@Override
 	public boolean providesStates()
 	{
-		return umbIndex.hasVariableAnnotations();
+		return umbIndex.hasStateValuations();
 	}
 
 	@Override
@@ -181,43 +183,62 @@ public class UMBImporter extends ExplicitModelImporter
 		basicModelInfo = new BasicModelInfo(modelType);
 		// Add variable info
 		VarList varList = basicModelInfo.getVarList();
-		varIDs = new ArrayList<>();
 		if (providesStates()) {
-			// We extract all variable annotations from the UMB file
-			// IDs are stores in varIDs and (valid) names go in basicModelInfo
-			for (UMBIndex.Annotation varAnnotation : umbIndex.getVariableAnnotationsList()) {
-				varIDs.add(varAnnotation.id);
-				// Get valid, unique variable name (usually just the variable annotation alias)
-				String varName = Prism.toIdentifier(varAnnotation.getName());
-				while (varList.getIndex(varName) != -1) {
-					varName = "_" + varName;
-				}
-				// Determine type, range, etc. of variable
-				try {
+			// We extract info about variable valuations from the UMB file
+			try {
+				UMBBitPacking bitPacking = umbIndex.getStateValuationBitPacking();
+				int numVars = bitPacking.getNumVariables();
+				for (int i = 0; i < numVars; i++) {
+					UMBBitPacking.BitPackedVariable var = bitPacking.getVariable(i);
+					// Get valid, unique variable name (usually just the provided variable name)
+					String varName = Prism.toIdentifier(var.name);
+					while (varList.getIndex(varName) != -1) {
+						varName = "_" + varName;
+					}
+					// Determine type, range, etc. of variable
 					DeclarationType varDecl = null;
-					switch (varAnnotation.type) {
-						case BOOL:
+					switch (var.type) {
+						case "bool":
 							varDecl = new DeclarationBool();
 							break;
-						case INT:
-							UMBReader.IntRange varRange = new UMBReader.IntRange();
-							umbReader.extractIntAnnotation(varAnnotation, UMBIndex.UMBEntity.STATES, varRange);
-							int varMin = varRange.getMin();
-							int varMax = varRange.getMax();
-							// Note: we do not yet allow 0-range variables
-							if (varMin == varMax) {
-								varMax++;
+						case "int":
+						case "uint":
+							boolean computeRange = true;
+							int varIntMin;
+							int varIntMax;
+							if (computeRange) {
+								UMBReader.IntRange varIntRange = umbReader.getStateValuationIntRange(bitPacking, i);
+								varIntMin = varIntRange.getMin();
+								varIntMax = varIntRange.getMax();
+							} else {
+								// Default to min/max values for (u)ints
+								if (var.type.equals("int")) {
+									varIntMin = -(1 << (bitPacking.getVariableSize(i) - 1));
+									varIntMax = (1 << (bitPacking.getVariableSize(i) - 1)) -1;
+								} else {
+									varIntMin = 0;
+									varIntMax = (1 << bitPacking.getVariableSize(i)) - 1;
+								}
 							}
-							varDecl = new DeclarationInt(Expression.Int(varMin), Expression.Int(varMax));
+							// Note: we do not yet allow 0-range variables
+							if (varIntMin == varIntMax) {
+								varIntMax++;
+							}
+							varDecl = new DeclarationInt(Expression.Int(varIntMin), Expression.Int(varIntMax));
+							break;
+						case "double":
+							varDecl = new DeclarationDoubleUnbounded();
 							break;
 						default:
-							throw new PrismException("Unknown variable type in UMB index: " + varAnnotation.type);
+							throw new PrismException("Unknown variable type in UMB index: " + var.type);
 					}
 					varList.addVar(varName, varDecl, -1);
-				} catch (UMBException e) {
-					throw new PrismException("UMB import problem: " + e.getMessage());
 				}
+			} catch (UMBException e) {
+				throw new RuntimeException(e);
 			}
+
+
 		} else {
 			varList.addVar(defaultVariableName(), defaultVariableDeclarationType(), -1);
 		}
@@ -322,37 +343,38 @@ public class UMBImporter extends ExplicitModelImporter
 			return;
 		}
 		// Otherwise, extract state variable info
-		int numVars = basicModelInfo.getNumVars();
-		for (int i = 0; i < numVars; i++) {
-			int finalI = i;
-			UMBIndex.Annotation varAnnotation = umbIndex.getVariableAnnotation(i);
-			try {
-				switch (varAnnotation.type) {
-					case BOOL:
-							// TODO: custom method for var extraction in UMBReader?
-							umbReader.extractIndexedBooleanAnnotation(varAnnotation, UMBIndex.UMBEntity.STATES, (s, v) -> {
-								try {
-									storeStateDefn.accept(SafeCast.toInt(s), finalI, v);
-								} catch (PrismException e) {
-									throw new RuntimeException(e);
-								}
-							});
-						break;
-					case INT:
-							umbReader.extractIndexedIntAnnotation(varAnnotation, UMBIndex.UMBEntity.STATES, (s, v) -> {
-								try {
-									storeStateDefn.accept(SafeCast.toInt(s), finalI, v);
-								} catch (PrismException e) {
-									throw new RuntimeException(e);
-								}
-							});
-						break;
-					default:
-						throw new PrismException("Unknown variable type in UMB index: " + varAnnotation.type);
+		try {
+			UMBBitPacking bitPacking = umbIndex.getStateValuationBitPacking();
+			AtomicInteger s = new AtomicInteger(0);
+			int numVars = bitPacking.getNumVariables();
+			umbReader.extractStateValuations(bitString -> {
+				try {
+					//System.out.println(s + ":" + bitPacking.decodeBitString(bitString));
+					for (int i = 0; i < numVars; i++) {
+						switch (bitPacking.getVariable(i).type) {
+							case "bool":
+								storeStateDefn.accept(s.get(), i, bitPacking.getBooleanVariableValue(bitString, i));
+								break;
+							case "int":
+								storeStateDefn.accept(s.get(), i, bitPacking.getIntVariableValue(bitString, i));
+								break;
+							case "uint":
+								storeStateDefn.accept(s.get(), i, bitPacking.getUIntVariableValue(bitString, i));
+								break;
+							case "double":
+								storeStateDefn.accept(s.get(), i, bitPacking.getDoubleVariableValue(bitString, i));
+								break;
+							default:
+								throw new PrismException("Unknown variable type in UMB index: " + bitPacking.getVariable(i).type);
+						}
+					}
+					s.incrementAndGet();
+				} catch (UMBException | PrismException e) {
+					throw new RuntimeException(e.getMessage());
 				}
-			} catch (UMBException e) {
-				throw new PrismException("UMB import problem: " + e.getMessage());
-			}
+			});
+		} catch (UMBException | RuntimeException e) {
+			throw new PrismException("UMB import problem: " + e.getMessage());
 		}
 	}
 

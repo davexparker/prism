@@ -37,6 +37,7 @@ import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
 import com.google.gson.annotations.SerializedName;
+import io.UMBBitPacking;
 
 import java.lang.reflect.Type;
 import java.time.Instant;
@@ -65,6 +66,8 @@ public class UMBIndex
 	public TransitionSystem transitionSystem = new TransitionSystem();
 	/** Annotations, arranged by group and then by annotation ID, in ordered maps */
 	public LinkedHashMap<String, LinkedHashMap<String, Annotation>> annotations = new LinkedHashMap<>();
+	/** State valuations details */
+	public StateValuationsDescription stateValuations;
 
 	// Further info about annotations
 
@@ -286,6 +289,72 @@ public class UMBIndex
 		}
 	}
 
+	/** Info about state valuations */
+	public static class StateValuationsDescription
+	{
+		/** Alignment (in bytes) of the data */
+		public Integer alignment;
+		/** List of variables/padding making up each state valuation */
+		public List<StateValuationVariable> variables = new ArrayList<>();
+
+		/**
+		 * Get the total size of the variables/padding (in bits).
+		 */
+		public int numBits()
+		{
+			int numBits = 0;
+			for (StateValuationVariable variable : variables) {
+				numBits += variable.numBits();
+			}
+			return numBits;
+		}
+	}
+
+	/** Info about a state valuation variable/padding */
+	public static class StateValuationVariable
+	{
+		// For variables
+		/** Variable name */
+		public String name;
+		/** Variable size (number of bits) */
+		public Integer size;
+		/** Variable type */
+		public String type;
+		// For padding
+		/** Amount of padding (number of bits) */
+		public Integer padding;
+
+		/**
+		 * Is this a variable (as opposed to padding)?
+		 */
+		public boolean isVariable()
+		{
+			return padding == null;
+		}
+
+		/**
+		 * Is this padding (as opposed to a variable)?
+		 */
+		public boolean isPadding()
+		{
+			return padding != null;
+		}
+
+		/**
+		 * Get the size of this variable/padding (in bits).
+		 */
+		public int numBits()
+		{
+			if (padding != null) {
+				return padding;
+			} else if (size != null) {
+				return size;
+			} else {
+				return 0;
+			}
+		}
+	}
+
 	/**
 	 * Perform validation of this object
 	 */
@@ -306,6 +375,9 @@ public class UMBIndex
 				validateAnnotations(entry.getKey(), entry.getValue());
 			}
 		}
+		if (stateValuations != null) {
+			validateStateValuations(stateValuations, "stateValuations");
+		}
 	}
 
 	/**
@@ -322,6 +394,42 @@ public class UMBIndex
 			}
 			Annotation a = entry.getValue();
 			a.validate();
+		}
+	}
+
+	/**
+	 * Perform validation of a state valuations description
+	 */
+	public void validateStateValuations(StateValuationsDescription valuations, String fieldName) throws UMBException
+	{
+		checkFieldExists(valuations.alignment, fieldName + ".alignment");
+		checkFieldExists(valuations.variables, fieldName + ".variables");
+		for (StateValuationVariable var : stateValuations.variables) {
+			validateStateValuationVariable(var);
+		}
+		// TODO: If strict and (valuations.numBits() % 8 != 0)
+	}
+
+	/**
+	 * Perform validation of an individual state valuation variable
+	 */
+	public void validateStateValuationVariable(StateValuationVariable var) throws UMBException
+	{
+		// Should either be padding or a named variable
+		if (var.padding != null) {
+			if (var.name != null || var.size != null || var.type != null) {
+				throw new UMBException("Malformed variable/padding in state valuation metadata");
+			}
+		} else {
+			if (var.name == null) {
+				throw new UMBException("Unnamed variable in state valuation metadata");
+			}
+			if (var.type == null) {
+				throw new UMBException("Untyped variable in state valuation metadata");
+			}
+			if (var.size == null) {
+				throw new UMBException("Only fixed size variables are currently supported for state valuations");
+			}
 		}
 	}
 
@@ -457,6 +565,14 @@ public class UMBIndex
 		annotation.type = type;
 		grpAnnotations.put(id, annotation);
 		return annotation;
+	}
+
+	/**
+	 * Set the state valuations metadata, extracted from a {@link UMBBitPacking} object.
+	 */
+	public void setStateValuationsFromBitPacking(UMBBitPacking bitPacking)
+	{
+		stateValuations = bitPacking.toStateValuationsDescription();
 	}
 
 	// Getters
@@ -787,89 +903,24 @@ public class UMBIndex
 		return getRewardAnnotation(i).appliesTo(UMBEntity.BRANCHES);
 	}
 
-	// Methods to get info about variable annotations
-
 	/**
-	 * Get all variable annotations, as an ordered map from ID to {@link Annotation}.
-	 * This is guaranteed to return a non-null map, but it may be empty.
+	 * Does this UMB file have any state valuations?
 	 */
-	public LinkedHashMap<String, Annotation> getVariableAnnotations()
+	public boolean hasStateValuations()
 	{
-		return annotations.getOrDefault(UMBFormat.VARIABLE_ANNOTATIONS_GROUP, new LinkedHashMap<>());
+		return stateValuations != null;
 	}
 
 	/**
-	 * Get all variable annotations as a list.
+	 * Get a {@link UMBBitPacking} object representing the state valuations metadata.
+	 * Throws an exception if no such metadata is present.
 	 */
-	public List<Annotation> getVariableAnnotationsList()
+	public UMBBitPacking getStateValuationBitPacking() throws UMBException
 	{
-		return new ArrayList<>(getVariableAnnotations().values());
-	}
-
-	/**
-	 * Does this UMB file have any variable annotations?
-	 */
-	public boolean hasVariableAnnotations()
-	{
-		return !getVariableAnnotations().isEmpty();
-	}
-
-	/**
-	 * Get the number of variable annotations.
-	 */
-	public int getNumVariableAnnotations()
-	{
-		return getVariableAnnotations().size();
-	}
-
-	/**
-	 * Get the {@code i}th variable annotation.
-	 */
-	public Annotation getVariableAnnotation(int i)
-	{
-		return getVariableAnnotationsList().get(i);
-	}
-
-	/**
-	 * Get a variable annotation by its ID
-	 * Throws an exception if no such annotation exists.
-	 */
-	public Annotation getVariableAnnotationByID(String variableID) throws UMBException
-	{
-		Annotation annotation = getVariableAnnotations().get(variableID);
-		if (annotation == null) {
-			throw new UMBException("Unknown variable annotation ID \"" + variableID + "\"");
+		if (stateValuations == null) {
+			throw new UMBException("No state valuation metadata present");
 		}
-		return annotation;
-	}
-
-	/**
-	 * Does this UMB file have a variable annotation with the specified alias?
-	 */
-	public boolean hasVariableAnnotationWithAlias(String variableAlias)
-	{
-		return annotationWithAliasExists(UMBFormat.VARIABLE_ANNOTATIONS_GROUP, variableAlias);
-	}
-
-	/**
-	 * Get a variable annotation by its alias.
-	 * Throws an exception if no such annotation exists.
-	 */
-	public Annotation getVariableAnnotationByAlias(String variableAlias) throws UMBException
-	{
-
-		String variableID = getAnnotationIdForAlias(UMBFormat.VARIABLE_ANNOTATIONS_GROUP, variableAlias);
-		return getVariableAnnotationByID(variableID);
-	}
-
-	/**
-	 * Get the names of all variable annotations (name is alias if present or ID if not)
-	 */
-	public List<String> getVariableNames()
-	{
-		return getVariableAnnotationsList().stream()
-				.map(Annotation::getName)
-				.collect(Collectors.toCollection(ArrayList::new));
+		return new UMBBitPacking(stateValuations);
 	}
 
 	// Validation methods

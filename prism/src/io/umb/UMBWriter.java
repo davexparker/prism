@@ -26,6 +26,7 @@
 
 package io.umb;
 
+import io.UMBBitPacking;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
@@ -302,25 +303,23 @@ public class UMBWriter
 	}
 
 	/**
-	 * Add a new boolean-valued variable annotation.
-	 * @param variableAlias Variable annotation alias
-	 * @param bitset BitSet providing values for the variable
+	 * Add state valuations, i.e., variable values for each state, encoded as a bitstring
+	 * @param stateValuations Iterator providing bitstrings defining the state valuations
+	 * @param numBytes Number of bytes in each bitstring
 	 */
-	public void addBooleanVariableDefinition(String variableAlias, BitSet bitset) throws UMBException
+	public void addStateValuations(Iterator<UMBBitString> stateValuations, int numBytes) throws UMBException
 	{
-		UMBIndex.Annotation annotation = umbIndex.addAnnotation(UMBFormat.VARIABLE_ANNOTATIONS_GROUP, variableAlias, UMBIndex.UMBType.BOOL);
-		addBooleanDataToAnnotation(annotation, UMBIndex.UMBEntity.STATES, bitset);
+		addBitStringArray(UMBFormat.STATE_VALUATIONS_FILE, stateValuations, numBytes, umbIndex.getNumStates());
 	}
 
 	/**
-	 * Add a new int-valued variable annotation.
-	 * @param variableAlias Variable annotation alias
-	 * @param varValues Iterator providing values for the variable
+	 * Add state valuations, i.e., variable values for each state, encoded as a bitstring
+	 * @param stateValuations Iterator providing bitstrings defining the state valuations
+	 * @param bitPacking Information about how the bitstrings are packed
 	 */
-	public void addIntVariableDefinition(String variableAlias, PrimitiveIterator.OfInt varValues) throws UMBException
+	public void addStateValuations(Iterator<UMBBitString> stateValuations, UMBBitPacking bitPacking) throws UMBException
 	{
-		UMBIndex.Annotation annotation = umbIndex.addAnnotation(UMBFormat.VARIABLE_ANNOTATIONS_GROUP, variableAlias, UMBIndex.UMBType.INT);
-		addIntDataToAnnotation(annotation, UMBIndex.UMBEntity.STATES, varValues);
+		addBitStringArray(UMBFormat.STATE_VALUATIONS_FILE, stateValuations, bitPacking, umbIndex.getNumStates());
 	}
 
 	// Methods to add annotations
@@ -441,6 +440,16 @@ public class UMBWriter
 	public void addDoubleArray(String name, PrimitiveIterator.OfDouble doubleValues, long size)
 	{
 		umbDataFiles.add(new DoubleArray(doubleValues, size, name));
+	}
+
+	public void addBitStringArray(String name, Iterator<UMBBitString> bitStrings, int numBytes, long size)
+	{
+		umbDataFiles.add(new BitStringArray(bitStrings, numBytes, size, name));
+	}
+
+	public void addBitStringArray(String name, Iterator<UMBBitString> bitStrings, UMBBitPacking bitPacking, long size)
+	{
+		umbDataFiles.add(new BitStringArray(bitStrings, bitPacking, size, name));
 	}
 
 	public void addStringList(String name, List<String> strings)
@@ -946,6 +955,64 @@ public class UMBWriter
 		public void encodeNextBytes()
 		{
 			buffer.putDouble(doubleValues.nextDouble());
+		}
+	}
+
+	/**
+	 * A UMB data file to be stored containing an array of (fixed size) bit strings.
+	 */
+	class BitStringArray extends Array
+	{
+		protected Iterator<UMBBitString> bitStrings;
+		protected UMBBitPacking bitPacking; // optional
+		protected int numBytes;
+
+		public BitStringArray(Iterator<UMBBitString> bitStrings, int numBytes, long size, String name)
+		{
+			this.bitStrings = bitStrings;
+			this.bitPacking = null;
+			this.numBytes = numBytes;
+			this.size = size;
+			this.name = name;
+		}
+
+		public BitStringArray(Iterator<UMBBitString> bitStrings, UMBBitPacking bitPacking, long size, String name)
+		{
+			this.bitStrings = bitStrings;
+			this.bitPacking = bitPacking;
+			this.numBytes = bitPacking.getTotalNumBytes();
+			this.size = size;
+			this.name = name;
+		}
+
+		@Override
+		public Iterator<UMBBitString> iterator()
+		{
+			return bitStrings;
+		}
+
+		@Override
+		public int numBytes()
+		{
+			return numBytes;
+		}
+
+		@Override
+		public boolean hasNextBytes()
+		{
+			return bitStrings.hasNext();
+		}
+
+		public String nextAsText()
+		{
+			UMBBitString bitString = bitStrings.next();
+			return bitPacking == null ? bitString.toString() : bitPacking.formatBitString(bitString);
+		}
+
+		@Override
+		public void encodeNextBytes()
+		{
+			buffer.put(bitStrings.next().bytes);
 		}
 	}
 
