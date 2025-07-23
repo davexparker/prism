@@ -1,0 +1,48 @@
+// CAV 2014
+//
+// CONCUR 2015 - Lazy Probabilistic Model Checking without Determinisation 
+// Table 1: Runtime comparison for the randomised mutual exclusion protocol
+
+// CAV 2014
+
+Pmax=? [(G F (p1=10)) & (G F (p2=10)) & (G F (p3=10))]
+
+Pmax=? [(G F (p1=10)) & (G F (p2=10)) & (G F (p3=10)) & (G F (p4=10))]
+
+// CONCUR 2015
+
+Pmin=? [(G F (p1=10)) & (G F (p2=10)) & (G F (p3=10)) & (G F (p4=10))]
+
+Pmax=? [((G F (p1=0)) | (F G (!p2=0))) & ((G F (p2=0)) | (F G (!p3=0)))]
+
+Pmax=? [((G F (p1=0)) | (F G (!p1=0))) & ((G F (p2=0)) | (F G (!p2=0)))]
+
+Pmax=? [((G F (p1=0)) | (F G (!p2=0))) & ((G F (p2=0)) | (F G (!p3=0))) & ((G F (p3=0)) | (F G (!p1=0)))]
+
+Pmax=? [((G F (p1=0)) | (F G (!p1=0))) & ((G F (p2=0)) | (F G (!p2=0))) & ((G F (p3=0)) | (F G (!p3=0)))]
+
+Pmin=? [((G F (!p1=10)) | (G F (p1=0)) | (F G (p1=1))) & (G F (!p1=0)) & (G F (p1=1))]
+
+Pmax=? [((G (!p1=10)) | (G (!p2=10)) | (G (!p3=10))) & ((F G (!p1=1)) | (G F (p2=1)) | (G F (p3=1))) & ((F G (!p2=1)) | (G F (p1=1)) | (G F (p3=1)))] 
+
+Pmin=? [((F (G (!p1=0))) | (F (G (!p2=0))) | (G (F (p3 = 0)))) | ((F (G (!p1=10))) & (G (F (p2=10))) & (G (F (p3=10))))]
+
+// Custom
+
+Pmin=? [((F (G (!p1=0))) | (F (G (!p2=0))) | (G (F (p3 = 0)))) | ((F (G (!p1=10))) | (G (F (p2=10))) | (G (F (p3=10))))]
+
+// CAV 2016
+
+Pmin=? [(G F (p1=10)) U (p2=10)]
+
+Pmax=? [(G F (p1=10)) U (X X X X (p2=10))]
+
+Pmin=? [(G F (p1=10)) U (G ((G F (p2=10)) U (p3=10)))]
+
+Pmax=? [(G F (p1=10)) U (G ((G F (p2=10)) U (X X X X (p3=10))))]
+
+// Reachability
+
+Pmax=? [(p1=0) U (p2=10)]
+
+Pmax=? [X X X X X X (p1=0)]
