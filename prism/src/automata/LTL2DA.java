@@ -36,7 +36,9 @@ import java.io.PrintStream;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import acceptance.AcceptanceBuchi;
 import jhoafparser.consumer.HOAIntermediateStoreAndManipulate;
@@ -49,6 +51,7 @@ import jltl2ba.LTLFragments;
 import jltl2dstar.LTL2Rabin;
 import owl.automaton.Automaton;
 import owl.automaton.Views;
+import owl.automaton.acceptance.BuchiAcceptance;
 import owl.automaton.acceptance.GeneralizedRabinAcceptance;
 import owl.automaton.acceptance.OmegaAcceptanceCast;
 import owl.automaton.acceptance.RabinAcceptance;
@@ -57,6 +60,9 @@ import owl.automaton.acceptance.optimization.AcceptanceOptimizations;
 import owl.automaton.hoa.HoaWriter;
 import owl.ltl.LabelledFormula;
 import owl.ltl.parser.LtlParser;
+import owl.translations.LtlTranslationRepository;
+import owl.translations.ltl2ldba.AnnotatedLDBA;
+import owl.translations.ltl2ldba.AsymmetricLDBAConstruction;
 import owl.translations.rabinizer.RabinizerBuilder;
 import owl.translations.rabinizer.RabinizerConfiguration;
 import parser.Values;
@@ -68,6 +74,8 @@ import prism.PrismSettings;
 import acceptance.AcceptanceOmega;
 import acceptance.AcceptanceRabin;
 import acceptance.AcceptanceType;
+
+import static owl.translations.LtlTranslationRepository.applyPreAndPostProcessing;
 
 /**
  * Infrastructure for constructing deterministic automata for LTL formulas.
@@ -141,6 +149,23 @@ public class LTL2DA extends PrismComponent
 	}
 
 	/**
+	 * Convert an LTL formula into a limit deterministic Buchi automaton.
+	 * The LTL formula is represented as a PRISM Expression,
+	 * in which atomic propositions are represented by ExpressionLabel objects.
+	 * @param ltl the formula
+	 * @param constants the values of constants, may be {@code null}
+	 */
+	public DA<BitSet, ? extends AcceptanceOmega> convertLTLFormulaToLDBA(Expression ltl, Values constants) throws PrismException
+	{
+		boolean containsTemporalBounds = Expression.containsTemporalTimeBounds(ltl);
+		if (containsTemporalBounds) {
+			throw new PrismNotSupportedException("Could not convert LTL formula to deterministic automaton, formula had time-bounds");
+		}
+		DA<BitSet, ? extends AcceptanceOmega> da = convertLTLFormulaToLDBAWithOwl(ltl, constants);
+		return da;
+	}
+
+	/**
 	 * Convert an LTL formula into a DA using a specified conversion process.
 	 * Perform any requested simplifications of the acceptance condition
 	 * and check that the acceptance condition is suitable.
@@ -191,6 +216,14 @@ public class LTL2DA extends PrismComponent
 	public DA<BitSet, ? extends AcceptanceOmega> convertLTLFormulaToDAWithOwl(Expression ltl, Values constants, AcceptanceType... allowedAcceptance) throws PrismException
 	{
 		return convertLTLFormulaToDA(new ConvertLTLFormulaToDAWithOwl(), ltl, constants, allowedAcceptance);
+	}
+
+	/**
+	 * LTL-to-LDBA conversion via Owl.
+	 */
+	public DA<BitSet, ? extends AcceptanceOmega> convertLTLFormulaToLDBAWithOwl(Expression ltl, Values constants) throws PrismException
+	{
+		return convertLTLFormulaToDA(new ConvertLTLFormulaToLDBAWithOwl(), ltl, constants);
 	}
 
 	/**
@@ -290,6 +323,40 @@ public class LTL2DA extends PrismComponent
 			dra = OmegaAcceptanceCast.cast(AcceptanceOptimizations.transform(dra), RabinAcceptance.class);
 			dra = OmegaAcceptanceCast.cast(Views.complete(dra), RabinAcceptance.class);
 			String hoaString = HoaWriter.toString(dra);
+
+			// Extract result and convert HOA
+			DA<BitSet, ? extends AcceptanceOmega> da = constructDAFromHOA(hoaString);
+			checkAPs(ltlFormula, da.getAPList());
+			revertDAForExternalTool(da);
+
+			return da;
+		}
+	}
+
+	/**
+	 * LTL-to-LDBA conversion via Owl
+	 */
+	private class ConvertLTLFormulaToLDBAWithOwl implements LTL2DAProcess
+	{
+		public DA<BitSet, ? extends AcceptanceOmega> convert(Expression ltl, Values constants, AcceptanceType... allowedAcceptance) throws PrismException
+		{
+			// Convert LTL formula to required format
+			SimpleLTL ltlFormula = prepareLTLFormulaForExternalTool(ltl);
+			String ltlString = convertLTLToExternalSyntax(ltlFormula, "Spot");
+
+			// Parse and convert with Owl
+			LabelledFormula formula = LtlParser.parse(ltlString);
+			Set<LtlTranslationRepository.Option> translationOptions = new HashSet<>();
+			translationOptions.add(LtlTranslationRepository.Option.SIMPLIFY_AUTOMATON);
+			translationOptions.add(LtlTranslationRepository.Option.SIMPLIFY_FORMULA);
+			translationOptions.add(LtlTranslationRepository.Option.USE_PORTFOLIO_FOR_SYNTACTIC_LTL_FRAGMENTS);
+			translationOptions.add(LtlTranslationRepository.Option.COMPLETE);
+			Automaton<?, ? extends BuchiAcceptance> ldba = applyPreAndPostProcessing(AsymmetricLDBAConstruction.of(BuchiAcceptance.class).andThen(AnnotatedLDBA::copyAsMutable),
+					LtlTranslationRepository.BranchingMode.DETERMINISTIC,
+					translationOptions,
+					BuchiAcceptance.class)
+					.apply(formula);
+			String hoaString = HoaWriter.toString(ldba);
 
 			// Extract result and convert HOA
 			DA<BitSet, ? extends AcceptanceOmega> da = constructDAFromHOA(hoaString);

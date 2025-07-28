@@ -266,6 +266,57 @@ public class LTLModelChecker extends PrismComponent
 	}
 
 	/**
+	 * Construct a limit deterministic Buchi automaton (LDBA) for an LTL formula, having first extracted maximal state formulas
+	 * and model checked them with the passed in model checker. The maximal state formulas are assigned labels
+	 * (L0, L1, etc.) which become the atomic propositions in the resulting DA. BitSets giving the states which
+	 * satisfy each label are put into the vector {@code labelBS}, which should be empty when this function is called.
+	 *
+	 * @param mc a ProbModelChecker, used for checking maximal state formulas
+	 * @param model the model
+	 * @param expr a path expression, i.e. the LTL formula
+	 * @param labelBS empty vector to be filled with BitSets for subformulas
+	 * @return the DA
+	 */
+	public DA<BitSet,? extends AcceptanceOmega> constructLDBAForLTLFormula(ProbModelChecker mc, Model<?> model, Expression expr, Vector<BitSet> labelBS) throws PrismException
+	{
+		Expression ltl;
+		DA<BitSet,? extends AcceptanceOmega> da;
+		long time;
+
+		if (Expression.containsTemporalTimeBounds(expr)) {
+			if (model.getModelType().continuousTime()) {
+				throw new PrismException("Automaton construction for time-bounded operators not supported for " + model.getModelType()+".");
+			}
+
+			if (!expr.isSimplePathFormula()) {
+				throw new PrismNotSupportedException("Time-bounded operators not supported in LTL: " + expr);
+			}
+		}
+
+		// Model check maximal state formulas
+		ltl = checkMaximalStateFormulas(mc, model, expr.deepCopy(), labelBS);
+
+		// Convert LTL formula to deterministic automaton
+		mainLog.println("\nBuilding deterministic automaton (for " + ltl + ")...");
+		time = System.currentTimeMillis();
+		LTL2DA ltl2da = new LTL2DA(this);
+		da = ltl2da.convertLTLFormulaToLDBA(ltl, mc.getConstantValues());
+		mainLog.println(da.getAutomataType()+" has " + da.size() + " states, " + da.getAcceptance().getSizeStatistics() + ".");
+		da.checkForCanonicalAPs(labelBS.size());
+		time = System.currentTimeMillis() - time;
+		mainLog.println("Time for "+da.getAutomataType()+" translation: " + time / 1000.0 + " seconds.");
+		// If required, export DA
+		if (settings.getExportPropAut()) {
+			mainLog.println("Exporting " + da.getAutomataType() + " to file \"" + settings.getExportPropAutFilename() + "\"...");
+			PrintStream out = PrismUtils.newPrintStream(settings.getExportPropAutFilename());
+			da.print(out, settings.getExportPropAutType());
+			out.close();
+		}
+
+		return da;
+	}
+
+	/**
 	 * Constructs a deterministic finite automaton (DFA) for the given syntactically co-safe LTL formula.
 	 * <br>
 	 * First, extracted maximal state formulas are model checked with the passed in model checker.
@@ -429,7 +480,35 @@ public class LTLModelChecker extends PrismComponent
 
 		return product;
 	}
-	
+
+	/**
+	 * Generate a limit deterministic Buchi automaton (LDBA) for the given LTL formula, having first extracted maximal state formulas
+	 * and model checked them with the passed in model and model checker (see {@link #constructDAForLTLFormula}.
+	 * Then construct the product of this automaton with the model.
+	 *
+	 * @param mc a ProbModelChecker, used for checking maximal state formulas
+	 * @param model the model
+	 * @param expr a path expression
+	 * @param statesOfInterest the set of states for which values should be calculated (null = all states)
+	 * @return the product with the DA
+	 * @throws PrismException
+	 */
+	public <Value,M extends Model<Value>> LTLProduct<M> constructLDBAProductForLTLFormula(ProbModelChecker mc, M model, Expression expr, BitSet statesOfInterest) throws PrismException
+	{
+		// Convert LTL formula to automaton
+		Vector<BitSet> labelBS = new Vector<BitSet>();
+		DA<BitSet,? extends AcceptanceOmega> da = constructLDBAForLTLFormula(mc, model, expr, labelBS);
+
+		// Build product of model and automaton
+		mainLog.println("Constructing " + model.getModelType() + "-" + da.getAutomataType() + " product...");
+		StopWatch timer = new StopWatch(getLog());
+		timer.start("product construction");
+		LTLProduct<M> product = constructProductModel(da, model, labelBS, statesOfInterest);
+		timer.stop("product has " + product.getProductModel().infoString());
+
+		return product;
+	}
+
 	/**
 	 * Generate a deterministic finite automaton (DFA) for the given syntactically co-safe LTL formula,
 	 * for use in probability computations for co-safe LTL, having first extracted maximal state formulas

@@ -92,6 +92,12 @@ public class MDPModelChecker extends ProbModelChecker
 			expr = Expression.Not(Expression.Parenth(expr.deepCopy()));
 		}
 
+		boolean ldba = true;
+		if (ldba) {
+			LTLModelChecker mcLtl = new LTLModelChecker(this);
+			LTLModelChecker.LTLProduct<MDP<Double>> ldbaProduct = mcLtl.constructLDBAProductForLTLFormula(this, (MDP<Double>) model, expr, statesOfInterest);
+		}
+
 		// Build product of MDP and DA for the LTL formula, and do any required exports
 		LTLModelChecker mcLtl = new LTLModelChecker(this);
 		AcceptanceType[] allowedAcceptance = {
