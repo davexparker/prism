@@ -263,6 +263,13 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 		} else {
 			umbIndex.setBranchProbabilityType(UMBIndex.BranchProbabilityType.NONE);
 		}
+		if (modelType.isProbabilistic() && !modelType.choicesSumToOne()) {
+			if (modelType.intervals()) {
+				umbIndex.setExitRateType(UMBIndex.BranchProbabilityType.DOUBLE_INTERVAL);
+			} else {
+				umbIndex.setExitRateType(UMBIndex.BranchProbabilityType.DOUBLE);
+			}
+		}
 	}
 
 	/**

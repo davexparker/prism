@@ -202,6 +202,8 @@ public class UMBIndex
 		public Long numBranches;
 		/** Type of branch probabilities */
 		public BranchProbabilityType branchProbabilityType;
+		/** Type of exit rates */
+		public BranchProbabilityType exitRateType;
 
 		/**
 		 * Check this object is valid; throw an exception if not.
@@ -216,6 +218,9 @@ public class UMBIndex
 			checkFieldExists(numActions, "numActions");
 			checkFieldExists(numBranches, "numBranches");
 			checkFieldExists(branchProbabilityType, "branchProbabilityType");
+			if (time == Time.STOCHASTIC || time == Time.URGENT_STOCHASTIC) {
+				checkFieldExists(exitRateType, "exitRateType");
+			}
 		}
 	}
 
@@ -402,6 +407,15 @@ public class UMBIndex
 	}
 
 	/**
+	 * Set the type of exit rates used in the model.
+	 * @param exitRateType The type of exit rates
+	 */
+	public void setExitRateType(BranchProbabilityType exitRateType)
+	{
+		transitionSystem.exitRateType = exitRateType;
+	}
+
+	/**
 	 * Add a new annotation, for now without any data attached.
 	 * If an alias is provided, there should not already exist
 	 * an annotation in the same group with the same alias.
@@ -508,6 +522,14 @@ public class UMBIndex
 	public BranchProbabilityType getBranchProbabilityType()
 	{
 		return transitionSystem.branchProbabilityType;
+	}
+
+	/**
+	 * Get the type of exit rates used in the model.
+	 */
+	public BranchProbabilityType getExitRateType()
+	{
+		return transitionSystem.exitRateType;
 	}
 
 	// Methods to get info about annotations
