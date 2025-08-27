@@ -29,15 +29,7 @@ package explicit;
 
 import java.awt.Point;
 import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.BitSet;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Stack;
-import java.util.Vector;
+import java.util.*;
 
 import common.Interval;
 import parser.State;
@@ -51,12 +43,7 @@ import parser.ast.ExpressionTemporal;
 import parser.ast.ExpressionUnaryOp;
 import parser.type.TypeBool;
 import parser.type.TypePathBool;
-import prism.ModelType;
-import prism.PrismComponent;
-import prism.PrismException;
-import prism.PrismLangException;
-import prism.PrismNotSupportedException;
-import prism.PrismUtils;
+import prism.*;
 import acceptance.AcceptanceBuchi;
 import acceptance.AcceptanceGenRabin;
 import acceptance.AcceptanceOmega;
@@ -297,7 +284,7 @@ public class LTLModelChecker extends PrismComponent
 		ltl = checkMaximalStateFormulas(mc, model, expr.deepCopy(), labelBS);
 
 		// Convert LTL formula to deterministic automaton
-		mainLog.println("\nBuilding deterministic automaton (for " + ltl + ")...");
+		mainLog.println("\nBuilding GFM automaton (for " + ltl + ")...");
 		time = System.currentTimeMillis();
 		LTL2DA ltl2da = new LTL2DA(this);
 		da = ltl2da.convertLTLFormulaToLDBA(ltl, mc.getConstantValues());
@@ -622,23 +609,26 @@ public class LTLModelChecker extends PrismComponent
 	 * @return The product model
 	 */
 	@SuppressWarnings("unchecked")
-	protected <Value, M extends Model<Value>> LTLProduct<M> doConstructProductModel(ModelType modelType, ModelSimple<?> prodModel, DA<BitSet, ? extends AcceptanceOmega> da, M model, Vector<BitSet> labelBS, BitSet statesOfInterest) throws PrismException
-	{
+	protected <Value, M extends Model<Value>> LTLProduct<M> doConstructProductModel(
+			ModelType modelType,
+			ModelSimple<?> prodModel,
+			DA<BitSet, ? extends AcceptanceOmega> da,
+			M model,
+			Vector<BitSet> labelBS,
+			BitSet statesOfInterest) throws PrismException {
 		int daSize = da.size();
 		int numAPs = da.getAPList().size();
 		int modelNumStates = model.getNumStates();
-		int prodNumStates = Math.multiplyExact(modelNumStates, daSize);
-		BitSet s_labels = new BitSet(numAPs);
-		List<State> prodStatesList, daStatesList;
-
-		// Check size limits for this product construction approach
+		int prodNumStates;
 		try {
 			prodNumStates = Math.multiplyExact(modelNumStates, daSize);
 		} catch (ArithmeticException e) {
 			throw new PrismException("Size of product state space of model and automaton is too large for explicit engine");
 		}
-		
-		// Encoding: 
+		BitSet s_labels = new BitSet(numAPs);
+		List<State> prodStatesList, daStatesList;
+
+		// Encoding:
 		// each state s' = <s, q> = s * daSize + q
 		// s(s') = s' / daSize
 		// q(s') = s' % daSize
@@ -659,20 +649,12 @@ public class LTLModelChecker extends PrismComponent
 			daStatesList = null;
 		}
 
-		// Code to get the index for a new product state for model successor state s_2
-		// assuming the current automaton state is q_1
-		NewStateMap newStateMap = (q_1,s_2) -> {
-			// Get BitSet representing APs (labels) satisfied by successor state s_2
-			for (int k = 0; k < numAPs; k++) {
-				s_labels.set(k, labelBS.get(Integer.parseInt(da.getAPList().get(k).substring(1))).get(s_2));
-			}
-			// Find corresponding successor in DA
-			int q_2 = da.getEdgeDestByLabel(q_1, s_labels);
-			if (q_2 < 0) {
-				throw new PrismException("The deterministic automaton is not complete (state " + q_1 + ")");
-			}
-			// Add state/transition to model
-			if (!visited.get(s_2 * daSize + q_2) && map[s_2 * daSize + q_2] == -1) {
+		// helper to allocate a product state for pair (q2, s2)
+		java.util.function.BiFunction<Integer, Integer, Integer> ensurePair = (q_2, s_2) -> {
+			int idx = s_2 * daSize + q_2;
+
+			// if state is not there yet
+			if (!visited.get(idx) && map[idx] == -1) {
 				queue.add(new Point(s_2, q_2));
 				switch (modelType) {
 					case STPG:
@@ -682,25 +664,69 @@ public class LTLModelChecker extends PrismComponent
 						prodModel.addState();
 						break;
 				}
-				map[s_2 * daSize + q_2] = prodModel.getNumStates() - 1;
+				map[idx] = prodModel.getNumStates() - 1;
 				if (prodStatesList != null) {
-					// Store state information for the product
 					prodStatesList.add(new State(daStatesList.get(q_2), model.getStatesList().get(s_2)));
 				}
 			}
-			return map[s_2 * daSize + q_2];
+			return map[idx];
 		};
 
-		// Get initial states
-		// We need results for all states of the original model in statesOfInterest
-		// We thus explore states of the product starting from these states.
-		// These are designated as initial states of the product model
-		// (a) to ensure reachability is done for these states; and
-		// (b) to later identify the corresponding product state for the original states
-		//     of interest
+		// Code to get the index for a new product state for model successor state s_2
+		// assuming the current automaton state is q_1
+		NewStateMap newStateMap = (q_1, s_2) -> {
+			// Get BitSet representing APs satisfied by successor state s_2
+			for (int k = 0; k < numAPs; k++) {
+				s_labels.set(k, labelBS.get(Integer.parseInt(da.getAPList().get(k).substring(1))).get(s_2));
+			}
+			// Find corresponding successor in DA
+			int q_2 = da.getEdgeDestByLabel(q_1, s_labels);
+			if (q_2 < 0) {
+				throw new PrismException("The deterministic automaton is not complete (state " + q_1 + ")");
+			}
+			// Add state to model if needed
+			return ensurePair.apply(q_2, s_2);
+		};
+
+		// Trap state handling
+		// single trap index for normalisation when DA is nondeterministic over MDPs
+		final int[] trapIndex = new int[]{-1};
+		Runnable ensureTrapState = () -> {
+			if (trapIndex[0] != -1) return;
+
+			prodModel.addState();
+			trapIndex[0] = prodModel.getNumStates() - 1;
+			Distribution<Value> distr = new Distribution<Value>((Evaluator<Value>) prodModel.getEvaluator());
+			distr.add(trapIndex[0], (Value) prodModel.getEvaluator().one());
+			((MDPSimple<Value>) prodModel).addChoice(trapIndex[0], distr);
+
+			if (prodStatesList != null && daStatesList != null && !daStatesList.isEmpty()
+					&& model.getStatesList() != null && !model.getStatesList().isEmpty()) {
+				prodStatesList.add(new State(daStatesList.get(0), model.getStatesList().get(0)));
+			}
+		};
+
+		// Initial state handling
+		// Build the letter at s₀, collect all start successors q₀' in da.getEdgeDestsByLabel(start, letter(s₀)), and add each <s₀, q₀'> as an initial product state.
 		for (int s_0 : new IterableStateSet(statesOfInterest, model.getNumStates())) {
-			int map_0 = newStateMap.apply(da.getStartState(), s_0);
-			prodModel.addInitialState(map_0);
+			if (!da.isDeterministic() && modelType == ModelType.MDP) {
+				// build letter from s_0
+				for (int k = 0; k < numAPs; k++) {
+					s_labels.set(k, labelBS.get(Integer.parseInt(da.getAPList().get(k).substring(1))).get(s_0));
+				}
+				List<Integer> qSuccs = da.getEdgeDestsByLabel(da.getStartState(), s_labels);
+				if (qSuccs.isEmpty()) {
+					continue;
+				}
+				for (int q0p : qSuccs) {
+					int map_0 = ensurePair.apply(q0p, s_0);
+					prodModel.addInitialState(map_0);
+				}
+			} else {
+				// If the DA is deterministic, or the model is not an MDP, the old behaviour is used.
+				int map_0 = newStateMap.apply(da.getStartState(), s_0);
+				prodModel.addInitialState(map_0);
+			}
 		}
 
 		// Explore product
@@ -717,27 +743,76 @@ public class LTLModelChecker extends PrismComponent
 				Iterator<Map.Entry<Integer, Value>> iter = null;
 				Iterator<Map.Entry<Integer, Interval<Value>>> iterIntv = null;
 				switch (modelType) {
-				case DTMC:
-					iter = ((DTMC<Value>) model).getTransitionsIterator(s_1);
-					break;
-				case MDP:
-					iter = ((MDP<Value>) model).getTransitionsIterator(s_1, j);
-					break;
-				case POMDP:
-					iter = ((POMDP<Value>) model).getTransitionsIterator(s_1, j);
-					break;
-				case IDTMC:
-					iterIntv = ((IDTMC<Value>) model).getIntervalTransitionsIterator(s_1);
-					break;
-				case IMDP:
-					iterIntv = ((IMDP<Value>) model).getIntervalTransitionsIterator(s_1, j);
-					break;
-				case STPG:
-					iter = ((STPG<Value>) model).getTransitionsIterator(s_1, j);
-					break;
-				default:
-					throw new PrismNotSupportedException("Product construction not implemented for " + modelType + "s");
+					case DTMC:
+						iter = ((DTMC<Value>) model).getTransitionsIterator(s_1);
+						break;
+					case MDP:
+						iter = ((MDP<Value>) model).getTransitionsIterator(s_1, j);
+						break;
+					case POMDP:
+						iter = ((POMDP<Value>) model).getTransitionsIterator(s_1, j);
+						break;
+					case IDTMC:
+						iterIntv = ((IDTMC<Value>) model).getIntervalTransitionsIterator(s_1);
+						break;
+					case IMDP:
+						iterIntv = ((IMDP<Value>) model).getIntervalTransitionsIterator(s_1, j);
+						break;
+					case STPG:
+						iter = ((STPG<Value>) model).getTransitionsIterator(s_1, j);
+						break;
+					default:
+						throw new PrismNotSupportedException("Product construction not implemented for " + modelType + "s");
 				}
+
+				// Only change for MDP with nondeterministic DA
+				// keep in mind that we actually parse over the hoa to check whether it is deterministic or not
+				if (!da.isDeterministic() && modelType == ModelType.MDP) {
+					// one product choice per automaton successor q'
+					java.util.Map<Integer, Distribution<Value>> distByQp = new java.util.HashMap<>();
+					java.util.Map<Integer, Double> sumByQp = new java.util.HashMap<>();
+
+					while (iter.hasNext()) {
+						Map.Entry<Integer, Value> e = iter.next();
+						int s_2 = e.getKey();
+						Value prob = e.getValue();
+
+						// letter from s_2
+						for (int k = 0; k < numAPs; k++) {
+							s_labels.set(k, labelBS.get(Integer.parseInt(da.getAPList().get(k).substring(1))).get(s_2));
+						}
+
+						List<Integer> qps = da.getEdgeDestsByLabel(q_1, s_labels);
+						for (int qp : qps) {
+							int map_2 = ensurePair.apply(qp, s_2);
+							Distribution<Value> d = distByQp.get(qp);
+							if (d == null) {
+								d = new Distribution<>(model.getEvaluator());
+								distByQp.put(qp, d);
+								sumByQp.put(qp, 0.0);
+							}
+							d.set(map_2, prob);
+							// assume Value is Double for explicit MDPs
+							sumByQp.put(qp, sumByQp.get(qp) + ((Double) prob));
+						}
+					}
+
+					for (Map.Entry<Integer, Distribution<Value>> eQP : distByQp.entrySet()) {
+						int qp = eQP.getKey();
+						Distribution<Value> d = eQP.getValue();
+						double sum = sumByQp.get(qp);
+						double missing = 1.0 - sum;
+						if (missing > 0.0) {
+							ensureTrapState.run();
+							d.set(trapIndex[0], (Value) (Double) missing);
+						}
+						((MDPSimple<Value>) prodModel).addActionLabelledChoice(
+								map_1, d, ((MDP<Value>) model).getAction(s_1, j));
+					}
+					continue;
+				}
+
+				// Original paths unchanged
 				Distribution<Value> prodDistr = null;
 				Distribution<Interval<Value>> prodDistrIntv = null;
 				if (modelType.nondeterministic()) {
@@ -788,23 +863,23 @@ public class LTLModelChecker extends PrismComponent
 					}
 				}
 				switch (modelType) {
-				case MDP:
-					((MDPSimple<Value>) prodModel).addActionLabelledChoice(map_1, prodDistr, ((MDP<Value>) model).getAction(s_1, j));
-					break;
-				case POMDP:
-					((POMDPSimple<Value>) prodModel).addActionLabelledChoice(map_1, prodDistr, ((POMDP<Value>) model).getAction(s_1, j));
-					break;
-				case IMDP:
-					((IMDPSimple<Value>) prodModel).addActionLabelledChoice(map_1, prodDistrIntv, ((IMDP<Value>) model).getAction(s_1, j));
-					break;
-				case STPG:
-					((STPGSimple<Value>) prodModel).addActionLabelledChoice(map_1, prodDistr, ((STPG<Value>) model).getAction(s_1, j));
-					break;
-				default:
-					break;
+					case MDP:
+						((MDPSimple<Value>) prodModel).addActionLabelledChoice(map_1, prodDistr, ((MDP<Value>) model).getAction(s_1, j));
+						break;
+					case POMDP:
+						((POMDPSimple<Value>) prodModel).addActionLabelledChoice(map_1, prodDistr, ((POMDP<Value>) model).getAction(s_1, j));
+						break;
+					case IMDP:
+						((IMDPSimple<Value>) prodModel).addActionLabelledChoice(map_1, prodDistrIntv, ((IMDP<Value>) model).getAction(s_1, j));
+						break;
+					case STPG:
+						((STPGSimple<Value>) prodModel).addActionLabelledChoice(map_1, prodDistr, ((STPG<Value>) model).getAction(s_1, j));
+						break;
+					default:
+						break;
 				}
 			}
-			
+
 			// For partially observable models, transfer observation info
 			// (do it after transitions are added, since observation actions are checked)
 			if (modelType == ModelType.POMDP) {

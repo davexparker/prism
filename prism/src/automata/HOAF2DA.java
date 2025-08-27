@@ -48,6 +48,7 @@ import jhoafparser.transformations.ToStateAcceptance;
 import jhoafparser.util.ImplicitEdgeHelper;
 import jltl2ba.APElement;
 import jltl2ba.APSet;
+import jltl2ba.APElementIterator;
 import jltl2dstar.APMonom;
 import jltl2dstar.APMonom2APElements;
 import acceptance.AcceptanceBuchi;
@@ -131,6 +132,9 @@ public class HOAF2DA implements HOAConsumer {
 	 */
 	private BitSet statesWithoutDefinition = null;
 
+    /** are we parsing a deterministic automaton? */
+    private boolean deterministic;
+
 
 	/** In the knowSize=false case, ensure that all states (including with index id) exist */
 	private void ensureStateExists(int id) {
@@ -166,7 +170,8 @@ public class HOAF2DA implements HOAConsumer {
 	}
 
 	/** Constructor */
-	public HOAF2DA() {
+	public HOAF2DA(Boolean deterministic) {
+        this.deterministic = deterministic;
 	}
 
 	@Override
@@ -664,7 +669,7 @@ public class HOAF2DA implements HOAConsumer {
 					// state is the same, so we don't add an additional edge
 					continue;
 				}
-				if (previousTo != -1) {
+				if (deterministic && previousTo != -1) {
 					throw new HOAConsumerException("Not a deterministic automaton, non-determinism detected (state "+stateId+", label = "+el+", to="+to+", previously to "+previousTo+")");
 				}
 				da.addEdge(stateId, el, to);
@@ -677,12 +682,24 @@ public class HOAF2DA implements HOAConsumer {
 	{
 		implicitEdgeHelper.endOfState();
 
-		if (da.getNumEdges(stateId) != expectedNumberOfEdgesPerState) {
-			throw new HOAConsumerException("State "+ stateId +" has " + da.getNumEdges(stateId)
-			                               + " transitions, should have " + expectedNumberOfEdgesPerState
-			                               + " (automaton is required to be complete and deterministic)");
-		}
-	}
+        if (deterministic) {
+             if (da.getNumEdges(stateId) != expectedNumberOfEdgesPerState) {
+                 throw new HOAConsumerException("State " + stateId + " has " + da.getNumEdges(stateId)
+                     + " transitions, should have " + expectedNumberOfEdgesPerState
+                     + " (automaton is required to be complete and deterministic)");
+             }
+        } else {
+            // optional completeness check
+            APElementIterator it = new APElementIterator(apList.size());
+            while (it.hasNext()) {
+                APElement el = it.next();
+                if (!da.hasEdge(stateId, el)) {
+                    throw new HOAConsumerException(
+                            "State " + stateId + " is not complete, missing transition for label " + el);
+                }
+            }
+        }
+    }
 
 	@Override
 	public void notifyEnd() throws HOAConsumerException {
@@ -749,7 +766,7 @@ public class HOAF2DA implements HOAConsumer {
 
 			DA<BitSet, ? extends AcceptanceOmega> result;
 			try {
-				HOAF2DA consumerDA = new HOAF2DA();
+				HOAF2DA consumerDA = new HOAF2DA(false);
 				HOAFParser.parseHOA(input, consumerDA);
 				result = consumerDA.getDA();
 			} catch (HOAF2DA.TransitionBasedAcceptanceException e) {
@@ -759,7 +776,7 @@ public class HOAF2DA implements HOAConsumer {
 					System.exit(1);
 				}
 				System.out.println("Automaton with transition-based acceptance, automatically converting to state-based acceptance...");
-				HOAF2DA consumerDA = new HOAF2DA();
+				HOAF2DA consumerDA = new HOAF2DA(false);
 				HOAIntermediateStoreAndManipulate consumerTransform = new HOAIntermediateStoreAndManipulate(consumerDA, new ToStateAcceptance());
 
 				HOAFParser.parseHOA(input, consumerTransform);

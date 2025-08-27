@@ -79,8 +79,69 @@ public class MDPModelChecker extends ProbModelChecker
 	{
 		super(parent);
 	}
-	
+
 	// Model checking functions
+    @SuppressWarnings("unchecked")
+    protected StateValues originalCheckProbPathFormulaLTL(Model<?> model, Expression expr, boolean qual, MinMax minMax, BitSet statesOfInterest) throws PrismException
+    {
+        // For min probabilities, need to negate the formula
+        // (add parentheses to allow re-parsing if required)
+        if (minMax.isMin()) {
+            expr = Expression.Not(Expression.Parenth(expr.deepCopy()));
+        }
+
+        // Build product of MDP and DA for the LTL formula, and do any required exports
+        LTLModelChecker mcLtl = new LTLModelChecker(this);
+        AcceptanceType[] allowedAcceptance = {
+                AcceptanceType.BUCHI,
+                AcceptanceType.RABIN,
+                AcceptanceType.GENERALIZED_RABIN,
+                AcceptanceType.REACH
+        };
+        LTLModelChecker.LTLProduct<MDP<Double>> product = mcLtl.constructDAProductForLTLFormula(this, (MDP<Double>) model, expr, statesOfInterest, allowedAcceptance);
+        doProductExports(product);
+
+        // Find accepting states + compute reachability probabilities
+        BitSet acc;
+        if (product.getAcceptance() instanceof AcceptanceReach) {
+            mainLog.println("\nSkipping accepting MEC computation since acceptance is defined via goal states...");
+            acc = ((AcceptanceReach)product.getAcceptance()).getGoalStates();
+        } else {
+            mainLog.println("\nFinding accepting MECs...");
+            acc = mcLtl.findAcceptingECStates(product.getProductModel(), product.getAcceptance());
+        }
+        mainLog.println("\nComputing reachability probabilities...");
+        MDPModelChecker mcProduct = new MDPModelChecker(this);
+        mcProduct.inheritSettings(this);
+        ModelCheckerResult res = mcProduct.computeReachProbs((MDP<Double>) product.getProductModel(), acc, false);
+        StateValues probsProduct = StateValues.createFromArrayResult(res, product.getProductModel());
+
+        // Subtract from 1 if we're model checking a negated formula for regular Pmin
+        if (minMax.isMin()) {
+            probsProduct.applyFunction(TypeDouble.getInstance(), v -> 1.0 - (double) v);
+        }
+
+        // Output vector over product, if required
+        if (getExportProductVector()) {
+            mainLog.println("\nExporting product solution vector matrix to file \"" + getExportProductVectorFilename() + "\"...");
+            PrismFileLog out = new PrismFileLog(getExportProductVectorFilename());
+            probsProduct.print(out, false, false, false, false);
+            out.close();
+        }
+
+        // If a strategy was generated, lift it to the product and store
+        if (res.strat != null) {
+            Strategy<Double> stratProduct = new FMDStrategyProduct<>(product, (MDStrategy<Double>) res.strat);
+            result.setStrategy(stratProduct);
+        }
+
+        // Mapping probabilities in the original model
+        StateValues probs = product.projectToOriginalModel(probsProduct);
+        probsProduct.clear();
+
+        return probs;
+    }
+
 
 	@SuppressWarnings("unchecked")
 	@Override
@@ -92,21 +153,9 @@ public class MDPModelChecker extends ProbModelChecker
 			expr = Expression.Not(Expression.Parenth(expr.deepCopy()));
 		}
 
-		boolean ldba = true;
-		if (ldba) {
-			LTLModelChecker mcLtl = new LTLModelChecker(this);
-			LTLModelChecker.LTLProduct<MDP<Double>> ldbaProduct = mcLtl.constructLDBAProductForLTLFormula(this, (MDP<Double>) model, expr, statesOfInterest);
-		}
-
-		// Build product of MDP and DA for the LTL formula, and do any required exports
-		LTLModelChecker mcLtl = new LTLModelChecker(this);
-		AcceptanceType[] allowedAcceptance = {
-				AcceptanceType.BUCHI,
-				AcceptanceType.RABIN,
-				AcceptanceType.GENERALIZED_RABIN,
-				AcceptanceType.REACH
-		};
-		LTLModelChecker.LTLProduct<MDP<Double>> product = mcLtl.constructDAProductForLTLFormula(this, (MDP<Double>) model, expr, statesOfInterest, allowedAcceptance);
+        LTLModelChecker mcLtl = new LTLModelChecker(this);
+        LTLModelChecker.LTLProduct<MDP<Double>> product = mcLtl.constructLDBAProductForLTLFormula(this, (MDP<Double>) model, expr, statesOfInterest);
+        // originally we had constructDAProductForLTLFormula   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 		doProductExports(product);
 		
 		// Find accepting states + compute reachability probabilities
@@ -147,6 +196,8 @@ public class MDPModelChecker extends ProbModelChecker
 		StateValues probs = product.projectToOriginalModel(probsProduct);
 		probsProduct.clear();
 
+        // sanity check - compare with original checkProbPathFormulaLTL
+        StateValues originalProbs = originalCheckProbPathFormulaLTL(model, expr, qual, minMax, statesOfInterest);
 		return probs;
 	}
 

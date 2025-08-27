@@ -27,18 +27,10 @@
 
 package automata;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.PrintStream;
+import java.io.*;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.BitSet;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.regex.*;
 
 import acceptance.AcceptanceBuchi;
 import jhoafparser.consumer.HOAIntermediateStoreAndManipulate;
@@ -67,10 +59,7 @@ import owl.translations.rabinizer.RabinizerBuilder;
 import owl.translations.rabinizer.RabinizerConfiguration;
 import parser.Values;
 import parser.ast.Expression;
-import prism.PrismComponent;
-import prism.PrismException;
-import prism.PrismNotSupportedException;
-import prism.PrismSettings;
+import prism.*;
 import acceptance.AcceptanceOmega;
 import acceptance.AcceptanceRabin;
 import acceptance.AcceptanceType;
@@ -223,7 +212,7 @@ public class LTL2DA extends PrismComponent
 	 */
 	public DA<BitSet, ? extends AcceptanceOmega> convertLTLFormulaToLDBAWithOwl(Expression ltl, Values constants) throws PrismException
 	{
-		return convertLTLFormulaToDA(new ConvertLTLFormulaToLDBAWithOwl(), ltl, constants);
+		return convertLTLFormulaToDA(new ConvertLTLFormulaToLDBAWithOwl(), ltl, constants, AcceptanceType.BUCHI);
 	}
 
 	/**
@@ -406,7 +395,7 @@ public class LTL2DA extends PrismComponent
 				ProcessBuilder builder = new ProcessBuilder(arguments);
 				builder.redirectOutput(tool_output);
 				builder.redirectErrorStream(true);
-				prism.PrismNG.setupChildProcessEnvironment(builder);
+				PrismNG.setupChildProcessEnvironment(builder);
 				Process p = builder.start();
 				p.getInputStream().close();
 				int rv;
@@ -505,31 +494,112 @@ public class LTL2DA extends PrismComponent
 
 	interface HOAStreamSupplier { InputStream get() throws IOException; }
 
-	/**
+
+    /**
+     * Precheck that works on raw HOA and scans states for nondeterminism.
+     */
+    private static boolean isHOADeterministic(String hoaText) {
+        Map<Integer, Map<String, Integer>> seenPerState = new HashMap<>();
+        int curState = -1;
+		boolean trueEdge = false;
+
+        try (BufferedReader br = new BufferedReader(new StringReader(hoaText))) {
+            for (String line; (line = br.readLine()) != null; ) {
+                line = line.trim();
+                if (line.isEmpty() || line.startsWith("--")) continue;
+
+                if (line.startsWith("properties:") && line.contains("deterministic")) {
+                    return true; // fast path from header
+                }
+
+                if (line.startsWith("State:")) {
+                    String[] parts = line.split("\\s+");
+                    curState = Integer.parseInt(parts[1]);
+                    seenPerState.putIfAbsent(curState, new HashMap<>());
+					trueEdge = false;
+                    continue;
+                }
+
+                if (!line.startsWith("[")) continue;
+
+                int rb = line.indexOf(']');
+                if (rb < 0) continue;
+
+				// Assuming DNF here...
+                String[] label = line.substring(0, rb + 1).replaceAll("\\s+", "").replaceAll("\\[", "").replaceAll("]", "").replaceAll("\\)", "").replaceAll("\\(", "").split("\\|");
+                String rest = line.substring(rb + 1).trim();
+                String[] parts = rest.split("\\s+");
+                if (parts.length == 0) continue;
+
+                int dest;
+                try { dest = Integer.parseInt(parts[0]); }
+                catch (NumberFormatException ignore) { continue; }
+
+				// label --> state mapping
+                Map<String, Integer> map = seenPerState.get(curState);
+
+				// early exits involving [t]
+				if (Arrays.asList(label).contains("t")) {
+					trueEdge = true;
+				}
+
+				for (String l : label) {
+					Integer prev = map.putIfAbsent(l, dest);
+
+					if (prev != null && prev != dest) {
+						return false; // same label, different destination
+					}
+				}
+
+				if (trueEdge && map.size() > 1) {
+					return false; // true edge and something else
+				}
+            }
+        } catch (IOException ignore) { }
+
+        return true;
+    }
+
+    /**
 	 * Construct a DA by parsing an HOA file, supplied as an InputStream.
 	 * The InputStream may need to be recreated multiple times in case of failure.
 	 */
 	private DA<BitSet, ? extends AcceptanceOmega> constructDAFromHOA(HOAStreamSupplier hoaStreamSupplier, String hoaSourceDescription) throws PrismException
 	{
 		DA<BitSet, ? extends AcceptanceOmega> da;
+        final String hoa;
+
 		try {
-			try {
-				HOAF2DA consumerDA = new HOAF2DA();
-				HOAFParser.parseHOA(hoaStreamSupplier.get(), consumerDA);
-				da = consumerDA.getDA();
-			} catch (HOAF2DA.TransitionBasedAcceptanceException e) {
-				// Try again, this time transforming to state acceptance
-				mainLog.println("Automaton with transition-based acceptance, automatically converting to state-based acceptance...");
-				HOAF2DA consumerDA = new HOAF2DA();
-				HOAIntermediateStoreAndManipulate consumerTransform = new HOAIntermediateStoreAndManipulate(consumerDA, new ToStateAcceptance());
-				HOAFParser.parseHOA(hoaStreamSupplier.get(), consumerTransform);
-				da = consumerDA.getDA();
-			}
-		} catch (IOException e) {
-			throw new PrismException("Unable to read " + hoaSourceDescription);
-		} catch (ParseException e) {
-			throw new PrismException("Parse error: " + e.getMessage() + " reading " + hoaSourceDescription);
-		}
+            // Parse the HOA and convert to Automaton!
+            InputStream in = hoaStreamSupplier.get();
+            hoa = new String(in.readAllBytes());
+
+            boolean det = isHOADeterministic(hoa);
+
+            if (!det) {
+                mainLog.println("HOA automaton is nondeterministic.");
+            } else {
+                mainLog.println("HOA automaton is deterministic.");
+            }
+            try {
+                HOAF2DA consumerDA = new HOAF2DA(det);
+                HOAFParser.parseHOA(hoaStreamSupplier.get(), consumerDA);
+                da = consumerDA.getDA();
+                da.setDeterminism(det);
+            } catch (HOAF2DA.TransitionBasedAcceptanceException e) {
+                // Try again, this time transforming to state acceptance
+                mainLog.println("Automaton with transition-based acceptance, automatically converting to state-based acceptance...");
+                HOAF2DA consumerDA = new HOAF2DA(det);
+                HOAIntermediateStoreAndManipulate consumerTransform = new HOAIntermediateStoreAndManipulate(consumerDA, new ToStateAcceptance());
+                HOAFParser.parseHOA(hoaStreamSupplier.get(), consumerTransform);
+                da = consumerDA.getDA();
+                da.setDeterminism(det);
+            }
+        } catch (IOException e) {
+            throw new PrismException("Unable to read " + hoaSourceDescription);
+        } catch (ParseException e) {
+            throw new PrismException("Parse error: " + e.getMessage() + " reading " + hoaSourceDescription);
+        }
 
 		return da;
 	}
@@ -579,12 +649,12 @@ public class LTL2DA extends PrismComponent
 	{
 		try {
 			// Usage:
-			// * ... 'X p1' 
-			// * ... 'X p1' da.hoa 
-			// * ... 'X p1' da.hoa hoa 
-			// * ... 'X p1' da.dot dot 
-			// * ... 'X p1' - hoa 
-			// * ... 'X p1' - txt 
+			// * ... 'X p1'
+			// * ... 'X p1' da.hoa
+			// * ... 'X p1' da.hoa hoa
+			// * ... 'X p1' da.dot dot
+			// * ... 'X p1' - hoa
+			// * ... 'X p1' - txt
 
 			// Convert to Expression (from PRISM format)
 			/*String pltl = "P=?[" + ltl + "]";
