@@ -59,6 +59,8 @@ public class DA<Symbol, Acceptance extends AcceptanceOmega>
 	private List<List<Edge>> edges;
 	/** The acceptance condition (as BitSets) */
 	private Acceptance acceptance;
+    /** determinism */
+    private boolean deterministic = true;
 
 	/** Local class to represent DRA edge */
 	class Edge
@@ -81,6 +83,12 @@ public class DA<Symbol, Acceptance extends AcceptanceOmega>
 		this(0);
 	}
 
+    public DA(boolean deterministic)
+    {
+        this(0);
+        this.deterministic = deterministic;
+    }
+
 	/**
 	 * Construct a DRA of fixed size (i.e. fixed number of states).
 	 */
@@ -94,6 +102,16 @@ public class DA<Symbol, Acceptance extends AcceptanceOmega>
 			edges.add(new ArrayList<Edge>());
 		}
 	}
+
+    public void setDeterminism(boolean deterministic)
+    {
+        this.deterministic = deterministic;
+    }
+
+    public boolean isDeterministic()
+    {
+        return deterministic;
+    }
 
 	public void setAcceptance(Acceptance acceptance)
 	{
@@ -210,6 +228,25 @@ public class DA<Symbol, Acceptance extends AcceptanceOmega>
 				return e.dest;
 		return -1;
 	}
+
+    /**
+     * Get all destinations of edges from state i with label lab.
+     * For a deterministic automaton this list has size 0 or 1.
+     */
+    public List<Integer> getEdgeDestsByLabel(int i, Symbol lab)
+    {
+        List<Integer> res = new ArrayList<>();
+        for (Edge e : edges.get(i)) {
+            if (e.label.equals(lab)) {
+                res.add(e.dest);
+                if (deterministic) {
+                    break;
+                }
+            }
+        }
+        return res;
+    }
+
 
 	/**
 	 * Print the automaton in Dot format to an output stream.
@@ -391,7 +428,40 @@ public class DA<Symbol, Acceptance extends AcceptanceOmega>
 
 	public String getAutomataType()
 	{
-		return "D"+acceptance.getType().getNameAbbreviated()+"A";
+        if (deterministic) {
+            return "D"+acceptance.getType().getNameAbbreviated()+"A";
+        }
+        else  {
+            return "N"+acceptance.getType().getNameAbbreviated()+"A";
+        }
+	}
+
+	public boolean checkDeterminismByEnumerationOverAP() {
+		int nAP = apList.size();
+		APElementIterator it = new APElementIterator(nAP);
+		// Pre collect to reuse the list of valuations
+		List<BitSet> valuations = new ArrayList<>();
+		while (it.hasNext()) valuations.add(it.next());
+
+		for (int s = 0; s < size; s++) {
+			for (BitSet val : valuations) {
+				boolean seenAny = false;
+				int seenDest = -1;
+				for (Edge e : edges.get(s)) {
+
+					if ((e.label).equals(val)) {
+						if (!seenAny) {
+							seenAny = true;
+							seenDest = e.dest;
+						} else if (e.dest != seenDest) {
+							return false;
+						}
+					}
+
+				}
+			}
+		}
+		return true;
 	}
 
 	/**
