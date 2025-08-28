@@ -706,27 +706,16 @@ public class LTLModelChecker extends PrismComponent
 			}
 		};
 
-		// Initial state handling
-		// Build the letter at s₀, collect all start successors q₀' in da.getEdgeDestsByLabel(start, letter(s₀)), and add each <s₀, q₀'> as an initial product state.
+		// Get initial states
+		// We need results for all states of the original model in statesOfInterest
+		// We thus explore states of the product starting from these states.
+		// These are designated as initial states of the product model
+		// (a) to ensure reachability is done for these states; and
+		// (b) to later identify the corresponding product state for the original states
+		//     of interest
 		for (int s_0 : new IterableStateSet(statesOfInterest, model.getNumStates())) {
-			if (!da.isDeterministic() && modelType == ModelType.MDP) {
-				// build letter from s_0
-				for (int k = 0; k < numAPs; k++) {
-					s_labels.set(k, labelBS.get(Integer.parseInt(da.getAPList().get(k).substring(1))).get(s_0));
-				}
-				List<Integer> qSuccs = da.getEdgeDestsByLabel(da.getStartState(), s_labels);
-				if (qSuccs.isEmpty()) {
-					continue;
-				}
-				for (int q0p : qSuccs) {
-					int map_0 = ensurePair.apply(q0p, s_0);
-					prodModel.addInitialState(map_0);
-				}
-			} else {
-				// If the DA is deterministic, or the model is not an MDP, the old behaviour is used.
-				int map_0 = newStateMap.apply(da.getStartState(), s_0);
-				prodModel.addInitialState(map_0);
-			}
+			int map_0 = newStateMap.apply(da.getStartState(), s_0);
+			prodModel.addInitialState(map_0);
 		}
 
 		// Explore product
@@ -769,8 +758,8 @@ public class LTLModelChecker extends PrismComponent
 				// keep in mind that we actually parse over the hoa to check whether it is deterministic or not
 				if (!da.isDeterministic() && modelType == ModelType.MDP) {
 					// one product choice per automaton successor q'
-					java.util.Map<Integer, Distribution<Value>> distByQp = new java.util.HashMap<>();
-					java.util.Map<Integer, Double> sumByQp = new java.util.HashMap<>();
+					Map<Integer, Distribution<Value>> distByQp = new LinkedHashMap<>();
+					Map<Integer, Double> sumByQp = new LinkedHashMap<>();
 
 					while (iter.hasNext()) {
 						Map.Entry<Integer, Value> e = iter.next();
@@ -783,6 +772,7 @@ public class LTLModelChecker extends PrismComponent
 						}
 
 						List<Integer> qps = da.getEdgeDestsByLabel(q_1, s_labels);
+						Collections.sort(qps);
 						for (int qp : qps) {
 							int map_2 = ensurePair.apply(qp, s_2);
 							Distribution<Value> d = distByQp.get(qp);
@@ -797,17 +787,17 @@ public class LTLModelChecker extends PrismComponent
 						}
 					}
 
-					for (Map.Entry<Integer, Distribution<Value>> eQP : distByQp.entrySet()) {
-						int qp = eQP.getKey();
-						Distribution<Value> d = eQP.getValue();
+					List<Integer> qpsOrdered = new ArrayList<>(distByQp.keySet());
+					Collections.sort(qpsOrdered);
+					for (int qp : qpsOrdered) {
+						Distribution<Value> d = distByQp.get(qp);
 						double sum = sumByQp.get(qp);
 						double missing = 1.0 - sum;
 						if (missing > 0.0) {
 							ensureTrapState.run();
 							d.set(trapIndex[0], (Value) (Double) missing);
 						}
-						((MDPSimple<Value>) prodModel).addActionLabelledChoice(
-								map_1, d, ((MDP<Value>) model).getAction(s_1, j));
+						((MDPSimple<Value>) prodModel).addActionLabelledChoice(map_1, d, ((MDP<Value>) model).getAction(s_1, j));
 					}
 					continue;
 				}
