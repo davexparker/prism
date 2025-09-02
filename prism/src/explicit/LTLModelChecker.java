@@ -713,9 +713,16 @@ public class LTLModelChecker extends PrismComponent
 		// (a) to ensure reachability is done for these states; and
 		// (b) to later identify the corresponding product state for the original states
 		//     of interest
-		for (int s_0 : new IterableStateSet(statesOfInterest, model.getNumStates())) {
-			int map_0 = newStateMap.apply(da.getStartState(), s_0);
-			prodModel.addInitialState(map_0);
+		for (int s0 : new IterableStateSet(statesOfInterest, model.getNumStates())) {
+			int map0;
+			if (!da.isDeterministic() && modelType == ModelType.MDP) {
+				// nondet DA over MDP, keep q0, do NOT pre-advance
+				map0 = ensurePair.apply(da.getStartState(), s0);
+			} else {
+				// deterministic DA or not an MDP, pre-advance on L(s0)
+				map0 = newStateMap.apply(da.getStartState(), s0);
+			}
+			prodModel.addInitialState(map0);
 		}
 
 		// Explore product
@@ -797,7 +804,7 @@ public class LTLModelChecker extends PrismComponent
 							ensureTrapState.run();
 							d.set(trapIndex[0], (Value) (Double) missing);
 						}
-						((MDPSimple<Value>) prodModel).addActionLabelledChoice(map_1, d, ((MDP<Value>) model).getAction(s_1, j));
+						((MDPSimple<Value>) prodModel).addChoice(map_1, d);
 					}
 					continue;
 				}
