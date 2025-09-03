@@ -1615,7 +1615,7 @@ public class StateModelChecker extends PrismComponent
 		}
 
 		try (PrismLog out = getPrismLogForFile(file)) {
-			Rewards<Value> modelRewards = constructRewards(model, r);
+			Rewards<Value> modelRewards = constructRewards(model, r, true);
 			PrismExplicitExporter<Value> exporter = new PrismExplicitExporter<>(exportOptions);
 			exporter.exportStateRewards(model, modelRewards, rewardGen.getRewardStructName(r), out);
 		}
@@ -1635,7 +1635,7 @@ public class StateModelChecker extends PrismComponent
 		}
 
 		try (PrismLog out = getPrismLogForFile(file)) {
-			Rewards<Value> modelRewards = constructRewards(model, r);
+			Rewards<Value> modelRewards = constructRewards(model, r, true);
 			PrismExplicitExporter<Value> exporter = new PrismExplicitExporter<>(exportOptions);
 			exporter.exportTransRewards(model, modelRewards, rewardGen.getRewardStructName(r), out);
 		}
