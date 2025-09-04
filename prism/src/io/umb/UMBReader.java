@@ -197,8 +197,8 @@ public class UMBReader
 	public void extractActionStrings(Consumer<String> stringConsumer) throws UMBException
 	{
 		int numActions = umbIndex.getNumActions();
-		List<Integer> actionStringOffsets = new ArrayList<>(numActions);
-		extractIntArray(UMBFormat.ACTION_STRING_OFFSETS_FILE, numActions + 1, actionStringOffsets::add);
+		List<Long> actionStringOffsets = new ArrayList<>(numActions);
+		extractLongArray(UMBFormat.ACTION_STRING_OFFSETS_FILE, numActions + 1, actionStringOffsets::add);
 		extractStringList(UMBFormat.ACTION_STRINGS_FILE, actionStringOffsets, stringConsumer);
 	}
 
@@ -462,7 +462,7 @@ public class UMBReader
 		umbIn.close();
 	}
 
-	private void extractStringList(String filename, List<Integer> stringOffsets, Consumer<String> stringConsumer) throws UMBException
+	private void extractStringList(String filename, List<Long> stringOffsets, Consumer<String> stringConsumer) throws UMBException
 	{
 		int numStrings = stringOffsets.size() - 1;
 		UMBIn umbIn = open();
@@ -471,8 +471,11 @@ public class UMBReader
 			throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes, not " + stringOffsets.get(numStrings) + ")");
 		}
 		for (int i = 0; i < numStrings; i++) {
-			int sLen = stringOffsets.get(i + 1) - stringOffsets.get(i);
-			String s = umbIn.readString(sLen);
+			long sLen = stringOffsets.get(i + 1) - stringOffsets.get(i);
+			if (sLen > Integer.MAX_VALUE) {
+				throw new UMBException("Could not read overlength string (" + sLen + "bytes) from file " + filename);
+			}
+			String s = umbIn.readString((int) sLen);
 			if (s == null) {
 				throw new UMBException("Could not read string of length " + sLen + " from file " + filename);
 			}

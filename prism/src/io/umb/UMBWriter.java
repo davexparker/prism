@@ -192,13 +192,13 @@ public class UMBWriter
 	public void addActionStrings(List<String> actionStrings) throws UMBException
 	{
 		int numStrings = actionStrings.size();
-		int[] stringOffsets = new int[numStrings + 1];
+		long[] stringOffsets = new long[numStrings + 1];
 		stringOffsets[0] = 0;
 		for (int i = 0; i < numStrings; i++) {
 			stringOffsets[i + 1] = stringOffsets[i] + actionStrings.get(i).getBytes().length;
 		}
-		PrimitiveIterator.OfInt it = Arrays.stream(stringOffsets).iterator();
-		addIntArray(UMBFormat.ACTION_STRING_OFFSETS_FILE, it, umbIndex.getNumActions() + 1);
+		PrimitiveIterator.OfLong it = Arrays.stream(stringOffsets).iterator();
+		addLongArray(UMBFormat.ACTION_STRING_OFFSETS_FILE, it, umbIndex.getNumActions() + 1);
 		addStringList(UMBFormat.ACTION_STRINGS_FILE, actionStrings);
 	}
 
