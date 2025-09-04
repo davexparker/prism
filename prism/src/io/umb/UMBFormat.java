@@ -49,7 +49,7 @@ public class UMBFormat
 	public static final String INITIAL_STATES_FILE = "initial-states" + BIN_FILE_EXT;
 	public static final String CHOICE_ACTIONS_FILE = "choice-to-action" + BIN_FILE_EXT;
 	public static final String BRANCH_ACTIONS_FILE = "branch-to-action" + BIN_FILE_EXT;
-	public static final String ACTION_STRING_OFFSETS_FILE = "action-to-action-strings" + BIN_FILE_EXT;
+	public static final String ACTION_STRING_OFFSETS_FILE = "action-to-action-string" + BIN_FILE_EXT;
 	public static final String ACTION_STRINGS_FILE = "action-strings" + BIN_FILE_EXT;
 
 	// Annotations
