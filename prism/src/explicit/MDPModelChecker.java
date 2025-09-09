@@ -196,8 +196,6 @@ public class MDPModelChecker extends ProbModelChecker
 		StateValues probs = product.projectToOriginalModel(probsProduct);
 		probsProduct.clear();
 
-        // sanity check - compare with original checkProbPathFormulaLTL
-        StateValues originalProbs = originalCheckProbPathFormulaLTL(model, expr, qual, minMax, statesOfInterest);
 		return probs;
 	}
 
