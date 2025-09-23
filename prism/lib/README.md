@@ -13,6 +13,7 @@ To simplify maintenance of scripts and config files, we mostly omit version numb
 * junit-platform-console-standalone.jar - JUnit 5 executable & dependencies, version 1.7.2
 * nailgun-server.jar - Nailgun, version 0.9.2-SNAPSHOT
 * pepa.zip - PEPA-to-PRISM Compiler version 0.03.2
+* xz.jar - XZ for Java version 1.10
 
 See here for more details and links:
 

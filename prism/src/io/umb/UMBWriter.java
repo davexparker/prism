@@ -576,6 +576,7 @@ public class UMBWriter
 
 		/**
 		 * Open a new UMB file for writing
+		 * @param fileOut The file to write to
 		 */
 		public UMBOut(File fileOut) throws UMBException
 		{
@@ -584,14 +585,26 @@ public class UMBWriter
 
 		/**
 		 * Open a new UMB file for writing
+		 * @param fileOut The file to write to
+		 * @param zipped Whether to zip the file
 		 */
 		public UMBOut(File fileOut, boolean zipped) throws UMBException
 		{
+			this(fileOut, zipped ? UMBFormat.DEFAULT_COMPRESSION_FORMAT : null);
+		}
+
+		/**
+		 * Open a new UMB file for writing
+		 * @param fileOut The file to write to
+		 * @param compressionFormat How to zip the file (null means no zipping)
+		 */
+		public UMBOut(File fileOut, UMBFormat.CompressionFormat compressionFormat) throws UMBException
+		{
 			try {
-				// Open file/zip/tar (we use Gzip for zipping)
+				// Open file/zip/tar
 				fsOut = new BufferedOutputStream(Files.newOutputStream(fileOut.toPath()));
-				if (zipped) {
-					zipOut = new CompressorStreamFactory().createCompressorOutputStream("gz", fsOut);
+				if (compressionFormat != null) {
+					zipOut = new CompressorStreamFactory().createCompressorOutputStream(compressionFormat.extension(), fsOut);
 					tarOut = new TarArchiveOutputStream(zipOut);
 				} else {
 					zipOut = null;

@@ -26,6 +26,7 @@
 
 package io.umb;
 
+import java.util.List;
 import java.util.function.Predicate;
 
 /**
@@ -65,6 +66,26 @@ public class UMBFormat
 	public static final String AP_ANNOTATIONS_GROUP = "aps";
 	public static final String REWARD_ANNOTATIONS_GROUP = "rewards";
 	public static final String VARIABLE_ANNOTATIONS_GROUP = "variables";
+
+	// Allowable compression formats
+
+	public enum CompressionFormat {
+		GZIP,
+		XZ;
+		public String extension() {
+			switch (this) {
+				case GZIP: return "gz";
+				case XZ: return "xz";
+				default: throw new IllegalStateException("Unknown compression format: " + this);
+			}
+		}
+	}
+
+	/** Allowable compression formats (strict) */
+	public static final List<CompressionFormat> ALLOWED_COMPRESSION_FORMATS = List.of(CompressionFormat.XZ);
+
+	/** Default compression format */
+	public static final CompressionFormat DEFAULT_COMPRESSION_FORMAT = CompressionFormat.XZ;
 
 	/**
 	 * Get the directory name for an annotation
