@@ -301,9 +301,10 @@ public class UMBIndex
 		}
 		checkFieldExists(transitionSystem, "transitionSystem");
 		transitionSystem.validate();
-		checkFieldExists(annotations, "annotations");
-		for (Map.Entry<String, LinkedHashMap<String, Annotation>> entry : annotations.entrySet()) {
-			validateAnnotations(entry.getKey(), entry.getValue());
+		if (annotations != null) {
+			for (Map.Entry<String, LinkedHashMap<String, Annotation>> entry : annotations.entrySet()) {
+				validateAnnotations(entry.getKey(), entry.getValue());
+			}
 		}
 	}
 
