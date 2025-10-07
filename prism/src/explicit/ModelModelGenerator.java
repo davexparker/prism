@@ -38,6 +38,7 @@ import parser.type.Type;
 import prism.ModelGenerator;
 import prism.ModelInfo;
 import prism.ModelType;
+import prism.Pair;
 import prism.PrismException;
 import prism.PrismNotSupportedException;
 
@@ -58,15 +59,17 @@ public class ModelModelGenerator<Value> implements ModelGenerator<Value>
 	
 	private class Transitions
 	{
-		Object action;
+		Object choiceAction;
 		List<Integer> succs;
 		List<Value> probs;
-		
+		List<Object> transActions;
+
 		public Transitions()
 		{
-			action = null;
+			choiceAction = null;
 			succs = new ArrayList<>();
 			probs = new ArrayList<>();
+			transActions = null;
 		}
 	}
 	
@@ -121,6 +124,14 @@ public class ModelModelGenerator<Value> implements ModelGenerator<Value>
 	}
 
 	@Override
+	public List<Object> getActions()
+	{
+		// Use actions from model (not guaranteed to be present in the model source)
+		// (nor guaranteed to be consistent if present, currently)
+		return model.getActions();
+	}
+
+	@Override
 	public State getInitialState() throws PrismException
 	{
 		int sInitial = model.getFirstInitialState();
@@ -136,10 +147,10 @@ public class ModelModelGenerator<Value> implements ModelGenerator<Value>
 		trans.clear();
 		switch (model.getModelType()) {
 		case CTMC:
-			storeTransitions(null, ((CTMC<Value>) model).getTransitionsIterator(sExplore));
+			storeTransitionsAndActions(((CTMC<Value>) model).getTransitionsAndActionsIterator(sExplore));
 			break;
 		case DTMC:
-			storeTransitions(null, ((DTMC<Value>) model).getTransitionsIterator(sExplore));
+			storeTransitionsAndActions(((DTMC<Value>) model).getTransitionsAndActionsIterator(sExplore));
 			break;
 		case MDP:
 			int numChoices = ((MDP<Value>) model).getNumChoices(sExplore);
@@ -160,10 +171,10 @@ public class ModelModelGenerator<Value> implements ModelGenerator<Value>
 	/**
 	 * Store the transitions extracted from an action and Model-provided iterator.
 	 */
-	private void storeTransitions(Object action, Iterator<Map.Entry<Integer, Value>> transitionsIterator)
+	private void storeTransitions(Object choiceAction, Iterator<Map.Entry<Integer, Value>> transitionsIterator)
 	{
 		Transitions t = new Transitions();
-		t.action = action;
+		t.choiceAction = choiceAction;
 		while (transitionsIterator.hasNext()) {
 			Map.Entry<Integer, Value> e = transitionsIterator.next();
 			t.succs.add(e.getKey());
@@ -171,7 +182,20 @@ public class ModelModelGenerator<Value> implements ModelGenerator<Value>
 		}
 		trans.add(t);
 	}
-	
+
+	private void storeTransitionsAndActions(Iterator<java.util.Map.Entry<Integer, Pair<Value, Object>>> transitionsAndActionsIterator)
+	{
+		Transitions t = new Transitions();
+		t.transActions = new ArrayList<>();
+		while (transitionsAndActionsIterator.hasNext()) {
+			Map.Entry<Integer, Pair<Value, Object>> e = transitionsAndActionsIterator.next();
+			t.succs.add(e.getKey());
+			t.probs.add(e.getValue().first);
+			t.transActions.add(e.getValue().second);
+		}
+		trans.add(t);
+	}
+
 	@Override
 	public int getNumChoices() throws PrismException
 	{
@@ -185,9 +209,16 @@ public class ModelModelGenerator<Value> implements ModelGenerator<Value>
 	}
 
 	@Override
+	public Object getChoiceAction(int i) throws PrismException
+	{
+		return trans.get(i).choiceAction;
+	}
+
+	@Override
 	public Object getTransitionAction(int i, int offset) throws PrismException
 	{
-		return trans.get(i).action;
+		List<Object> transActions = trans.get(i).transActions;
+		return transActions == null ? null : transActions.get(offset);
 	}
 
 	@Override
