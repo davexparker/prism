@@ -181,6 +181,18 @@ public class UMBImporter extends ExplicitModelImporter
 		// Create BasicModelInfo object
 		ModelType modelType = getModelTypeFromIndex(umbIndex);
 		basicModelInfo = new BasicModelInfo(modelType);
+		// Extract/initialise action list
+		ArrayList<Object> actionStrings = new ArrayList<>();
+		try {
+			if (umbReader.hasActionStrings()) {
+				umbReader.extractActionStrings(actionStrings::add);
+			} else {
+				actionStrings.add(null);
+			}
+		} catch (UMBException e) {
+			throw new PrismException("Could not extract actions from UMB file");
+		}
+		basicModelInfo.setActionList(actionStrings);
 		// Add variable info
 		VarList varList = basicModelInfo.getVarList();
 		if (providesStates()) {
@@ -409,14 +421,7 @@ public class UMBImporter extends ExplicitModelImporter
 			}
 
 			// Extract action info
-			ArrayList<String> actionStrings = null;
-			actionStrings = new ArrayList<>();
-			if (umbReader.hasActionStrings()) {
-				umbReader.extractActionStrings(actionStrings::add);
-			} else {
-				actionStrings.add(null);
-			}
-			Object firstAction = actionStrings.get(0);
+			Object firstAction = getModelInfo().getActions().get(0);
 			IntList transitionActionIndices = null;
 			boolean hasActions = umbReader.hasBranchActionIndices();
 			if (hasActions) {
@@ -432,7 +437,7 @@ public class UMBImporter extends ExplicitModelImporter
 				jHi = choiceTransitionOffsets.getInt(s + 1);
 				for (int j = jLo; j < jHi; j++) {
 					//Value v = eval.fromString(Double.toString(d));
-					Object action = hasActions ? actionStrings.get(transitionActionIndices.getInt(j)) : firstAction;
+					Object action = hasActions ? getModelInfo().getActions().get(transitionActionIndices.getInt(j)) : firstAction;
 					if (getModelInfo().getModelType() == ModelType.IDTMC) {
 						Interval<Double> dIntv = new Interval<>(transitionProbabilities.getDouble(2 * j), transitionProbabilities.getDouble(2 * j + 1));
 						((IOUtils.MCTransitionConsumer<Interval<Double>>) storeTransition).accept(s, transitionSuccessors.getInt(j), dIntv, action);
@@ -466,14 +471,7 @@ public class UMBImporter extends ExplicitModelImporter
 			umbReader.extractBranchProbabilities(d -> transitionProbabilities.add(d));
 
 			// Extract action info
-			ArrayList<String> actionStrings = null;
-			actionStrings = new ArrayList<>();
-			if (umbReader.hasActionStrings()) {
-				umbReader.extractActionStrings(actionStrings::add);
-			} else {
-				actionStrings.add(null);
-			}
-			Object firstAction = actionStrings.get(0);
+			Object firstAction = getModelInfo().getActions().get(0);
 			IntList choiceActionIndices = null;
 			boolean hasActions = umbReader.hasChoiceActionIndices();
 			if (hasActions) {
@@ -493,7 +491,7 @@ public class UMBImporter extends ExplicitModelImporter
 					jLo = jHi;
 					jHi = choiceTransitionOffsets.getInt(i + 1);
 					for (int j = jLo; j < jHi; j++) {
-						Object action = hasActions ? actionStrings.get(choiceActionIndices.getInt(i)) : firstAction;
+						Object action = hasActions ? getModelInfo().getActions().get(choiceActionIndices.getInt(i)) : firstAction;
 						if (getModelInfo().getModelType() == ModelType.IMDP) {
 							Interval<Double> dIntv = new Interval<>(transitionProbabilities.getDouble(2 * j), transitionProbabilities.getDouble(2 * j + 1));
 							((IOUtils.MDPTransitionConsumer<Interval<Double>>) storeTransition).accept(s, iCount, transitionSuccessors.getInt(j), dIntv, action);
