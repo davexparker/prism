@@ -57,6 +57,7 @@ import automata.LTL2WDBA;
 import jltl2ba.SimpleLTL;
 import common.IterableStateSet;
 import common.StopWatch;
+import common.TimingReporter;
 
 /**
  * LTL model checking functionality
@@ -280,16 +281,34 @@ public class LTLModelChecker extends PrismComponent
 			}
 		}
 
-		// Model check maximal state formulas
-		ltl = checkMaximalStateFormulas(mc, model, expr.deepCopy(), labelBS);
+		TimingReporter timingReporter = TimingReporter.getInstance();
+		timingReporter.startStep("Max state formula");
+		try {
+			// Model check maximal state formulas
+			ltl = checkMaximalStateFormulas(mc, model, expr.deepCopy(), labelBS);
+		} finally {
+			timingReporter.stopStep("Max state formula");
+		}
 
-		// Convert LTL formula to deterministic automaton
-		mainLog.println("\nBuilding GFM automaton (for " + ltl + ")...");
-		time = System.currentTimeMillis();
-		LTL2DA ltl2da = new LTL2DA(this);
-		da = ltl2da.convertLTLFormulaToLDBA(ltl, mc.getConstantValues());
+		timingReporter.startStep("AT construction");
+		try {
+			// Convert LTL formula to GFM automaton
+			mainLog.println("\nBuilding GFM automaton (for " + ltl + ")...");
+			time = System.currentTimeMillis();
+			LTL2DA ltl2da = new LTL2DA(this);
+			da = ltl2da.convertLTLFormulaToLDBA(ltl, mc.getConstantValues());
+		} finally {
+			timingReporter.stopStep("AT construction");
+		}
+
 		mainLog.println(da.getAutomataType()+" has " + da.size() + " states, " + da.getAcceptance().getSizeStatistics() + ".");
-		da.checkForCanonicalAPs(labelBS.size());
+		timingReporter.startStep("Canocial AP");
+		try {
+			da.checkForCanonicalAPs(labelBS.size());
+		} finally {
+			timingReporter.stopStep("Canocial AP");
+		}
+
 		time = System.currentTimeMillis() - time;
 		mainLog.println("Time for "+da.getAutomataType()+" translation: " + time / 1000.0 + " seconds.");
 		// If required, export DA
@@ -566,35 +585,45 @@ public class LTLModelChecker extends PrismComponent
 	@SuppressWarnings("unchecked")
 	public <Value, M extends Model<Value>> LTLProduct<M> constructProductModel(DA<BitSet, ? extends AcceptanceOmega> da, M model, Vector<BitSet> labelBS, BitSet statesOfInterest) throws PrismException
 	{
-		// If the model has a VarList, we will create a new one
-		VarList newVarList = null;
-		if (model.getVarList() != null) {
-			VarList varList = model.getVarList();
-			// Create a (new, unique) name for the variable that will represent DA states
-			String daVar = "_da";
-			while (varList.exists(daVar)) {
-				daVar = "_" + daVar;
+		TimingReporter timingReporter = TimingReporter.getInstance();
+		timingReporter.startStep("Product construction");
+
+		try {
+
+
+			// If the model has a VarList, we will create a new one
+			VarList newVarList = null;
+			if (model.getVarList() != null) {
+				VarList varList = model.getVarList();
+				// Create a (new, unique) name for the variable that will represent DA states
+				String daVar = "_da";
+				while (varList.exists(daVar)) {
+					daVar = "_" + daVar;
+				}
+
+				newVarList = (VarList) varList.clone();
+				// NB: if DA only has one state, we add an extra dummy state
+				Declaration decl = new Declaration(daVar, new DeclarationInt(Expression.Int(0), Expression.Int(Math.max(da.size() - 1, 1))));
+				newVarList.addVarAtStart(decl, 1);
 			}
 
-			newVarList = (VarList) varList.clone();
-			// NB: if DA only has one state, we add an extra dummy state
-			Declaration decl = new Declaration(daVar, new DeclarationInt(Expression.Int(0), Expression.Int(Math.max(da.size() - 1, 1))));
-			newVarList.addVarAtStart(decl, 1);
+			// Create a (simple, mutable) model of the appropriate type
+			ModelType modelType = model.getModelType();
+			ModelSimple<?> prodModel = ModelSimple.forModelType(modelType);
+
+			// Attach evaluator and variable info
+			((ModelExplicit<Value>) prodModel).setEvaluator(model.getEvaluator());
+			if (prodModel instanceof IntervalModelExplicit) {
+				((IntervalModelExplicit<Value>) prodModel).setIntervalEvaluator(((IntervalModel<Value>) model).getIntervalEvaluator());
+			}
+			((ModelExplicit<Value>) prodModel).setVarList(newVarList);
+
+			// Now do the actual product model construction
+			return doConstructProductModel(modelType, prodModel, da, model, labelBS, statesOfInterest);
 		}
-
-		// Create a (simple, mutable) model of the appropriate type
-		ModelType modelType = model.getModelType();
-		ModelSimple<?> prodModel = ModelSimple.forModelType(modelType);
-
-		// Attach evaluator and variable info
-		((ModelExplicit<Value>) prodModel).setEvaluator(model.getEvaluator());
-		if (prodModel instanceof IntervalModelExplicit) {
-			((IntervalModelExplicit<Value>) prodModel).setIntervalEvaluator(((IntervalModel<Value>) model).getIntervalEvaluator());
+		finally {
+			timingReporter.stopStep("Product construction");
 		}
-		((ModelExplicit<Value>) prodModel).setVarList(newVarList);
-
-		// Now do the actual product model construction
-		return doConstructProductModel(modelType, prodModel, da, model, labelBS, statesOfInterest);
 	}
 	
 	/**

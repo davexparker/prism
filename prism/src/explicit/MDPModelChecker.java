@@ -57,6 +57,7 @@ import prism.PrismComponent;
 import prism.PrismDevNullLog;
 import prism.PrismException;
 import prism.PrismFileLog;
+import common.TimingReporter;
 import prism.PrismLog;
 import prism.PrismNotSupportedException;
 import prism.PrismSettings;
@@ -147,6 +148,8 @@ public class MDPModelChecker extends ProbModelChecker
 	@Override
 	protected StateValues checkProbPathFormulaLTL(Model<?> model, Expression expr, boolean qual, MinMax minMax, BitSet statesOfInterest) throws PrismException
 	{
+		TimingReporter timingReporter = TimingReporter.getInstance();
+		timingReporter.startSession();
 		// For min probabilities, need to negate the formula
 		// (add parentheses to allow re-parsing if required)
 		if (minMax.isMin()) {
@@ -165,12 +168,23 @@ public class MDPModelChecker extends ProbModelChecker
 			acc = ((AcceptanceReach)product.getAcceptance()).getGoalStates();
 		} else {
 			mainLog.println("\nFinding accepting MECs...");
-			acc = mcLtl.findAcceptingECStates(product.getProductModel(), product.getAcceptance());
+			timingReporter.startStep("AEC");
+			try {
+				acc = mcLtl.findAcceptingECStates(product.getProductModel(), product.getAcceptance());
+			} finally {
+				timingReporter.stopStep("AEC");
+			}
 		}
 		mainLog.println("\nComputing reachability probabilities...");
 		MDPModelChecker mcProduct = new MDPModelChecker(this);
 		mcProduct.inheritSettings(this);
-		ModelCheckerResult res = mcProduct.computeReachProbs((MDP<Double>) product.getProductModel(), acc, false);
+		timingReporter.startStep("Reachability solving");
+		ModelCheckerResult res;
+		try {
+			res = mcProduct.computeReachProbs((MDP) product.getProductModel(), acc, false);
+		} finally {
+			timingReporter.stopStep("Reachability solving");
+		}
 		StateValues probsProduct = StateValues.createFromArrayResult(res, product.getProductModel());
 
 		// Subtract from 1 if we're model checking a negated formula for regular Pmin
@@ -191,11 +205,14 @@ public class MDPModelChecker extends ProbModelChecker
 			Strategy<Double> stratProduct = new FMDStrategyProduct<>(product, (MDStrategy<Double>) res.strat);
 			result.setStrategy(stratProduct);
 		}
-		
-		// Mapping probabilities in the original model
-		StateValues probs = product.projectToOriginalModel(probsProduct);
-		probsProduct.clear();
 
+		// Mapping probabilities in the original model
+		timingReporter.startStep("Mapping probabilities in the original model");
+		StateValues probs = product.projectToOriginalModel(probsProduct);
+		timingReporter.stopStep("Mapping probabilities in the original model");
+
+		probsProduct.clear();
+		timingReporter.publishAndReset(getLog());
 		return probs;
 	}
 
