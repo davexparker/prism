@@ -43,10 +43,7 @@ import jltl2ba.LTLFragments;
 import jltl2dstar.LTL2Rabin;
 import owl.automaton.Automaton;
 import owl.automaton.Views;
-import owl.automaton.acceptance.BuchiAcceptance;
-import owl.automaton.acceptance.GeneralizedRabinAcceptance;
-import owl.automaton.acceptance.OmegaAcceptanceCast;
-import owl.automaton.acceptance.RabinAcceptance;
+import owl.automaton.acceptance.*;
 import owl.automaton.acceptance.degeneralization.RabinDegeneralization;
 import owl.automaton.acceptance.optimization.AcceptanceOptimizations;
 import owl.automaton.hoa.HoaWriter;
@@ -340,11 +337,21 @@ public class LTL2DA extends PrismComponent
 			translationOptions.add(LtlTranslationRepository.Option.SIMPLIFY_FORMULA);
 			translationOptions.add(LtlTranslationRepository.Option.USE_PORTFOLIO_FOR_SYNTACTIC_LTL_FRAGMENTS);
 			translationOptions.add(LtlTranslationRepository.Option.COMPLETE);
+
+			// LDBA buchi acceptance
 			Automaton<?, ? extends BuchiAcceptance> ldba = applyPreAndPostProcessing(AsymmetricLDBAConstruction.of(BuchiAcceptance.class).andThen(AnnotatedLDBA::copyAsMutable),
 					LtlTranslationRepository.BranchingMode.DETERMINISTIC,
 					translationOptions,
 					BuchiAcceptance.class)
 					.apply(formula);
+
+			// LDBA generalised buchi
+//			Automaton<?, ? extends GeneralizedBuchiAcceptance> ldba = applyPreAndPostProcessing(AsymmetricLDBAConstruction.of(GeneralizedBuchiAcceptance.class).andThen(AnnotatedLDBA::copyAsMutable),
+//					LtlTranslationRepository.BranchingMode.DETERMINISTIC,
+//					translationOptions,
+//					GeneralizedBuchiAcceptance.class)
+//					.apply(formula);
+
 			String hoaString = HoaWriter.toString(ldba);
 
 			// Extract result and convert HOA
