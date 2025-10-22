@@ -42,9 +42,7 @@ import jhoafparser.ast.AtomLabel;
 import jhoafparser.ast.BooleanExpression;
 import jhoafparser.consumer.HOAConsumer;
 import jhoafparser.consumer.HOAConsumerException;
-import jhoafparser.consumer.HOAIntermediateStoreAndManipulate;
 import jhoafparser.parser.HOAFParser;
-import jhoafparser.transformations.ToStateAcceptance;
 import jhoafparser.util.ImplicitEdgeHelper;
 import jltl2ba.APElement;
 import jltl2ba.APSet;
@@ -108,6 +106,7 @@ public class HOAF2DA implements HOAConsumer {
 	private String accName;
 	/** The extra information from the acc-name header (optional) */
 	private List<Object> extraInfo;
+	private final boolean allowTransitionAcceptance;
 
 	/** For each acceptance set in the HOA automaton, the set of states that are included in that set */
 	private List<BitSet> acceptanceSets = null;
@@ -171,7 +170,12 @@ public class HOAF2DA implements HOAConsumer {
 
 	/** Constructor */
 	public HOAF2DA(Boolean deterministic) {
+        this(deterministic, false);
+	}
+
+	public HOAF2DA(Boolean deterministic, boolean allowTransitionAcceptance) {
         this.deterministic = deterministic;
+        this.allowTransitionAcceptance = allowTransitionAcceptance;
 	}
 
 	@Override
@@ -302,7 +306,13 @@ public class HOAF2DA implements HOAConsumer {
 		da.setAPList(apList);
 		implicitEdgeHelper = new ImplicitEdgeHelper(apList.size());
 
-		DA.switchAcceptance(da, prepareAcceptance());
+		AcceptanceOmega acceptance = prepareAcceptance();
+		DA.switchAcceptance(da, acceptance);
+		if (acceptanceSets != null) {
+			da.setAcceptanceSetCount(acceptanceSets.size());
+		} else {
+			da.setAcceptanceSetCount(0);
+		}
 	}
 
 	/**
@@ -531,7 +541,7 @@ public class HOAF2DA implements HOAConsumer {
 			throw new HOAConsumerException("Not a DA, state "+stateId+" has transition with conjunctive target");
 		}
 
-		if (accSignature != null) {
+		if (!allowTransitionAcceptance && accSignature != null && !accSignature.isEmpty()) {
 			throw new TransitionBasedAcceptanceException("DA has transition-based acceptance (state "+stateId+", currently only state-labeled acceptance is supported");
 		}
 
@@ -555,7 +565,7 @@ public class HOAF2DA implements HOAConsumer {
 			tmp = tmp >> 1L;
 			index++;
 		}
-		da.addEdge(stateId, edge, to);
+		da.addEdge(stateId, edge, to, allowTransitionAcceptance ? buildAcceptanceBitSet(accSignature) : null);
 	}
 	
 	/**
@@ -629,7 +639,20 @@ public class HOAF2DA implements HOAConsumer {
 			throw new HOAConsumerException("While parsing, APMonom exception: "+e.getMessage());
 		}
 	}
-	
+
+	private BitSet buildAcceptanceBitSet(List<Integer> accSignature) {
+		if (accSignature == null || accSignature.isEmpty() || acceptanceSets == null) {
+			return null;
+		}
+		BitSet bitset = new BitSet(acceptanceSets.size());
+		for (int index : accSignature) {
+			if (index >= 0 && index < acceptanceSets.size()) {
+				bitset.set(index);
+			}
+		}
+		return bitset.isEmpty() ? null : bitset;
+	}
+
 	@Override
 	public void addEdgeWithLabel(int stateId,
 			BooleanExpression<AtomLabel> labelExpr,
@@ -640,7 +663,7 @@ public class HOAF2DA implements HOAConsumer {
 			throw new HOAConsumerException("Not a DA, state "+stateId+" has transition with conjunctive target");
 		}
 
-		if (accSignature != null) {
+		if (!allowTransitionAcceptance && accSignature != null && !accSignature.isEmpty()) {
 			throw new TransitionBasedAcceptanceException("DA has transition-based acceptance (state "+stateId+", currently only state-labeled acceptance is supported");
 		}
 
@@ -672,7 +695,7 @@ public class HOAF2DA implements HOAConsumer {
 				if (deterministic && previousTo != -1) {
 					throw new HOAConsumerException("Not a deterministic automaton, non-determinism detected (state "+stateId+", label = "+el+", to="+to+", previously to "+previousTo+")");
 				}
-				da.addEdge(stateId, el, to);
+				da.addEdge(stateId, el, to, allowTransitionAcceptance ? buildAcceptanceBitSet(accSignature) : null);
 			}
 		}
 	}
@@ -740,64 +763,4 @@ public class HOAF2DA implements HOAConsumer {
 		throw new HOAConsumerException(warning);
 	}
 
-	/** Command-line interface for reading, parsing and printing a HOA automaton (for testing) */
-	public static void main(String args[])
-	{
-		int rv = 0;
-		InputStream input = null;
-		try {
-			if (args.length != 2) {
-				System.err.println("Usage: input-file output-file\n\n Filename can be '-' for standard input/output");
-				System.exit(1);
-			}
-			if (args[0].equals("-")) {
-				input = System.in;
-			} else {
-				input = new FileInputStream(args[0]);
-			}
-
-			PrintStream output;
-			String outfile = args[1];
-			if (outfile.equals("-")) {
-				output = System.out;
-			} else {
-				output = new PrintStream(outfile);
-			}
-
-			DA<BitSet, ? extends AcceptanceOmega> result;
-			try {
-				HOAF2DA consumerDA = new HOAF2DA(false);
-				HOAFParser.parseHOA(input, consumerDA);
-				result = consumerDA.getDA();
-			} catch (HOAF2DA.TransitionBasedAcceptanceException e) {
-				// try again, this time transforming to state acceptance
-				if (input == System.in) {
-					System.out.println("Automaton with transition-based acceptance, can only be (re)parsed from file");
-					System.exit(1);
-				}
-				System.out.println("Automaton with transition-based acceptance, automatically converting to state-based acceptance...");
-				HOAF2DA consumerDA = new HOAF2DA(false);
-				HOAIntermediateStoreAndManipulate consumerTransform = new HOAIntermediateStoreAndManipulate(consumerDA, new ToStateAcceptance());
-
-				HOAFParser.parseHOA(input, consumerTransform);
-				result = consumerDA.getDA();
-			}
-
-			if (result == null) {
-				throw new PrismException("Could not construct DA");
-			}
-
-			// should we try and simplify?
-			// result = DASimplifyAcceptance.simplifyAcceptance(result, acceptance.AcceptanceType.REACH);
-
-			result.printHOA(output);
-		} catch (Exception e) {
-			System.err.println(e.toString());
-			rv = 1;
-		}
-		
-		if (rv != 0) {
-			System.exit(rv);
-		}
-	}
 }

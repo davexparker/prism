@@ -59,6 +59,10 @@ public class DA<Symbol, Acceptance extends AcceptanceOmega>
 	private List<List<Edge>> edges;
 	/** The acceptance condition (as BitSets) */
 	private Acceptance acceptance;
+    /** number of acceptance sets (as defined in HOA) */
+    private int acceptanceSetCount = 0;
+    /** whether any transition carries acceptance information */
+    private boolean hasTransitionAcceptance = false;
     /** determinism */
     private boolean deterministic = true;
 
@@ -67,11 +71,13 @@ public class DA<Symbol, Acceptance extends AcceptanceOmega>
 	{
 		private Symbol label;
 		private int dest;
+		private BitSet acceptanceSignature;
 
-		public Edge(Symbol label, int dest)
+		public Edge(Symbol label, int dest, BitSet acceptanceSignature)
 		{
 			this.label = label;
 			this.dest = dest;
+			this.acceptanceSignature = acceptanceSignature == null ? null : (BitSet) acceptanceSignature.clone();
 		}
 	}
 
@@ -172,7 +178,15 @@ public class DA<Symbol, Acceptance extends AcceptanceOmega>
 	 */
 	public void addEdge(int src, Symbol label, int dest)
 	{
-		edges.get(src).add(new Edge(label, dest));
+		addEdge(src, label, dest, null);
+	}
+
+	public void addEdge(int src, Symbol label, int dest, BitSet acceptanceSignature)
+	{
+		if (acceptanceSignature != null && !acceptanceSignature.isEmpty()) {
+			hasTransitionAcceptance = true;
+		}
+		edges.get(src).add(new Edge(label, dest, acceptanceSignature));
 	}
 
 	// Accessors
@@ -227,6 +241,50 @@ public class DA<Symbol, Acceptance extends AcceptanceOmega>
 			if (e.label.equals(lab))
 				return e.dest;
 		return -1;
+	}
+
+	/**
+	 * Get the acceptance signature of the edge from state {@code i} with label {@code lab} and destination {@code dest}.
+	 * Returns {@code null} if no such edge exists or the edge does not carry acceptance information.
+	 */
+	public BitSet getEdgeAcceptance(int i, Symbol lab, int dest)
+	{
+		for (Edge e : edges.get(i)) {
+			if (e.dest == dest && e.label.equals(lab)) {
+				return e.acceptanceSignature == null ? null : (BitSet) e.acceptanceSignature.clone();
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Get the acceptance signature of edge {@code j} from state {@code i}.
+	 * Returns {@code null} if the edge has no acceptance information.
+	 */
+	public BitSet getEdgeAcceptance(int i, int j)
+	{
+		Edge edge = edges.get(i).get(j);
+		return edge.acceptanceSignature == null ? null : (BitSet) edge.acceptanceSignature.clone();
+	}
+
+	public String getTransitionAcceptanceStatistics()
+	{
+		if (!hasTransitionAcceptance) {
+			return "0 accepting transitions";
+		}
+		
+		int acceptingTransitions = 0;
+		for (int state = 0; state < size(); state++) {
+			int numEdges = getNumEdges(state);
+			for (int e = 0; e < numEdges; e++) {
+				BitSet edgeAcc = getEdgeAcceptance(state, e);
+				if (edgeAcc != null && !edgeAcc.isEmpty()) {
+					acceptingTransitions++;
+				}
+			}
+		}
+		String stats = acceptingTransitions + (acceptingTransitions == 1 ? " accepting transition" : " accepting transitions");
+		return stats;
 	}
 
     /**
@@ -434,6 +492,21 @@ public class DA<Symbol, Acceptance extends AcceptanceOmega>
         else  {
             return "N"+acceptance.getType().getNameAbbreviated()+"A";
         }
+	}
+
+	public void setAcceptanceSetCount(int count)
+	{
+		this.acceptanceSetCount = count;
+	}
+
+	public int getAcceptanceSetCount()
+	{
+		return acceptanceSetCount;
+	}
+
+	public boolean hasTransitionAcceptance()
+	{
+		return hasTransitionAcceptance;
 	}
 
 	public boolean checkDeterminismByEnumerationOverAP() {

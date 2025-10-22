@@ -33,10 +33,8 @@ import java.util.*;
 import java.util.regex.*;
 
 import acceptance.AcceptanceBuchi;
-import jhoafparser.consumer.HOAIntermediateStoreAndManipulate;
 import jhoafparser.parser.HOAFParser;
 import jhoafparser.parser.generated.ParseException;
-import jhoafparser.transformations.ToStateAcceptance;
 import jltl2ba.APSet;
 import jltl2ba.SimpleLTL;
 import jltl2ba.LTLFragments;
@@ -594,11 +592,9 @@ public class LTL2DA extends PrismComponent
                 da = consumerDA.getDA();
                 da.setDeterminism(det);
             } catch (HOAF2DA.TransitionBasedAcceptanceException e) {
-                // Try again, this time transforming to state acceptance
-                mainLog.println("Automaton with transition-based acceptance, automatically converting to state-based acceptance...");
-                HOAF2DA consumerDA = new HOAF2DA(det);
-                HOAIntermediateStoreAndManipulate consumerTransform = new HOAIntermediateStoreAndManipulate(consumerDA, new ToStateAcceptance());
-                HOAFParser.parseHOA(hoaStreamSupplier.get(), consumerTransform);
+                mainLog.println("Automaton with transition-based acceptance, preserving transition acceptance...");
+                HOAF2DA consumerDA = new HOAF2DA(det, true);
+                HOAFParser.parseHOA(hoaStreamSupplier.get(), consumerDA);
                 da = consumerDA.getDA();
                 da.setDeterminism(det);
             }

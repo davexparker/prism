@@ -301,7 +301,12 @@ public class LTLModelChecker extends PrismComponent
 			timingReporter.stopStep("AT construction");
 		}
 
-		mainLog.println(da.getAutomataType()+" has " + da.size() + " states, " + da.getAcceptance().getSizeStatistics() + ".");
+		if (da.hasTransitionAcceptance()){
+			mainLog.println(da.getAutomataType()+" has " + da.size() + " states, " + da.getTransitionAcceptanceStatistics() + ".");
+		} else {
+			mainLog.println(da.getAutomataType()+" has " + da.size() + " states, " + da.getAcceptance().getSizeStatistics() + ".");
+		}
+		
 		timingReporter.startStep("Canocial AP");
 		try {
 			da.checkForCanonicalAPs(labelBS.size());
@@ -678,6 +683,17 @@ public class LTLModelChecker extends PrismComponent
 			daStatesList = null;
 		}
 
+		int acceptanceSetCount = da.getAcceptanceSetCount();
+		boolean trackTransitionAcceptance = modelType == ModelType.MDP && da.hasTransitionAcceptance() && acceptanceSetCount > 0;
+		List<Map<Integer, BitSet>> transitionAcceptanceActions = null;
+		BitSet transitionGoalStates = null;
+		if (trackTransitionAcceptance) {
+			transitionAcceptanceActions = new ArrayList<Map<Integer, BitSet>>(acceptanceSetCount);
+			for (int i = 0; i < acceptanceSetCount; i++) {
+				transitionAcceptanceActions.add(new HashMap<Integer, BitSet>());
+			}
+		}
+
 		// helper to allocate a product state for pair (q2, s2)
 		java.util.function.BiFunction<Integer, Integer, Integer> ensurePair = (q_2, s_2) -> {
 			int idx = s_2 * daSize + q_2;
@@ -796,6 +812,7 @@ public class LTLModelChecker extends PrismComponent
 					// one product choice per automaton successor q'
 					Map<Integer, Distribution<Value>> distByQp = new LinkedHashMap<>();
 					Map<Integer, Double> sumByQp = new LinkedHashMap<>();
+					Map<Integer, BitSet> acceptanceByQp = trackTransitionAcceptance ? new LinkedHashMap<>() : null;
 
 					while (iter.hasNext()) {
 						Map.Entry<Integer, Value> e = iter.next();
@@ -820,6 +837,17 @@ public class LTLModelChecker extends PrismComponent
 							d.set(map_2, prob);
 							// assume Value is Double for explicit MDPs
 							sumByQp.put(qp, sumByQp.get(qp) + ((Double) prob));
+							if (trackTransitionAcceptance) {
+								BitSet edgeAcc = da.getEdgeAcceptance(q_1, s_labels, qp);
+								if (edgeAcc != null && !edgeAcc.isEmpty()) {
+									BitSet agg = acceptanceByQp.get(qp);
+									if (agg == null) {
+										agg = new BitSet(acceptanceSetCount);
+										acceptanceByQp.put(qp, agg);
+									}
+									agg.or(edgeAcc);
+								}
+							}
 						}
 					}
 
@@ -834,6 +862,13 @@ public class LTLModelChecker extends PrismComponent
 							d.set(trapIndex[0], (Value) (Double) missing);
 						}
 						((MDPSimple<Value>) prodModel).addChoice(map_1, d);
+						if (trackTransitionAcceptance && acceptanceByQp != null) {
+							BitSet actionAcceptance = acceptanceByQp.get(qp);
+							if (actionAcceptance != null && !actionAcceptance.isEmpty()) {
+								int actionIndex = ((MDPSimple<Value>) prodModel).getNumChoices(map_1) - 1;
+								registerTransitionAcceptance(transitionAcceptanceActions, map_1, actionIndex, actionAcceptance);
+							}
+						}
 					}
 					continue;
 				}
@@ -848,6 +883,7 @@ public class LTLModelChecker extends PrismComponent
 						prodDistrIntv = new Distribution<>(((IMDP<Value>) model).getIntervalEvaluator());
 					}
 				}
+				BitSet actionAcceptance = trackTransitionAcceptance ? new BitSet(acceptanceSetCount) : null;
 
 				if (!(model instanceof IntervalModel)) {
 					while (iter.hasNext()) {
@@ -855,6 +891,13 @@ public class LTLModelChecker extends PrismComponent
 						int s_2 = e.getKey();
 						Value prob = e.getValue();
 						int map_2 = newStateMap.apply(q_1, s_2);
+						if (trackTransitionAcceptance) {
+							int q_2 = da.getEdgeDestByLabel(q_1, s_labels);
+							BitSet edgeAcc = da.getEdgeAcceptance(q_1, s_labels, q_2);
+							if (edgeAcc != null && !edgeAcc.isEmpty()) {
+								actionAcceptance.or(edgeAcc);
+							}
+						}
 
 						switch (modelType) {
 							case DTMC:
@@ -875,6 +918,13 @@ public class LTLModelChecker extends PrismComponent
 						int s_2 = e.getKey();
 						Interval<Value> prob = e.getValue();
 						int map_2 = newStateMap.apply(q_1, s_2);
+						if (trackTransitionAcceptance) {
+							int q_2 = da.getEdgeDestByLabel(q_1, s_labels);
+							BitSet edgeAcc = da.getEdgeAcceptance(q_1, s_labels, q_2);
+							if (edgeAcc != null && !edgeAcc.isEmpty()) {
+								actionAcceptance.or(edgeAcc);
+							}
+						}
 
 						switch (modelType) {
 							case IDTMC:
@@ -891,6 +941,10 @@ public class LTLModelChecker extends PrismComponent
 				switch (modelType) {
 					case MDP:
 						((MDPSimple<Value>) prodModel).addActionLabelledChoice(map_1, prodDistr, ((MDP<Value>) model).getAction(s_1, j));
+						if (trackTransitionAcceptance && actionAcceptance != null && !actionAcceptance.isEmpty()) {
+							int actionIndex = ((MDPSimple<Value>) prodModel).getNumChoices(map_1) - 1;
+							registerTransitionAcceptance(transitionAcceptanceActions, map_1, actionIndex, actionAcceptance);
+						}
 						break;
 					case POMDP:
 						((POMDPSimple<Value>) prodModel).addActionLabelledChoice(map_1, prodDistr, ((POMDP<Value>) model).getAction(s_1, j));
@@ -923,6 +977,10 @@ public class LTLModelChecker extends PrismComponent
 			}
 		}
 
+		if (trackTransitionAcceptance) {
+			transitionGoalStates = computeTransitionAcceptanceGoalStates((MDPSimple<Value>) prodModel, transitionAcceptanceActions);
+		}
+
 		prodModel.findDeadlocks(false);
 
 		if (prodStatesList != null) {
@@ -931,8 +989,12 @@ public class LTLModelChecker extends PrismComponent
 
 		LTLProduct<M> product = new LTLProduct<M>((M) prodModel, model, null, daSize, invMap);
 
-		// generate acceptance for the product model by lifting
-		product.setAcceptance(liftAcceptance(product, da.getAcceptance()));
+		// generate acceptance for the product model
+		if (trackTransitionAcceptance) {
+			product.setAcceptance(new AcceptanceReach(transitionGoalStates));
+		} else {
+			product.setAcceptance(liftAcceptance(product, da.getAcceptance()));
+		}
 
 		// lift the labels
 		for (String label : model.getLabels()) {
@@ -941,6 +1003,55 @@ public class LTLModelChecker extends PrismComponent
 		}
 
 		return product;
+	}
+
+	private void registerTransitionAcceptance(List<Map<Integer, BitSet>> transitionAcceptanceActions, int productState, int actionIndex, BitSet actionAcceptance)
+	{
+		for (int idx = actionAcceptance.nextSetBit(0); idx >= 0; idx = actionAcceptance.nextSetBit(idx + 1)) {
+			Map<Integer, BitSet> perState = transitionAcceptanceActions.get(idx);
+			BitSet actions = perState.get(productState);
+			if (actions == null) {
+				actions = new BitSet();
+				perState.put(productState, actions);
+			}
+			actions.set(actionIndex);
+		}
+	}
+
+	private <Value> BitSet computeTransitionAcceptanceGoalStates(MDPSimple<Value> prodModel, List<Map<Integer, BitSet>> transitionAcceptanceActions) throws PrismException
+	{
+		BitSet goalStates = new BitSet();
+		ECComputer ecComputer = ECComputer.createECComputer(this, prodModel);
+		ecComputer.computeMECStates();
+		for (BitSet mec : ecComputer.getMECStates()) {
+			if (isMecAccepting(prodModel, mec, transitionAcceptanceActions)) {
+				goalStates.or(mec);
+			}
+		}
+		return goalStates;
+	}
+
+	private <Value> boolean isMecAccepting(MDPSimple<Value> prodModel, BitSet mecStates, List<Map<Integer, BitSet>> transitionAcceptanceActions)
+	{
+		for (Map<Integer, BitSet> perAcceptance : transitionAcceptanceActions) {
+			boolean satisfied = false;
+			for (int state = mecStates.nextSetBit(0); state >= 0 && !satisfied; state = mecStates.nextSetBit(state + 1)) {
+				BitSet actions = perAcceptance.get(state);
+				if (actions == null) {
+					continue;
+				}
+				for (int action = actions.nextSetBit(0); action >= 0; action = actions.nextSetBit(action + 1)) {
+					if (prodModel.allSuccessorsInSet(state, action, mecStates)) {
+						satisfied = true;
+						break;
+					}
+				}
+			}
+			if (!satisfied) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	@FunctionalInterface
