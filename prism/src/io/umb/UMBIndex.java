@@ -197,12 +197,15 @@ public class UMBIndex
 		/** Number of choices */
 		@SerializedName("#choices")
 		public Long numChoices;
-		/** Number of actions */
-		@SerializedName("#actions")
-		public Integer numActions;
+		/** Number of choice actions */
+		@SerializedName("#choice-actions")
+		public Integer numChoiceActions;
 		/** Number of branches */
 		@SerializedName("#branches")
 		public Long numBranches;
+		/** Number of branch actions */
+		@SerializedName("#branch-actions")
+		public Integer numBranchActions;
 		/** Type of branch probabilities */
 		public BranchProbabilityType branchProbabilityType;
 		/** Type of exit rates */
@@ -218,8 +221,9 @@ public class UMBIndex
 			checkFieldExists(numStates, "numStates");
 			checkFieldExists(numInitialStates, "numInitialStates");
 			checkFieldExists(numChoices, "numChoices");
-			checkFieldExists(numActions, "numActions");
+			checkFieldExists(numChoiceActions, "numChoiceActions");
 			checkFieldExists(numBranches, "numBranches");
+			checkFieldExists(numBranchActions, "numBranchActions");
 			checkFieldExists(branchProbabilityType, "branchProbabilityType");
 			if (time == Time.STOCHASTIC || time == Time.URGENT_STOCHASTIC) {
 				checkFieldExists(exitRateType, "exitRateType");
@@ -498,12 +502,21 @@ public class UMBIndex
 	}
 
 	/**
-	 * Set the number of actions in the model.
-	 * @param numActions The number of actions
+	 * Set the number of choice actions in the model.
+	 * @param numChoiceActions The number of choice actions
 	 */
-	public void setNumActions(int numActions)
+	public void setNumChoiceActions(int numChoiceActions)
 	{
-		transitionSystem.numActions = numActions;
+		transitionSystem.numChoiceActions = numChoiceActions;
+	}
+
+	/**
+	 * Set the number of branch actions in the model.
+	 * @param numBranchActions The number of choice actions
+	 */
+	public void setNumBranchActions(int numBranchActions)
+	{
+		transitionSystem.numBranchActions = numBranchActions;
 	}
 
 	/**
@@ -626,11 +639,19 @@ public class UMBIndex
 	}
 
 	/**
-	 * Get the number of actions in the model.
+	 * Get the number of choice actions in the model.
 	 */
-	public int getNumActions()
+	public int getNumChoiceActions()
 	{
-		return transitionSystem.numActions;
+		return transitionSystem.numChoiceActions;
+	}
+
+	/**
+	 * Get the number of branch actions in the model.
+	 */
+	public int getNumBranchActions()
+	{
+		return transitionSystem.numBranchActions;
 	}
 
 	/**

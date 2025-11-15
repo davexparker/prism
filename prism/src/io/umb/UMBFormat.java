@@ -48,10 +48,12 @@ public class UMBFormat
 	public static final String BRANCH_PROBABILITIES_FILE = "branch-probabilities" + BIN_FILE_EXT;
 	public static final String EXIT_RATES_FILE = "exit-rates" + BIN_FILE_EXT;
 	public static final String INITIAL_STATES_FILE = "initial-states" + BIN_FILE_EXT;
-	public static final String CHOICE_ACTIONS_FILE = "choice-to-action" + BIN_FILE_EXT;
-	public static final String BRANCH_ACTIONS_FILE = "branch-to-action" + BIN_FILE_EXT;
-	public static final String ACTION_STRING_OFFSETS_FILE = "action-to-action-string" + BIN_FILE_EXT;
-	public static final String ACTION_STRINGS_FILE = "action-strings" + BIN_FILE_EXT;
+	public static final String CHOICE_ACTIONS_FILE = "choice-to-choice-action" + BIN_FILE_EXT;
+	public static final String BRANCH_ACTIONS_FILE = "branch-to-branch-action" + BIN_FILE_EXT;
+	public static final String CHOICE_ACTION_STRING_OFFSETS_FILE = "choice-action-to-string" + BIN_FILE_EXT;
+	public static final String CHOICE_ACTION_STRINGS_FILE = "choice-action-strings" + BIN_FILE_EXT;
+	public static final String BRANCH_ACTION_STRING_OFFSETS_FILE = "branch-action-to-string" + BIN_FILE_EXT;
+	public static final String BRANCH_ACTION_STRINGS_FILE = "branch-action-strings" + BIN_FILE_EXT;
 
 	// Annotations
 

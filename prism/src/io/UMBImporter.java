@@ -58,6 +58,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
+import java.util.stream.IntStream;
 
 /**
  * Class to manage importing models from UMB binary files.
@@ -184,10 +185,28 @@ public class UMBImporter extends ExplicitModelImporter
 		// Extract/initialise action list
 		ArrayList<Object> actionStrings = new ArrayList<>();
 		try {
-			if (umbReader.hasActionStrings()) {
-				umbReader.extractActionStrings(actionStrings::add);
+			if (modelType.nondeterministic()) {
+				if (umbReader.hasChoiceActionIndices()) {
+					if (umbReader.hasChoiceActionStrings()) {
+						umbReader.extractChoiceActionStrings(actionStrings::add);
+					} else {
+						// No strings provided: use default action strings _1, _2, ...
+						IntStream.rangeClosed(1, umbIndex.getNumChoiceActions()).mapToObj(i -> "_" + i).forEach(actionStrings::add);
+					}
+				} else {
+					actionStrings.add(null);
+				}
 			} else {
-				actionStrings.add(null);
+				if (umbReader.hasBranchActionIndices()) {
+					if (umbReader.hasBranchActionStrings()) {
+						umbReader.extractBranchActionStrings(actionStrings::add);
+					} else {
+						// No strings provided: use default action strings _1, _2, ...
+						IntStream.rangeClosed(1, umbIndex.getNumBranchActions()).mapToObj(i -> "_" + i).forEach(actionStrings::add);
+					}
+				} else {
+					actionStrings.add(null);
+				}
 			}
 		} catch (UMBException e) {
 			throw new PrismException("Could not extract actions from UMB file");
@@ -521,14 +540,7 @@ public class UMBImporter extends ExplicitModelImporter
 			umbReader.extractBranchTargets(l -> transitionSuccessors.add((int) l));
 
 			// Extract action info
-			ArrayList<String> actionStrings = null;
-			actionStrings = new ArrayList<>();
-			if (umbReader.hasActionStrings()) {
-				umbReader.extractActionStrings(actionStrings::add);
-			} else {
-				actionStrings.add(null);
-			}
-			Object firstAction = actionStrings.get(0);
+			Object firstAction = getModelInfo().getActions().get(0);
 			IntList choiceActionIndices = null;
 			boolean hasActions = umbReader.hasChoiceActionIndices();
 			if (hasActions) {
@@ -543,7 +555,7 @@ public class UMBImporter extends ExplicitModelImporter
 				iHi = stateChoiceOffsets.getInt(s + 1);
 				int iCount = 0;
 				for (int i = iLo; i < iHi; i++) {
-					Object action = hasActions ? actionStrings.get(choiceActionIndices.getInt(i)) : firstAction;
+					Object action = hasActions ? getModelInfo().getActions().get(choiceActionIndices.getInt(i)) : firstAction;
 					storeTransition.accept(s, iCount, transitionSuccessors.getInt(i), action);
 					iCount++;
 				}

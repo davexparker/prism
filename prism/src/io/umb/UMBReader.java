@@ -186,22 +186,41 @@ public class UMBReader
 	}
 
 	/**
-	 * Does this file store a list of action strings?
+	 * Does this file store a list of choice action strings?
 	 */
-	public boolean hasActionStrings() throws UMBException
+	public boolean hasChoiceActionStrings() throws UMBException
 	{
-		return fileExists(UMBFormat.ACTION_STRING_OFFSETS_FILE) && fileExists(UMBFormat.ACTION_STRINGS_FILE);
+		return fileExists(UMBFormat.CHOICE_ACTION_STRING_OFFSETS_FILE) && fileExists(UMBFormat.CHOICE_ACTION_STRINGS_FILE);
 	}
 
 	/**
-	 * Extract the action strings
+	 * Extract the choice action strings
 	 */
-	public void extractActionStrings(Consumer<String> stringConsumer) throws UMBException
+	public void extractChoiceActionStrings(Consumer<String> stringConsumer) throws UMBException
 	{
-		int numActions = umbIndex.getNumActions();
+		int numActions = umbIndex.getNumChoiceActions();
 		List<Long> actionStringOffsets = new ArrayList<>(numActions);
-		extractLongArray(UMBFormat.ACTION_STRING_OFFSETS_FILE, numActions + 1, actionStringOffsets::add);
-		extractStringList(UMBFormat.ACTION_STRINGS_FILE, actionStringOffsets, stringConsumer);
+		extractLongArray(UMBFormat.CHOICE_ACTION_STRING_OFFSETS_FILE, numActions + 1, actionStringOffsets::add);
+		extractStringList(UMBFormat.CHOICE_ACTION_STRINGS_FILE, actionStringOffsets, stringConsumer);
+	}
+
+	/**
+	 * Does this file store a list of branch action strings?
+	 */
+	public boolean hasBranchActionStrings() throws UMBException
+	{
+		return fileExists(UMBFormat.BRANCH_ACTION_STRING_OFFSETS_FILE) && fileExists(UMBFormat.BRANCH_ACTION_STRINGS_FILE);
+	}
+
+	/**
+	 * Extract the branch action strings
+	 */
+	public void extractBranchActionStrings(Consumer<String> stringConsumer) throws UMBException
+	{
+		int numActions = umbIndex.getNumBranchActions();
+		List<Long> actionStringOffsets = new ArrayList<>(numActions);
+		extractLongArray(UMBFormat.BRANCH_ACTION_STRING_OFFSETS_FILE, numActions + 1, actionStringOffsets::add);
+		extractStringList(UMBFormat.BRANCH_ACTION_STRINGS_FILE, actionStringOffsets, stringConsumer);
 	}
 
 	// Utility methods for extracting date

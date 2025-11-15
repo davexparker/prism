@@ -187,10 +187,29 @@ public class UMBWriter
 	}
 
 	/**
-	 * Add the names of all actions as strings (can include "")
+	 * Add the names of all choice actions as strings (can include "")
 	 * @param actionStrings Iterator providing the names for all actions
 	 */
-	public void addActionStrings(List<String> actionStrings) throws UMBException
+	public void addChoiceActionStrings(List<String> actionStrings) throws UMBException
+	{
+		addActionStrings(actionStrings, UMBFormat.CHOICE_ACTION_STRING_OFFSETS_FILE, UMBFormat.CHOICE_ACTION_STRINGS_FILE);
+	}
+
+	/**
+	 * Add the names of all branch actions as strings (can include "")
+	 * @param actionStrings Iterator providing the names for all actions
+	 */
+	public void addBranchActionStrings(List<String> actionStrings) throws UMBException
+	{
+		addActionStrings(actionStrings, UMBFormat.BRANCH_ACTION_STRING_OFFSETS_FILE, UMBFormat.BRANCH_ACTION_STRINGS_FILE);
+	}
+
+	/**
+	 * Add the names of some actions as strings (can include "")
+	 * @param actionStrings Iterator providing the names for the actions
+	 *
+	 */
+	private void addActionStrings(List<String> actionStrings, String actionStringOffsetsFile, String actionStringsFile) throws UMBException
 	{
 		int numStrings = actionStrings.size();
 		long[] stringOffsets = new long[numStrings + 1];
@@ -199,8 +218,8 @@ public class UMBWriter
 			stringOffsets[i + 1] = stringOffsets[i] + actionStrings.get(i).getBytes().length;
 		}
 		PrimitiveIterator.OfLong it = Arrays.stream(stringOffsets).iterator();
-		addLongArray(UMBFormat.ACTION_STRING_OFFSETS_FILE, it, umbIndex.getNumActions() + 1);
-		addStringList(UMBFormat.ACTION_STRINGS_FILE, actionStrings);
+		addLongArray(actionStringOffsetsFile, it, actionStrings.size() + 1);
+		addStringList(actionStringsFile, actionStrings);
 	}
 
 	// Methods to add standard annotations
