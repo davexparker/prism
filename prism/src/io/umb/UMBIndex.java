@@ -218,12 +218,33 @@ public class UMBIndex
 		{
 			checkFieldExists(time, "time");
 			checkFieldExists(numPlayers, "numPlayers");
+			if (numPlayers < 0) {
+				throw new UMBException("Number of players must be non-negative");
+			}
 			checkFieldExists(numStates, "numStates");
+			if (numStates < 0) {
+				throw new UMBException("Number of states must be at least 1");
+			}
 			checkFieldExists(numInitialStates, "numInitialStates");
+			if (numInitialStates < 0) {
+				throw new UMBException("Number of initial states must be non-negative");
+			}
 			checkFieldExists(numChoices, "numChoices");
+			if (numChoices < 0) {
+				throw new UMBException("Number of choices must be non-negative");
+			}
 			checkFieldExists(numChoiceActions, "numChoiceActions");
+			if (numChoiceActions < 0) {
+				throw new UMBException("Number of choice actions must be non-negative");
+			}
 			checkFieldExists(numBranches, "numBranches");
+			if (numBranches < 0) {
+				throw new UMBException("Number of branches must be non-negative");
+			}
 			checkFieldExists(numBranchActions, "numBranchActions");
+			if (numBranchActions < 0) {
+				throw new UMBException("Number of branch actions must be non-negative");
+			}
 			checkFieldExists(branchProbabilityType, "branchProbabilityType");
 			if (time == Time.STOCHASTIC || time == Time.URGENT_STOCHASTIC) {
 				checkFieldExists(exitRateType, "exitRateType");
