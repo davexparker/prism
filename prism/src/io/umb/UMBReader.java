@@ -133,7 +133,7 @@ public class UMBReader
 	 */
 	public void extractBranchProbabilities(DoubleConsumer doubleConsumer) throws UMBException
 	{
-		long numProbs = umbIndex.transitionSystem.branchProbabilityType.intervals() ? umbIndex.getNumBranches() * 2 : umbIndex.getNumBranches();
+		long numProbs = umbIndex.getBranchProbabilityType().intervals() ? umbIndex.getNumBranches() * 2 : umbIndex.getNumBranches();
 		extractDoubleArray(UMBFormat.BRANCH_PROBABILITIES_FILE, numProbs, doubleConsumer);
 	}
 

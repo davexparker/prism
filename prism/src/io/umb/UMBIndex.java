@@ -110,24 +110,24 @@ public class UMBIndex
 		}
 	}
 
-	/** Notions of time */
-	public enum Time implements UMBField
+	/** Types of continuous numerical values */
+	public enum ContinuousNumericType implements UMBField
 	{
-		DISCRETE, STOCHASTIC, URGENT_STOCHASTIC
-	}
-
-	/** Types of branch probabilities */
-	public enum BranchProbabilityType implements UMBField
-	{
-		NONE, DOUBLE, RATIONAL, DOUBLE_INTERVAL, RATIONAL_INTERVAL;
+		DOUBLE, RATIONAL, DOUBLE_INTERVAL, RATIONAL_INTERVAL;
 
 		/**
-		 * Returns true if branch probabilities are defined as intervals.
+		 * Returns true if values are defined as intervals.
 		 */
 		public boolean intervals()
 		{
 			return this == DOUBLE_INTERVAL || this == RATIONAL_INTERVAL;
 		}
+	}
+
+	/** Notions of time */
+	public enum Time implements UMBField
+	{
+		DISCRETE, STOCHASTIC, URGENT_STOCHASTIC
 	}
 
 	// Index contents
@@ -207,9 +207,9 @@ public class UMBIndex
 		@SerializedName("#branch-actions")
 		public Integer numBranchActions;
 		/** Type of branch probabilities */
-		public BranchProbabilityType branchProbabilityType;
+		public ContinuousNumericType branchProbabilityType;
 		/** Type of exit rates */
-		public BranchProbabilityType exitRateType;
+		public ContinuousNumericType exitRateType;
 
 		/**
 		 * Check this object is valid; throw an exception if not.
@@ -245,7 +245,6 @@ public class UMBIndex
 			if (numBranchActions < 0) {
 				throw new UMBException("Number of branch actions must be non-negative");
 			}
-			checkFieldExists(branchProbabilityType, "branchProbabilityType");
 			if (time == Time.STOCHASTIC || time == Time.URGENT_STOCHASTIC) {
 				checkFieldExists(exitRateType, "exitRateType");
 			}
@@ -544,7 +543,7 @@ public class UMBIndex
 	 * Set the type of branch probabilities used in the model.
 	 * @param branchProbabilityType The type of branch probabilities
 	 */
-	public void setBranchProbabilityType(BranchProbabilityType branchProbabilityType)
+	public void setBranchProbabilityType(ContinuousNumericType branchProbabilityType)
 	{
 		transitionSystem.branchProbabilityType = branchProbabilityType;
 	}
@@ -553,7 +552,7 @@ public class UMBIndex
 	 * Set the type of exit rates used in the model.
 	 * @param exitRateType The type of exit rates
 	 */
-	public void setExitRateType(BranchProbabilityType exitRateType)
+	public void setExitRateType(ContinuousNumericType exitRateType)
 	{
 		transitionSystem.exitRateType = exitRateType;
 	}
@@ -678,7 +677,7 @@ public class UMBIndex
 	/**
 	 * Get the type of branch probabilities used in the model.
 	 */
-	public BranchProbabilityType getBranchProbabilityType()
+	public ContinuousNumericType getBranchProbabilityType()
 	{
 		return transitionSystem.branchProbabilityType;
 	}
@@ -686,7 +685,7 @@ public class UMBIndex
 	/**
 	 * Get the type of exit rates used in the model.
 	 */
-	public BranchProbabilityType getExitRateType()
+	public ContinuousNumericType getExitRateType()
 	{
 		return transitionSystem.exitRateType;
 	}

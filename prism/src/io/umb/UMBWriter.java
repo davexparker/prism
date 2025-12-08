@@ -138,7 +138,7 @@ public class UMBWriter
 	 */
 	public void addBranchProbabilities(PrimitiveIterator.OfDouble branchValues)
 	{
-		long numProbs = umbIndex.transitionSystem.branchProbabilityType.intervals() ? umbIndex.getNumBranches() * 2 : umbIndex.getNumBranches();
+		long numProbs = umbIndex.getBranchProbabilityType().intervals() ? umbIndex.getNumBranches() * 2 : umbIndex.getNumBranches();
 		addDoubleArray(UMBFormat.BRANCH_PROBABILITIES_FILE, branchValues, numProbs);
 	}
 

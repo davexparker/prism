@@ -324,17 +324,15 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 		umbIndex.setTime(modelType.continuousTime() ? UMBIndex.Time.STOCHASTIC : UMBIndex.Time.DISCRETE);
 		umbIndex.setNumPlayers(model.getNumPlayers());
 		if (modelType.intervals()) {
-			umbIndex.setBranchProbabilityType(UMBIndex.BranchProbabilityType.DOUBLE_INTERVAL);
+			umbIndex.setBranchProbabilityType(UMBIndex.ContinuousNumericType.DOUBLE_INTERVAL);
 		} else if (modelType.isProbabilistic()) {
-			umbIndex.setBranchProbabilityType(UMBIndex.BranchProbabilityType.DOUBLE);
-		} else {
-			umbIndex.setBranchProbabilityType(UMBIndex.BranchProbabilityType.NONE);
+			umbIndex.setBranchProbabilityType(UMBIndex.ContinuousNumericType.DOUBLE);
 		}
 		if (modelType.isProbabilistic() && !modelType.choicesSumToOne()) {
 			if (modelType.intervals()) {
-				umbIndex.setExitRateType(UMBIndex.BranchProbabilityType.DOUBLE_INTERVAL);
+				umbIndex.setExitRateType(UMBIndex.ContinuousNumericType.DOUBLE_INTERVAL);
 			} else {
-				umbIndex.setExitRateType(UMBIndex.BranchProbabilityType.DOUBLE);
+				umbIndex.setExitRateType(UMBIndex.ContinuousNumericType.DOUBLE);
 			}
 		}
 	}

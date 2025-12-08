@@ -295,9 +295,10 @@ public class UMBImporter extends ExplicitModelImporter
 	private static ModelType getModelTypeFromIndex(UMBIndex umbIndex) throws PrismException
 	{
 		if (umbIndex.getNumPlayers() == 0) {
+			if (umbIndex.getBranchProbabilityType() == null) {
+				throw new PrismException("Unsupported model type in UMB file");
+			}
 			switch (umbIndex.getBranchProbabilityType()) {
-				case NONE:
-					throw new PrismException("Unsupported model type in UMB file");
 				case DOUBLE:
 				case RATIONAL:
 					switch (umbIndex.getTime()) {
@@ -319,9 +320,10 @@ public class UMBImporter extends ExplicitModelImporter
 					}
 			}
 		} else if (umbIndex.getNumPlayers() == 1) {
+			if (umbIndex.getBranchProbabilityType() == null) {
+				return ModelType.LTS;
+			}
 			switch (umbIndex.getBranchProbabilityType()) {
-				case NONE:
-					return ModelType.LTS;
 				case DOUBLE:
 				case RATIONAL:
 					switch (umbIndex.getTime()) {
