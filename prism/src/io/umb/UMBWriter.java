@@ -222,6 +222,34 @@ public class UMBWriter
 		addStringList(actionStringsFile, actionStrings);
 	}
 
+	/**
+	 * Add the (deterministic) observations for all states
+	 * @param stateObservations Iterator providing the observations for all states
+	 */
+	public void addStateObservations(PrimitiveIterator.OfInt stateObservations) throws UMBException
+	{
+		addObservations(UMBIndex.UMBEntity.STATES, stateObservations);
+	}
+
+	/**
+	 * Add the (deterministic) observations for all branches
+	 * @param branchObservations Iterator providing the observations for all branches
+	 */
+	public void addBranchObservations(PrimitiveIterator.OfInt branchObservations) throws UMBException
+	{
+		addObservations(UMBIndex.UMBEntity.BRANCHES, branchObservations);
+	}
+
+	/**
+	 * Add the (deterministic) observations for some entity (states, branches)
+	 * @param entity The entity for which observations are being added
+	 * @param observations Iterator providing the observations
+	 */
+	public void addObservations(UMBIndex.UMBEntity entity, PrimitiveIterator.OfInt observations) throws UMBException
+	{
+		addLongArray(UMBFormat.observationsFile(entity), new UMBUtils.IntToLongIteratorAdapter(observations), umbIndex.getNumStates());
+	}
+
 	// Methods to add standard annotations
 
 	/**
@@ -445,6 +473,37 @@ public class UMBWriter
 	public void addStateValuations(Iterator<UMBBitString> stateValuations, UMBBitPacking bitPacking) throws UMBException
 	{
 		addValuations(UMBIndex.UMBEntity.STATES, stateValuations, bitPacking);
+	}
+
+	/**
+	 * Add a new description for the valuations to be attached to observations,
+	 * extracted from a {@link UMBBitPacking} object.
+	 * Returns the index of the description within those that exist for the entity.
+	 * @param bitPacking Definition of valuation contents
+	 */
+	public int addObservationValuationDescription(UMBBitPacking bitPacking) throws UMBException
+	{
+		return addValuationDescription(UMBIndex.UMBEntity.OBSERVATIONS, bitPacking);
+	}
+
+	/**
+	 * Add observation valuations, i.e., observable values for each observation, encoded as a bitstring
+	 * @param observationValuations Iterator providing bitstrings defining the observation valuations
+	 * @param numBytes Number of bytes in each bitstring
+	 */
+	public void addObservationValuations(Iterator<UMBBitString> observationValuations, int numBytes) throws UMBException
+	{
+		addValuations(UMBIndex.UMBEntity.OBSERVATIONS, observationValuations, numBytes);
+	}
+
+	/**
+	 * Add observation valuations, i.e., observable values for each observation, encoded as a bitstring
+	 * @param observationValuations Iterator providing bitstrings defining the observation valuations
+	 * @param bitPacking Information about how the bitstrings are packed
+	 */
+	public void addObservationValuations(Iterator<UMBBitString> observationValuations, UMBBitPacking bitPacking) throws UMBException
+	{
+		addValuations(UMBIndex.UMBEntity.OBSERVATIONS, observationValuations, bitPacking);
 	}
 
 	/**

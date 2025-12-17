@@ -223,6 +223,34 @@ public class UMBReader
 		extractStringList(UMBFormat.BRANCH_ACTION_STRINGS_FILE, actionStringOffsets, stringConsumer);
 	}
 
+	/**
+	 * Extract the (deterministic) observations for all states
+	 * @param longConsumer Consumer to receive the observation indices
+	 */
+	public void extractStateObservations(LongConsumer longConsumer) throws UMBException
+	{
+		extractObservations(UMBIndex.UMBEntity.STATES, longConsumer);
+	}
+
+	/**
+	 * Extract the (deterministic) observations for all branches
+	 * @param longConsumer Consumer to receive the observation indices
+	 */
+	public void extractBranchObservations(LongConsumer longConsumer) throws UMBException
+	{
+		extractObservations(UMBIndex.UMBEntity.BRANCHES, longConsumer);
+	}
+
+	/**
+	 * Extract the (deterministic) observations for some entity (states, branches)
+	 * @param entity The entity for which observations are being extracted
+	 * @param longConsumer Consumer to receive the observation indices
+	 */
+	public void extractObservations(UMBIndex.UMBEntity entity, LongConsumer longConsumer) throws UMBException
+	{
+		extractLongArray(UMBFormat.observationsFile(entity), umbIndex.getEntityCount(entity), longConsumer);
+	}
+
 	// Utility methods for extracting date
 
 	public <T extends LongConsumer> T extractStateChoiceCounts(T longConsumer) throws UMBException
@@ -389,20 +417,40 @@ public class UMBReader
 	 */
 	public void extractStateValuations(Consumer<UMBBitString> bitstringConsumer) throws UMBException
 	{
-		UMBBitPacking bitPacking = umbIndex.getValuationBitPacking(UMBIndex.UMBEntity.STATES);
-		extractBitStringArray(UMBFormat.valuationsFile(UMBIndex.UMBEntity.STATES), umbIndex.getNumStates(), bitPacking.getTotalNumBytes(), bitstringConsumer);
+		extractValuations(UMBIndex.UMBEntity.STATES, bitstringConsumer);
 	}
 
 	/**
-	 * Compute the range of a (signed or unsigned) integer variable, from the values stored for it in state valuations.
-	 * @param bitPacking The bit-packing for state valuations
+	 * Extract the observation valuations (observable values), one bitstring per observation.
+	 * @param bitstringConsumer Bitstring consumer
+	 */
+	public void extractObservationValuations(Consumer<UMBBitString> bitstringConsumer) throws UMBException
+	{
+		extractValuations(UMBIndex.UMBEntity.OBSERVATIONS, bitstringConsumer);
+	}
+
+	/**
+	 * Extract the valuations (variable values) for an entity, as bitstrings.
+	 * @param entity The entity to which the valuations apply
+	 * @param bitstringConsumer Bitstring consumer
+	 */
+	public void extractValuations(UMBIndex.UMBEntity entity, Consumer<UMBBitString> bitstringConsumer) throws UMBException
+	{
+		UMBBitPacking bitPacking = umbIndex.getValuationBitPacking(entity);
+		extractBitStringArray(UMBFormat.valuationsFile(entity), umbIndex.getEntityCount(entity), bitPacking.getTotalNumBytes(), bitstringConsumer);
+	}
+
+	/**
+	 * Compute the range of a (signed or unsigned) integer variable, from the values stored for it in a list of valuations.
+	 * @param entity The entity to which the valuations apply
+	 * @param bitPacking The bit-packing for the valuations
 	 * @param i Index of the variable (in the bit-packing)
 	 */
-	public UMBReader.IntRange getStateValuationIntRange(UMBBitPacking bitPacking, int i) throws PrismException
+	public UMBReader.IntRange getValuationIntRange(UMBIndex.UMBEntity entity, UMBBitPacking bitPacking, int i) throws PrismException
 	{
 		UMBReader.IntRangeComputer varRange = new UMBReader.IntRangeComputer();
 		try {
-			extractStateValuations(bitString -> {
+			extractValuations(entity, bitString -> {
 				try {
 					switch (bitPacking.getVariable(i).type) {
 						case "int":

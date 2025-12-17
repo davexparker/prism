@@ -289,6 +289,26 @@ public class UMBBitPacking
 	// Methods to extract values stored in bit strings according to this packing
 
 	/**
+	 * Get the value of the {@code i}th variable, from a bit string, as an Object
+	 */
+	public Object getVariableValue(UMBBitString bitString, int i) throws UMBException
+	{
+		BitPackedVariable var = getVariable(i);
+		switch (var.type) {
+			case "bool":
+				return getBooleanVariableValue(bitString, i);
+			case "int":
+				return getIntVariableValue(bitString, i);
+			case "uint":
+				return getUIntVariableValue(bitString, i);
+			case "double":
+				return getDoubleVariableValue(bitString, i);
+			default:
+				throw new UMBException("Unknown variable type: " + var.type);
+		}
+	}
+
+	/**
 	 * Get the value of the {@code i}th variable, which must be a (signed) integer, from a bit string.
 	 */
 	public int getIntVariableValue(UMBBitString bitString, int i) throws UMBException

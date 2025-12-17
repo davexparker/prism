@@ -59,6 +59,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
+import java.util.function.IntConsumer;
+import java.util.function.LongConsumer;
 import java.util.stream.IntStream;
 
 /**
@@ -78,10 +80,11 @@ public class UMBImporter extends ExplicitModelImporter
 	private List<String> rewardIDs;
 	private List<String> varIDs;
 
-	// Num states/transitions
+	// Num states/transitions/etc.
 	private int numStates = 0;
 	private int numChoices = 0;
 	private int numTransitions = 0;
+	private int numObservations = 0;
 
 	// Reward info extracted from files and then stored in a BasicRewardInfo object
 	private BasicRewardInfo basicRewardInfo;
@@ -97,6 +100,7 @@ public class UMBImporter extends ExplicitModelImporter
 			numStates = SafeCast.toIntExact(umbIndex.getNumStates());
 			numChoices = SafeCast.toIntExact(umbIndex.getNumChoices());
 			numTransitions = SafeCast.toIntExact(umbIndex.getNumBranches());
+			numObservations = SafeCast.toIntExact(umbIndex.getNumObservations());
 		} catch (ArithmeticException e) {
 			throw new PrismException("UMB model is too large to be imported");
 		} catch (UMBException e) {
@@ -113,7 +117,7 @@ public class UMBImporter extends ExplicitModelImporter
 	@Override
 	public boolean providesObservations()
 	{
-		return false;
+		return umbIndex.hasValuations(UMBIndex.UMBEntity.OBSERVATIONS);
 	}
 
 	@Override
@@ -159,8 +163,7 @@ public class UMBImporter extends ExplicitModelImporter
 	@Override
 	public int getNumObservations() throws PrismException
 	{
-		// TODO
-		return 0;
+		return numObservations;
 	}
 
 	@Override
@@ -226,66 +229,25 @@ public class UMBImporter extends ExplicitModelImporter
 			throw new PrismException("Could not extract actions from UMB file");
 		}
 		basicModelInfo.setActionList(actionStrings);
-		// Add variable info
+		// Add variable info, extracting from UMB file if provided
 		VarList varList = basicModelInfo.getVarList();
 		if (providesStates()) {
-			// We extract info about variable valuations from the UMB file
-			try {
-				UMBBitPacking bitPacking = umbIndex.getValuationBitPacking(UMBIndex.UMBEntity.STATES);
-				int numVars = bitPacking.getNumVariables();
-				for (int i = 0; i < numVars; i++) {
-					UMBBitPacking.BitPackedVariable var = bitPacking.getVariable(i);
-					// Get valid, unique variable name (usually just the provided variable name)
-					String varName = Prism.toIdentifier(var.name);
-					while (varList.getIndex(varName) != -1) {
-						varName = "_" + varName;
-					}
-					// Determine type, range, etc. of variable
-					DeclarationType varDecl = null;
-					switch (var.type) {
-						case "bool":
-							varDecl = new DeclarationBool();
-							break;
-						case "int":
-						case "uint":
-							boolean computeRange = true;
-							int varIntMin;
-							int varIntMax;
-							if (computeRange) {
-								UMBReader.IntRange varIntRange = umbReader.getStateValuationIntRange(bitPacking, i);
-								varIntMin = varIntRange.getMin();
-								varIntMax = varIntRange.getMax();
-							} else {
-								// Default to min/max values for (u)ints
-								if (var.type.equals("int")) {
-									varIntMin = -(1 << (bitPacking.getVariableSize(i) - 1));
-									varIntMax = (1 << (bitPacking.getVariableSize(i) - 1)) -1;
-								} else {
-									varIntMin = 0;
-									varIntMax = (1 << bitPacking.getVariableSize(i)) - 1;
-								}
-							}
-							// Note: we do not yet allow 0-range variables
-							if (varIntMin == varIntMax) {
-								varIntMax++;
-							}
-							varDecl = new DeclarationInt(Expression.Int(varIntMin), Expression.Int(varIntMax));
-							break;
-						case "double":
-							varDecl = new DeclarationDoubleUnbounded();
-							break;
-						default:
-							throw new PrismException("Unknown variable type in UMB index: " + var.type);
-					}
-					varList.addVar(varName, varDecl, -1);
-				}
-			} catch (UMBException e) {
-				throw new RuntimeException(e);
-			}
-
-
+			buildVarInfo(UMBIndex.UMBEntity.STATES, varList);
 		} else {
 			varList.addVar(defaultVariableName(), defaultVariableDeclarationType(), -1);
+		}
+		// Add observable info, extracting from UMB file if provided
+		if (providesObservations()) {
+			VarList obsVarList = new VarList();
+			obsVarList.setEvaluateContext(basicModelInfo.getEvaluateContext());
+			buildVarInfo(UMBIndex.UMBEntity.OBSERVATIONS, obsVarList);
+			for (int i = 0; i < obsVarList.getNumVars(); i++) {
+				basicModelInfo.getObservableNames().add(obsVarList.getName(i));
+				basicModelInfo.getObservableTypeList().add(obsVarList.getType(i));
+			}
+		} else {
+			basicModelInfo.getObservableNames().add(defaultObservableName());
+			basicModelInfo.getObservableTypeList().add(defaultObservableType());
 		}
 		// Add label info
 		// We extract all labels (AP) annotations from the UMB file, ignoring "deadlock" if present
@@ -310,6 +272,9 @@ public class UMBImporter extends ExplicitModelImporter
 	{
 		if (umbIndex.getNumPlayers() == 0) {
 			if (umbIndex.getBranchProbabilityType() == null) {
+				throw new PrismException("Unsupported model type in UMB file");
+			}
+			if (umbIndex.getNumObservations() > 0) {
 				throw new PrismException("Unsupported model type in UMB file");
 			}
 			switch (umbIndex.getBranchProbabilityType()) {
@@ -342,13 +307,16 @@ public class UMBImporter extends ExplicitModelImporter
 				case RATIONAL:
 					switch (umbIndex.getTime()) {
 						case DISCRETE:
-							return ModelType.MDP;
+							return (umbIndex.getNumObservations() > 0) ? ModelType.POMDP: ModelType.MDP;
 						case STOCHASTIC:
 						case URGENT_STOCHASTIC:
 							throw new PrismException("Unsupported model type in UMB file");
 					}
 				case DOUBLE_INTERVAL:
 				case RATIONAL_INTERVAL:
+					if (umbIndex.getNumObservations() > 0) {
+						throw new PrismException("Unsupported model type in UMB file");
+					}
 					switch (umbIndex.getTime()) {
 						case DISCRETE:
 							return ModelType.IMDP;
@@ -381,6 +349,67 @@ public class UMBImporter extends ExplicitModelImporter
 		}
 	}
 
+	/**
+	 * Extract info about variables/observables for states/observations and store in the provided VarList.
+	 * @param entity State or observations?
+	 * @param varList Storage for variable/observable info
+	 */
+	private void buildVarInfo(UMBIndex.UMBEntity entity, VarList varList) throws PrismException
+	{
+		try {
+			UMBBitPacking bitPacking = umbIndex.getValuationBitPacking(entity);
+			int numVars = bitPacking.getNumVariables();
+			for (int i = 0; i < numVars; i++) {
+				UMBBitPacking.BitPackedVariable var = bitPacking.getVariable(i);
+				// Get valid, unique variable name (usually just the provided variable name)
+				String varName = Prism.toIdentifier(var.name);
+				while (varList.getIndex(varName) != -1) {
+					varName = "_" + varName;
+				}
+				// Determine type, range, etc. of variable
+				DeclarationType varDecl = null;
+				switch (var.type) {
+					case "bool":
+						varDecl = new DeclarationBool();
+						break;
+					case "int":
+					case "uint":
+						boolean computeRange = true;
+						int varIntMin;
+						int varIntMax;
+						if (computeRange) {
+							UMBReader.IntRange varIntRange = umbReader.getValuationIntRange(entity, bitPacking, i);
+							varIntMin = varIntRange.getMin();
+							varIntMax = varIntRange.getMax();
+						} else {
+							// Default to min/max values for (u)ints
+							if (var.type.equals("int")) {
+								varIntMin = -(1 << (bitPacking.getVariableSize(i) - 1));
+								varIntMax = (1 << (bitPacking.getVariableSize(i) - 1)) -1;
+							} else {
+								varIntMin = 0;
+								varIntMax = (1 << bitPacking.getVariableSize(i)) - 1;
+							}
+						}
+						// Note: we do not yet allow 0-range variables
+						if (varIntMin == varIntMax) {
+							varIntMax++;
+						}
+						varDecl = new DeclarationInt(Expression.Int(varIntMin), Expression.Int(varIntMax));
+						break;
+					case "double":
+						varDecl = new DeclarationDoubleUnbounded();
+						break;
+					default:
+						throw new PrismException("Unknown variable type in UMB index: " + var.type);
+				}
+				varList.addVar(varName, varDecl, -1);
+			}
+		} catch (UMBException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
 	@Override
 	public void extractStates(IOUtils.StateDefnConsumer storeStateDefn) throws PrismException
 	{
@@ -398,22 +427,36 @@ public class UMBImporter extends ExplicitModelImporter
 				try {
 					//System.out.println(s + ":" + bitPacking.decodeBitString(bitString));
 					for (int i = 0; i < numVars; i++) {
-						switch (bitPacking.getVariable(i).type) {
-							case "bool":
-								storeStateDefn.accept(s.get(), i, bitPacking.getBooleanVariableValue(bitString, i));
-								break;
-							case "int":
-								storeStateDefn.accept(s.get(), i, bitPacking.getIntVariableValue(bitString, i));
-								break;
-							case "uint":
-								storeStateDefn.accept(s.get(), i, bitPacking.getUIntVariableValue(bitString, i));
-								break;
-							case "double":
-								storeStateDefn.accept(s.get(), i, bitPacking.getDoubleVariableValue(bitString, i));
-								break;
-							default:
-								throw new PrismException("Unknown variable type in UMB index: " + bitPacking.getVariable(i).type);
-						}
+						storeStateDefn.accept(s.get(), i, bitPacking.getVariableValue(bitString, i));
+					}
+					s.incrementAndGet();
+				} catch (UMBException | PrismException e) {
+					throw new RuntimeException(e.getMessage());
+				}
+			});
+		} catch (UMBException | RuntimeException e) {
+			throw new PrismException("UMB import problem: " + e.getMessage());
+		}
+	}
+
+	@Override
+	public void extractObservationDefinitions(IOUtils.StateDefnConsumer storeObservationDefn) throws PrismException
+	{
+		// If there is no info, just assume that states comprise a single integer value
+		if (!providesObservations()) {
+			super.extractObservationDefinitions(storeObservationDefn);
+			return;
+		}
+		// Otherwise, extract observation observable info
+		try {
+			UMBBitPacking bitPacking = umbIndex.getValuationBitPacking(UMBIndex.UMBEntity.OBSERVATIONS);
+			AtomicInteger s = new AtomicInteger(0);
+			int numVars = bitPacking.getNumVariables();
+			umbReader.extractObservationValuations(bitString -> {
+				try {
+					//System.out.println(s + ":" + bitPacking.decodeBitString(bitString));
+					for (int i = 0; i < numVars; i++) {
+						storeObservationDefn.accept(s.get(), i, bitPacking.getVariableValue(bitString, i));
 					}
 					s.incrementAndGet();
 				} catch (UMBException | PrismException e) {
@@ -614,7 +657,17 @@ public class UMBImporter extends ExplicitModelImporter
 	@Override
 	public void extractObservations(IOUtils.StateIntConsumer storeObservation) throws PrismException
 	{
-		throw new PrismNotSupportedException("Observation import not yet supported for UMB");
+		try {
+			// Extract observations from UMB
+			IntList stateObservations = new IntArrayList(numStates);
+			umbReader.extractStateObservations(l -> stateObservations.add((int) l));
+			// Store observations in model
+			for (int s = 0; s < numStates; s++) {
+				storeObservation.accept(s, stateObservations.getInt(s));
+			}
+		} catch (UMBException e) {
+			throw new PrismException("UMB import problem: " + e.getMessage());
+		}
 	}
 
 	@Override
@@ -759,7 +812,26 @@ public class UMBImporter extends ExplicitModelImporter
 	// Utility classes
 
 	/**
-	 * Class to add an increasing index to values from a consumer.
+	 * Class to map a long consumer to an int consumer.
+	 */
+	private static class LongConsumerToIntConsumer implements LongConsumer
+	{
+		IntConsumer out;
+
+		LongConsumerToIntConsumer(IntConsumer out)
+		{
+			this.out = out;
+		}
+
+		@Override
+		public void accept(long v)
+		{
+			out.accept(SafeCast.toIntExact(v));
+		}
+	}
+
+	/**
+	 * Class to add an increasing index to values from a double consumer.
 	 */
 	private static class IndexedConsumer<Value> implements Consumer<Value>
 	{

@@ -37,6 +37,7 @@ import explicit.LTS;
 import explicit.MDP;
 import explicit.Model;
 import explicit.NondetModel;
+import explicit.PartiallyObservableModel;
 import explicit.Utils;
 import explicit.rewards.Rewards;
 import it.unimi.dsi.fastutil.ints.IntIterators;
@@ -81,6 +82,11 @@ public interface ModelAccess<Value>
 	 * Get the number of players.
 	 */
 	int getNumPlayers();
+
+	/**
+	 * Get the number of observations.
+	 */
+	int getNumObservations();
 
 	/**
 	 * Get the number of states.
@@ -187,6 +193,12 @@ public interface ModelAccess<Value>
 	PrimitiveIterator.OfInt getInitialStates();
 
 	/**
+	 * Get the (deterministic) observation for state {@code s}
+	 * of a partially observable model (returns -1 for other models).
+	 */
+	int getStateObservation(int s);
+
+	/**
 	 * For interval models, Get the underlying model over {@code Interval<Value>}.
 	 */
 	ModelAccess<Interval<Value>> getIntervalModel();
@@ -223,6 +235,16 @@ public interface ModelAccess<Value>
 			public int getNumPlayers()
 			{
 				return model.getNumPlayers();
+			}
+
+			@Override
+			public int getNumObservations()
+			{
+				if (getModelType().partiallyObservable()) {
+					return ((PartiallyObservableModel<?>) model).getNumObservations();
+				} else {
+					return 0;
+				}
 			}
 
 			@Override
@@ -353,6 +375,16 @@ public interface ModelAccess<Value>
 			public PrimitiveIterator.OfInt getInitialStates()
 			{
 				return IntIterators.asIntIterator(model.getInitialStates().iterator());
+			}
+
+			@Override
+			public int getStateObservation(int s)
+			{
+				if (model instanceof PartiallyObservableModel) {
+					return ((PartiallyObservableModel<Value>) model).getObservation(s);
+				} else {
+					return -1;
+				}
 			}
 
 			@Override
@@ -544,6 +576,21 @@ public interface ModelAccess<Value>
 			public int getIntValue()
 			{
 				return actionIndex;
+			}
+		};
+	}
+
+	/**
+	 * Get the observations for all states, as an iterator.
+	 */
+	default PrimitiveIterator.OfInt getStateObservations()
+	{
+		return new ModelAccessIterators.GetStateIntValues<>(this)
+		{
+			@Override
+			public int getIntValue()
+			{
+				return model.getStateObservation(s);
 			}
 		};
 	}

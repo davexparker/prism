@@ -42,6 +42,7 @@ import io.UMBBitPacking;
 import java.lang.reflect.Type;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -81,7 +82,7 @@ public class UMBIndex
 	/** UMB file entities which can be annotated/indexed */
 	public enum UMBEntity implements UMBField
 	{
-		STATES, CHOICES, BRANCHES;
+		STATES, CHOICES, BRANCHES, OBSERVATIONS;
 		@Override
 		public String toString()
 		{
@@ -89,6 +90,7 @@ public class UMBIndex
 				case STATES: return "states";
 				case CHOICES: return "choices";
 				case BRANCHES: return "branches";
+				case OBSERVATIONS: return "observations";
 				default: return "?";
 			}
 		}
@@ -206,6 +208,11 @@ public class UMBIndex
 		/** Number of branch actions */
 		@SerializedName("#branch-actions")
 		public Integer numBranchActions;
+		/** Number of observations */
+		@SerializedName("#observations")
+		public Integer numObservations;
+		/** Observation style */
+		public UMBEntity observationsApplyTo;
 		/** Type of branch probabilities */
 		public ContinuousNumericType branchProbabilityType;
 		/** Type of exit rates */
@@ -244,6 +251,16 @@ public class UMBIndex
 			checkFieldExists(numBranchActions, "numBranchActions");
 			if (numBranchActions < 0) {
 				throw new UMBException("Number of branch actions must be non-negative");
+			}
+			checkFieldExists(numObservations, "numObservations");
+			if (numObservations < 0) {
+				throw new UMBException("Number of observations must be non-negative");
+			}
+			if (numObservations > 0) {
+				checkFieldExists(observationsApplyTo, "observationsApplyTo");
+				if (!EnumSet.of(UMBEntity.STATES, UMBEntity.CHOICES, UMBEntity.BRANCHES).contains(observationsApplyTo)) {
+					throw new UMBException("Invalid value \" + observationsApplyTo" + "\" for " + fieldNameToUMB("observationsApplyTo"));
+				}
 			}
 			if (time == Time.STOCHASTIC || time == Time.URGENT_STOCHASTIC) {
 				checkFieldExists(exitRateType, "exitRateType");
@@ -546,6 +563,24 @@ public class UMBIndex
 	}
 
 	/**
+	 * Set the number of observations in the model.
+	 * @param numObservations The number of observations
+	 */
+	public void setNumObservations(int numObservations)
+	{
+		transitionSystem.numObservations = numObservations;
+	}
+
+	/**
+	 * Set the entity (e.g. states/branches) observations are attached to.
+	 * @param observationsApplyTo The entity
+	 */
+	public void setObservationsApplyTo(UMBEntity observationsApplyTo)
+	{
+		transitionSystem.observationsApplyTo = observationsApplyTo;
+	}
+
+	/**
 	 * Set the type of branch probabilities used in the model.
 	 * @param branchProbabilityType The type of branch probabilities
 	 */
@@ -690,6 +725,22 @@ public class UMBIndex
 	}
 
 	/**
+	 * Get the number of observations in the model.
+	 */
+	public int getNumObservations()
+	{
+		return transitionSystem.numObservations;
+	}
+
+	/**
+	 * Get the entity (e.g. states/branches) observations are attached to.
+	 */
+	public UMBEntity getObservationsApplyTo()
+	{
+		return transitionSystem.observationsApplyTo;
+	}
+
+	/**
 	 * Get the type of branch probabilities used in the model.
 	 */
 	public ContinuousNumericType getBranchProbabilityType()
@@ -717,6 +768,8 @@ public class UMBIndex
 				return getNumChoices();
 			case BRANCHES:
 				return getNumBranches();
+			case OBSERVATIONS:
+				return getNumObservations();
 			default:
 				throw new UMBException("Unsupported entity \"" + entity + "\"");
 		}

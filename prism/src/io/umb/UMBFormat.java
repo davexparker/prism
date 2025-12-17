@@ -54,6 +54,8 @@ public class UMBFormat
 	public static final String CHOICE_ACTION_STRINGS_FILE = "choice-action-strings" + BIN_FILE_EXT;
 	public static final String BRANCH_ACTION_STRING_OFFSETS_FILE = "branch-action-to-string" + BIN_FILE_EXT;
 	public static final String BRANCH_ACTION_STRINGS_FILE = "branch-action-strings" + BIN_FILE_EXT;
+	public static final String OBSERVATIONS_DIR = "observations";
+	public static final String OBSERVATIONS_FILE = "values" + BIN_FILE_EXT;
 
 	// Annotations
 
@@ -95,6 +97,22 @@ public class UMBFormat
 
 	/** Default compression format */
 	public static final CompressionFormat DEFAULT_COMPRESSION_FORMAT = CompressionFormat.XZ;
+
+	/**
+	 * Get the directory name for observations
+	 */
+	public static String observationsDir(UMBIndex.UMBEntity entity)
+	{
+		return OBSERVATIONS_DIR + "/" + "for-" + entity;
+	}
+
+	/**
+	 * Get the filename for observations
+	 */
+	public static String observationsFile(UMBIndex.UMBEntity entity)
+	{
+		return observationsDir(entity) + "/" + OBSERVATIONS_FILE;
+	}
 
 	/**
 	 * Get the directory name for an annotation

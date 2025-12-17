@@ -27,6 +27,8 @@
 package io;
 
 import explicit.Model;
+
+import explicit.PartiallyObservableModel;
 import explicit.rewards.Rewards;
 import io.umb.UMBBitString;
 import io.umb.UMBException;
@@ -45,7 +47,6 @@ import parser.type.TypeBool;
 import parser.type.TypeDouble;
 import parser.type.TypeInt;
 import prism.Evaluator;
-import prism.ModelInfo;
 import prism.ModelType;
 import prism.Prism;
 import prism.PrismException;
@@ -129,10 +130,9 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 		ModelType modelType = model.getModelType();
 		int numStates = model.getNumStates();
 		boolean showActions = modelExportOptions.getShowActions();
-		boolean showStates = modelExportOptions.getShowStates();
 
 		// Check for currently unsupported cases
-		if (modelType.partiallyObservable() || (modelType.uncertain() && !modelType.intervals())) {
+		if (modelType.uncertain() && !modelType.intervals()) {
 			throw new PrismNotSupportedException(modelType + "s cannot yet be exported to UMB");
 		}
 		if (!(model.getEvaluator().one() instanceof Double)) {
@@ -189,6 +189,11 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 				}
 			}
 
+			// Add observation info
+			if (modelType.partiallyObservable()) {
+				umbWriter.addStateObservations(modelAccess.getStateObservations());
+			}
+
 			// Add label info
 			int numLabels = getNumLabels();
 			for (int i = 0; i < numLabels; i++) {
@@ -217,80 +222,27 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 			}
 
 			// Add variable info
-			ModelInfo modelInfo = getModelInfo();
-			List<State> statesList = model.getStatesList();
-			if (showStates && modelInfo != null && statesList != null) {
+			boolean showStates = modelExportOptions.getShowStates();
+			if (showStates && modelInfo != null && model.getStatesList() != null) {
 				VarList varList = modelInfo.createVarList();
-				int numVars = modelInfo.getNumVars();
+				storeVarInfo(varList, model.getStatesList(), UMBIndex.UMBEntity.STATES, umbWriter);
+			}
 
-				// Create bit-packing for state variable values, store metadata in index
-				boolean storeOffsets = false;
-				UMBBitPacking bitPacking = new UMBBitPacking();
-				for (int i = 0; i < numVars; i++) {
-					DeclarationType varDecl = modelInfo.getVarDeclarationType(i);
-					String varTypeUMB;
-					int varSize;
-					if (varDecl instanceof DeclarationBool) {
-						varTypeUMB = "bool";
-						varSize = 1;
-					} else if (varDecl instanceof DeclarationInt) {
-						if (storeOffsets) {
-							varTypeUMB = "int";
-							varSize = varList.getRangeLogTwo(i); // TODO
-						} else {
-							int varLow = varList.getLow(i);
-							int varHigh = varList.getHigh(i);
-							if (varLow < 0) {
-								varTypeUMB = "int";
-								int varMaxAbs = Math.abs(varLow);
-								if (varHigh > 0) {
-									varMaxAbs = Math.max(varMaxAbs, varHigh + 1);
-								}
-								varSize = (int) Math.ceil(PrismUtils.log2(varMaxAbs)) + 1;
-							} else {
-								varTypeUMB = "uint";
-								varSize = (int) Math.ceil(PrismUtils.log2(varHigh + 1));
-							}
-						}
-					} else if (varDecl instanceof DeclarationIntUnbounded) {
-						varTypeUMB = "int";
-						varSize = 32;
-					} else if (varDecl instanceof DeclarationDoubleUnbounded) {
-						varTypeUMB = "double";
-						varSize = 64;
-					} else {
-						throw new PrismException("Unsupported variable type in UMB export: " + varDecl);
-					}
-					bitPacking.addVariable(modelInfo.getVarName(i), varSize, varTypeUMB);
+			// Add observable info
+			boolean showObservations = modelExportOptions.getShowObservations();
+			if (showObservations && modelInfo != null && modelInfo.getModelType().partiallyObservable()) {
+				// Create a VarList for the observables
+				VarList obsVarList = new VarList();
+				obsVarList.setEvaluateContext(modelInfo.getEvaluateContext());
+				int numObservables = modelInfo.getNumObservables();
+				for (int i = 0; i < numObservables; i++) {
+					String obsName = modelInfo.getObservableName(i);
+					Type obsType = modelInfo.getObservableType(i);
+					DeclarationType obsDecl = obsType.defaultDeclarationType();
+					obsVarList.addVar(obsName, obsDecl, -1);
 				}
-				bitPacking.padToByteBoundary();
-				umbWriter.addStateValuationDescription(bitPacking);
-
-				// Build an iterator to supply the bit-packed state variable values, add data
-				Iterator<UMBBitString> iter = statesList.stream()
-						.map(s -> {
-							UMBBitString bitString = bitPacking.newBitString();
-							try {
-								for (int i = 0; i < numVars; i++) {
-									Type varType = null;
-									varType = modelInfo.getVarType(i);
-									if (varType instanceof TypeBool) {
-										bitPacking.setBooleanVariableValue(bitString, i, (boolean) s.varValues[i]);
-									} else if (varType instanceof TypeInt) {
-										bitPacking.setUIntVariableValue(bitString, i, (int) s.varValues[i]);
-									} else if (varType instanceof TypeDouble) {
-										bitPacking.setDoubleVariableValue(bitString, i, (double) s.varValues[i]);
-									} else {
-										throw new PrismException("Unsupported variable type in UMB export: " + varType);
-									}
-								}
-							} catch (UMBException | PrismException e) {
-								throw new RuntimeException(e);
-							}
-							return bitString;
-						})
-						.iterator();
-				umbWriter.addStateValuations(iter, bitPacking);
+				// Store observables
+				storeVarInfo(obsVarList, ((PartiallyObservableModel<Value>) model).getObservationsList(), UMBIndex.UMBEntity.OBSERVATIONS, umbWriter);
 			}
 
 			return umbWriter;
@@ -323,6 +275,10 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 		ModelType modelType = model.getModelType();
 		umbIndex.setTime(modelType.continuousTime() ? UMBIndex.Time.STOCHASTIC : UMBIndex.Time.DISCRETE);
 		umbIndex.setNumPlayers(model.getNumPlayers());
+		umbIndex.setNumObservations(model.getNumObservations());
+		if (model.getNumObservations() > 0) {
+			umbIndex.setObservationsApplyTo(UMBIndex.UMBEntity.STATES);
+		}
 		if (modelType.intervals()) {
 			umbIndex.setBranchProbabilityType(UMBIndex.ContinuousNumericType.DOUBLE_INTERVAL);
 		} else if (modelType.isProbabilistic()) {
@@ -354,6 +310,91 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 		} else {
 			umbIndex.setNumChoiceActions(0);
 			umbIndex.setNumBranchActions(model.getActions().size());
+		}
+	}
+
+	/**
+	 * Extract variable/observable info from a VarList and State list and store in UMBWriter.
+	 * @param varList Variable/observable info
+	 * @param statesList List of states/observations
+	 * @param umbWriter The UMBWriter to store info in
+	 */
+	private void storeVarInfo(VarList varList, List<State> statesList, UMBIndex.UMBEntity entity, UMBWriter umbWriter) throws PrismException
+	{
+		try {
+			int numVars = varList.getNumVars();
+
+			// Create bit-packing for variable/observable values, store metadata in index
+			boolean storeOffsets = false;
+			UMBBitPacking bitPacking = new UMBBitPacking();
+			for (int i = 0; i < numVars; i++) {
+				DeclarationType varDecl = varList.getDeclarationType(i);
+				String varTypeUMB;
+				int varSize;
+				if (varDecl instanceof DeclarationBool) {
+					varTypeUMB = "bool";
+					varSize = 1;
+				} else if (varDecl instanceof DeclarationInt) {
+					if (storeOffsets) {
+						varTypeUMB = "int";
+						varSize = varList.getRangeLogTwo(i); // TODO
+					} else {
+						int varLow = varList.getLow(i);
+						int varHigh = varList.getHigh(i);
+						if (varLow < 0) {
+							varTypeUMB = "int";
+							int varMaxAbs = Math.abs(varLow);
+							if (varHigh > 0) {
+								varMaxAbs = Math.max(varMaxAbs, varHigh + 1);
+							}
+							varSize = (int) Math.ceil(PrismUtils.log2(varMaxAbs)) + 1;
+						} else {
+							varTypeUMB = "uint";
+							varSize = (int) Math.ceil(PrismUtils.log2(varHigh + 1));
+						}
+					}
+				} else if (varDecl instanceof DeclarationIntUnbounded) {
+					varTypeUMB = "int";
+					varSize = 32;
+				} else if (varDecl instanceof DeclarationDoubleUnbounded) {
+					varTypeUMB = "double";
+					varSize = 64;
+				} else {
+					throw new PrismException("Unsupported variable type in UMB export: " + varDecl);
+				}
+				bitPacking.addVariable(varList.getName(i), varSize, varTypeUMB);
+			}
+			bitPacking.padToByteBoundary();
+			umbWriter.addValuationDescription(entity, bitPacking);
+
+			// Build an iterator to supply the bit-packed variable/observable values, add data
+			Iterator<UMBBitString> iter = statesList.stream()
+					.map(s -> {
+						UMBBitString bitString = bitPacking.newBitString();
+						try {
+							for (int i = 0; i < numVars; i++) {
+								String varTypeUMB = bitPacking.getVariable(i).type;
+								if (varTypeUMB.equals("bool")) {
+									bitPacking.setBooleanVariableValue(bitString, i, (boolean) s.varValues[i]);
+								} else if (varTypeUMB.equals("int")) {
+									bitPacking.setIntVariableValue(bitString, i, (int) s.varValues[i]);
+								} else if (varTypeUMB.equals("uint")) {
+									bitPacking.setUIntVariableValue(bitString, i, (int) s.varValues[i]);
+								} else if (varTypeUMB.equals("double")) {
+									bitPacking.setDoubleVariableValue(bitString, i, (double) s.varValues[i]);
+								} else {
+									throw new PrismException("Unsupported variable type in UMB export: " + varTypeUMB);
+								}
+							}
+						} catch (UMBException | PrismException e) {
+							throw new RuntimeException(e);
+						}
+						return bitString;
+					})
+					.iterator();
+			umbWriter.addValuations(entity, iter, bitPacking);
+	} catch (UMBException e) {
+			throw new PrismException("UMB export problem: " + e.getMessage());
 		}
 	}
 }
