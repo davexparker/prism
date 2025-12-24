@@ -48,6 +48,7 @@ import prism.ModelInfo;
 import prism.ModelType;
 import prism.Prism;
 import prism.PrismException;
+import prism.PrismNotSupportedException;
 import prism.RewardInfo;
 
 import java.io.File;
@@ -110,6 +111,12 @@ public class UMBImporter extends ExplicitModelImporter
 	}
 
 	@Override
+	public boolean providesObservations()
+	{
+		return false;
+	}
+
+	@Override
 	public boolean providesLabels()
 	{
 		return umbIndex.hasAPAnnotations();
@@ -147,6 +154,13 @@ public class UMBImporter extends ExplicitModelImporter
 	public int getNumTransitions() throws PrismException
 	{
 		return numTransitions;
+	}
+
+	@Override
+	public int getNumObservations() throws PrismException
+	{
+		// TODO
+		return 0;
 	}
 
 	@Override
@@ -595,6 +609,12 @@ public class UMBImporter extends ExplicitModelImporter
 		} catch (UMBException e) {
 			throw new PrismException("UMB import problem: " + e.getMessage());
 		}
+	}
+
+	@Override
+	public void extractObservations(IOUtils.StateIntConsumer storeObservation) throws PrismException
+	{
+		throw new PrismNotSupportedException("Observation import not yet supported for UMB");
 	}
 
 	@Override
