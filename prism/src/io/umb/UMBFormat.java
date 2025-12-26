@@ -68,10 +68,13 @@ public class UMBFormat
 	public static final String AP_ANNOTATIONS_GROUP = "aps";
 	public static final String REWARD_ANNOTATIONS_GROUP = "rewards";
 
-	// Variable valuations
+	// Valuations
 
-	/** Filename for storing state variable valuations */
-	public static final String STATE_VALUATIONS_FILE = "state-valuations" + BIN_FILE_EXT;
+	/** Location for valuations (directory in zip) */
+	public static final String VALUATIONS_DIR = "valuations";
+
+	/** Filename for storing valuation variable values */
+	public static final String VALUATIONS_FILE = "valuations" + BIN_FILE_EXT;
 
 	// Allowable compression formats
 
@@ -107,6 +110,22 @@ public class UMBFormat
 	public static String annotationFile(String group, String id, UMBIndex.UMBEntity entity)
 	{
 		return annotationDir(group, id, entity) + "/" + ANNOTATION_VALUES_FILE;
+	}
+
+	/**
+	 * Get the directory name for a set of valuations
+	 */
+	public static String valuationsDir(UMBIndex.UMBEntity entity)
+	{
+		return VALUATIONS_DIR + "/" + "for-" + entity;
+	}
+
+	/**
+	 * Get the filename for a set of valuations
+	 */
+	public static String valuationsFile(UMBIndex.UMBEntity entity)
+	{
+		return valuationsDir(entity) + "/" + VALUATIONS_FILE;
 	}
 
 	// Utility functions

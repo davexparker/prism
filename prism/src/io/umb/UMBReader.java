@@ -389,8 +389,8 @@ public class UMBReader
 	 */
 	public void extractStateValuations(Consumer<UMBBitString> bitstringConsumer) throws UMBException
 	{
-		UMBBitPacking bitPacking = umbIndex.getStateValuationBitPacking();
-		extractBitStringArray(UMBFormat.STATE_VALUATIONS_FILE, umbIndex.getNumStates(), bitPacking.getTotalNumBytes(), bitstringConsumer);
+		UMBBitPacking bitPacking = umbIndex.getValuationBitPacking(UMBIndex.UMBEntity.STATES);
+		extractBitStringArray(UMBFormat.valuationsFile(UMBIndex.UMBEntity.STATES), umbIndex.getNumStates(), bitPacking.getTotalNumBytes(), bitstringConsumer);
 	}
 
 	/**

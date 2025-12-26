@@ -321,26 +321,6 @@ public class UMBWriter
 		addBranchRewardsByID(addRewards(rewardAlias), branchRewards);
 	}
 
-	/**
-	 * Add state valuations, i.e., variable values for each state, encoded as a bitstring
-	 * @param stateValuations Iterator providing bitstrings defining the state valuations
-	 * @param numBytes Number of bytes in each bitstring
-	 */
-	public void addStateValuations(Iterator<UMBBitString> stateValuations, int numBytes) throws UMBException
-	{
-		addBitStringArray(UMBFormat.STATE_VALUATIONS_FILE, stateValuations, numBytes, umbIndex.getNumStates());
-	}
-
-	/**
-	 * Add state valuations, i.e., variable values for each state, encoded as a bitstring
-	 * @param stateValuations Iterator providing bitstrings defining the state valuations
-	 * @param bitPacking Information about how the bitstrings are packed
-	 */
-	public void addStateValuations(Iterator<UMBBitString> stateValuations, UMBBitPacking bitPacking) throws UMBException
-	{
-		addBitStringArray(UMBFormat.STATE_VALUATIONS_FILE, stateValuations, bitPacking, umbIndex.getNumStates());
-	}
-
 	// Methods to add annotations
 
 	/**
@@ -432,6 +412,73 @@ public class UMBWriter
 		annotation.addAppliesTo(appliesTo);
 		long annotationSize = umbIndex.getAnnotationDataSize(appliesTo);
 		addDoubleArray(annotation.getFilename(appliesTo), doubleValues, annotationSize);
+	}
+
+	// Methods to add valuations
+
+	/**
+	 * Add a new description for the valuations to be attached to states,
+	 * extracted from a {@link UMBBitPacking} object.
+	 * Returns the index of the description within those that exist for the entity.
+	 * @param bitPacking Definition of valuation contents
+	 */
+	public int addStateValuationDescription(UMBBitPacking bitPacking) throws UMBException
+	{
+		return addValuationDescription(UMBIndex.UMBEntity.STATES, bitPacking);
+	}
+
+	/**
+	 * Add state valuations, i.e., variable values for each state, encoded as a bitstring
+	 * @param stateValuations Iterator providing bitstrings defining the state valuations
+	 * @param numBytes Number of bytes in each bitstring
+	 */
+	public void addStateValuations(Iterator<UMBBitString> stateValuations, int numBytes) throws UMBException
+	{
+		addValuations(UMBIndex.UMBEntity.STATES, stateValuations, numBytes);
+	}
+
+	/**
+	 * Add state valuations, i.e., variable values for each state, encoded as a bitstring
+	 * @param stateValuations Iterator providing bitstrings defining the state valuations
+	 * @param bitPacking Information about how the bitstrings are packed
+	 */
+	public void addStateValuations(Iterator<UMBBitString> stateValuations, UMBBitPacking bitPacking) throws UMBException
+	{
+		addValuations(UMBIndex.UMBEntity.STATES, stateValuations, bitPacking);
+	}
+
+	/**
+	 * Add a new description for the valuations to be attached to some model entity,
+	 * extracted from a {@link UMBBitPacking} object.
+	 * Returns the index of the description within those that exist for the entity.
+	 * @param entity The entity to which the valuations apply
+	 * @param bitPacking Definition of valuation contents
+	 */
+	public int addValuationDescription(UMBIndex.UMBEntity entity, UMBBitPacking bitPacking) throws UMBException
+	{
+		return umbIndex.addValuationDescription(entity, bitPacking);
+	}
+
+	/**
+	 * Add valuations for an entity, i.e., variable values for each one, encoded as a bitstring
+	 * @param valuations Iterator providing bitstrings defining the valuations
+	 * @param entity The entity to which the valuations apply
+	 * @param numBytes Number of bytes in each bitstring
+	 */
+	public void addValuations(UMBIndex.UMBEntity entity, Iterator<UMBBitString> valuations, int numBytes) throws UMBException
+	{
+		addBitStringArray(UMBFormat.valuationsFile(entity), valuations, numBytes, umbIndex.getEntityCount(entity));
+	}
+
+	/**
+	 * Add valuations for an entity, i.e., variable values for each one, encoded as a bitstring
+	 * @param entity The entity to which the valuations apply
+	 * @param valuations Iterator providing bitstrings defining the valuations
+	 * @param bitPacking Information about how the bitstrings are packed
+	 */
+	public void addValuations(UMBIndex.UMBEntity entity, Iterator<UMBBitString> valuations, UMBBitPacking bitPacking) throws UMBException
+	{
+		addBitStringArray(UMBFormat.valuationsFile(entity), valuations, bitPacking, umbIndex.getEntityCount(entity));
 	}
 
 	// Methods to add binary files

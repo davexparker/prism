@@ -66,8 +66,8 @@ public class UMBIndex
 	public TransitionSystem transitionSystem = new TransitionSystem();
 	/** Annotations, arranged by group and then by annotation ID, in ordered maps */
 	public LinkedHashMap<String, LinkedHashMap<String, Annotation>> annotations = new LinkedHashMap<>();
-	/** State valuations details */
-	public StateValuationsDescription stateValuations;
+	/** Valuation descriptions, arranged by entity type */
+	public LinkedHashMap<String, List<ValuationDescription>> valuations = new LinkedHashMap<>();
 
 	// Further info about annotations
 
@@ -313,13 +313,13 @@ public class UMBIndex
 		}
 	}
 
-	/** Info about state valuations */
-	public static class StateValuationsDescription
+	/** Info about a valuation (of state, etc.) */
+	public static class ValuationDescription
 	{
 		/** Alignment (in bytes) of the data */
 		public Integer alignment;
 		/** List of variables/padding making up each state valuation */
-		public List<StateValuationVariable> variables = new ArrayList<>();
+		public List<ValuationVariable> variables = new ArrayList<>();
 
 		/**
 		 * Get the total size of the variables/padding (in bits).
@@ -327,19 +327,21 @@ public class UMBIndex
 		public int numBits()
 		{
 			int numBits = 0;
-			for (StateValuationVariable variable : variables) {
+			for (ValuationVariable variable : variables) {
 				numBits += variable.numBits();
 			}
 			return numBits;
 		}
 	}
 
-	/** Info about a state valuation variable/padding */
-	public static class StateValuationVariable
+	/** Info about a valuation variable/padding */
+	public static class ValuationVariable
 	{
 		// For variables
 		/** Variable name */
 		public String name;
+		/** Is the variable optional */
+		public Boolean isOptional;
 		/** Variable size (number of bits) */
 		public Integer size;
 		/** Variable type */
@@ -399,8 +401,12 @@ public class UMBIndex
 				validateAnnotations(entry.getKey(), entry.getValue());
 			}
 		}
-		if (stateValuations != null) {
-			validateStateValuations(stateValuations, "stateValuations");
+		if (valuations != null) {
+			for (Map.Entry<String, List<ValuationDescription>> entry : valuations.entrySet()) {
+				for (ValuationDescription valuationDescription : entry.getValue()) {
+					validateValuationDescription(valuationDescription, "valuations." + entry.getKey());
+				}
+			}
 		}
 	}
 
@@ -422,22 +428,22 @@ public class UMBIndex
 	}
 
 	/**
-	 * Perform validation of a state valuations description
+	 * Perform validation of a valuation description
 	 */
-	public void validateStateValuations(StateValuationsDescription valuations, String fieldName) throws UMBException
+	public void validateValuationDescription(ValuationDescription valuationDescr, String fieldName) throws UMBException
 	{
-		checkFieldExists(valuations.alignment, fieldName + ".alignment");
-		checkFieldExists(valuations.variables, fieldName + ".variables");
-		for (StateValuationVariable var : stateValuations.variables) {
-			validateStateValuationVariable(var);
+		checkFieldExists(valuationDescr.alignment, fieldName + ".alignment");
+		checkFieldExists(valuationDescr.variables, fieldName + ".variables");
+		for (ValuationVariable var : valuationDescr.variables) {
+			validateValuationVariable(var);
 		}
 		// TODO: If strict and (valuations.numBits() % 8 != 0)
 	}
 
 	/**
-	 * Perform validation of an individual state valuation variable
+	 * Perform validation of an individual valuation variable
 	 */
-	public void validateStateValuationVariable(StateValuationVariable var) throws UMBException
+	public void validateValuationVariable(ValuationVariable var) throws UMBException
 	{
 		// Should either be padding or a named variable
 		if (var.padding != null) {
@@ -601,11 +607,20 @@ public class UMBIndex
 	}
 
 	/**
-	 * Set the state valuations metadata, extracted from a {@link UMBBitPacking} object.
+	 * Add a new description for the valuations to be attached to some model entity,
+	 * extracted from a {@link UMBBitPacking} object.
+	 * Returns the index of the description within those that exist for the entity.
+	 * @param entity The entity to which the valuations apply
+	 * @param bitPacking Definition of valuation contents
 	 */
-	public void setStateValuationsFromBitPacking(UMBBitPacking bitPacking)
+	public int addValuationDescription(UMBEntity entity, UMBBitPacking bitPacking) throws UMBException
 	{
-		stateValuations = bitPacking.toStateValuationsDescription();
+		if (!valuations.containsKey(entity.toString())) {
+			valuations.put(entity.toString(), new ArrayList<>());
+		}
+		List<ValuationDescription> defns = valuations.get(entity.toString());
+		defns.add(bitPacking.toValuationDescription());
+		return defns.size() - 1;
 	}
 
 	// Getters
@@ -688,6 +703,23 @@ public class UMBIndex
 	public ContinuousNumericType getExitRateType()
 	{
 		return transitionSystem.exitRateType;
+	}
+
+	/**
+	 * Get the number of the specified entity (states, choices, etc.).
+	 */
+	public long getEntityCount(UMBEntity entity) throws UMBException
+	{
+		switch (entity) {
+			case STATES:
+				return getNumStates();
+			case CHOICES:
+				return getNumChoices();
+			case BRANCHES:
+				return getNumBranches();
+			default:
+				throw new UMBException("Unsupported entity \"" + entity + "\"");
+		}
 	}
 
 	// Methods to get info about annotations
@@ -944,24 +976,37 @@ public class UMBIndex
 		return getRewardAnnotation(i).appliesTo(UMBEntity.BRANCHES);
 	}
 
+	// Methods to get info about valuations
+
 	/**
-	 * Does this UMB file have any state valuations?
+	 * Does this UMB file have any valuations for the specified entity?
 	 */
-	public boolean hasStateValuations()
+	public boolean hasValuations(UMBEntity entity)
 	{
-		return stateValuations != null;
+		return valuations != null && valuations.containsKey(entity.toString()) && !valuations.get(entity.toString()).isEmpty();
 	}
 
 	/**
-	 * Get a {@link UMBBitPacking} object representing the state valuations metadata.
+	 * Get a {@link UMBBitPacking} object describing the valuations for the specified entity.
+	 * If there is more than one valuation description for the entity, it returns the first one.
+	 * Use {@link #getValuationBitPacking(UMBEntity, int)} to get others.
 	 * Throws an exception if no such metadata is present.
 	 */
-	public UMBBitPacking getStateValuationBitPacking() throws UMBException
+	public UMBBitPacking getValuationBitPacking(UMBEntity entity) throws UMBException
 	{
-		if (stateValuations == null) {
-			throw new UMBException("No state valuation metadata present");
+		return getValuationBitPacking(entity, 0);
+	}
+
+	/**
+	 * Get a {@link UMBBitPacking} object for the {@ocde i}th valuation description for the specified entity.
+	 * Throws an exception if no such metadata is present.
+	 */
+	public UMBBitPacking getValuationBitPacking(UMBEntity entity, int i) throws UMBException
+	{
+		if (valuations == null || !valuations.containsKey(entity.toString()) || valuations.get(entity.toString()).size() <= i) {
+			throw new UMBException("No valuation metadata present");
 		}
-		return new UMBBitPacking(stateValuations);
+		return new UMBBitPacking(valuations.get(entity.toString()).get(i));
 	}
 
 	// Validation methods

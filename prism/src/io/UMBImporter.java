@@ -107,7 +107,7 @@ public class UMBImporter extends ExplicitModelImporter
 	@Override
 	public boolean providesStates()
 	{
-		return umbIndex.hasStateValuations();
+		return umbIndex.hasValuations(UMBIndex.UMBEntity.STATES);
 	}
 
 	@Override
@@ -231,7 +231,7 @@ public class UMBImporter extends ExplicitModelImporter
 		if (providesStates()) {
 			// We extract info about variable valuations from the UMB file
 			try {
-				UMBBitPacking bitPacking = umbIndex.getStateValuationBitPacking();
+				UMBBitPacking bitPacking = umbIndex.getValuationBitPacking(UMBIndex.UMBEntity.STATES);
 				int numVars = bitPacking.getNumVariables();
 				for (int i = 0; i < numVars; i++) {
 					UMBBitPacking.BitPackedVariable var = bitPacking.getVariable(i);
@@ -391,7 +391,7 @@ public class UMBImporter extends ExplicitModelImporter
 		}
 		// Otherwise, extract state variable info
 		try {
-			UMBBitPacking bitPacking = umbIndex.getStateValuationBitPacking();
+			UMBBitPacking bitPacking = umbIndex.getValuationBitPacking(UMBIndex.UMBEntity.STATES);
 			AtomicInteger s = new AtomicInteger(0);
 			int numVars = bitPacking.getNumVariables();
 			umbReader.extractStateValuations(bitString -> {
