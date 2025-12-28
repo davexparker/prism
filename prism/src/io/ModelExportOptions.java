@@ -51,6 +51,11 @@ public class ModelExportOptions implements Cloneable
 	private Optional<Boolean> showStates = Optional.empty();
 
 	/**
+	 * Whether to show full observation details
+	 */
+	private Optional<Boolean> showObservations = Optional.empty();
+
+	/**
 	 * Whether to show actions
 	 */
 	private Optional<Boolean> showActions = Optional.empty();
@@ -130,6 +135,15 @@ public class ModelExportOptions implements Cloneable
 	}
 
 	/**
+	 * Set whether to show full observation details.
+	 */
+	public ModelExportOptions setShowObservations(boolean showObservations)
+	{
+		this.showObservations = Optional.of(showObservations);
+		return this;
+	}
+
+	/**
 	 * Set whether to show actions.
 	 */
 	public ModelExportOptions setShowActions(boolean showActions)
@@ -188,6 +202,9 @@ public class ModelExportOptions implements Cloneable
 		if (other.showStates.isPresent()) {
 			setShowStates(other.getShowStates());
 		}
+		if (other.showObservations.isPresent()) {
+			setShowObservations(other.getShowObservations());
+		}
 		if (other.showActions.isPresent()) {
 			setShowActions(other.getShowActions());
 		}
@@ -240,6 +257,14 @@ public class ModelExportOptions implements Cloneable
 	public boolean getShowStates()
 	{
 		return showStates.orElse(true);
+	}
+
+	/**
+	 * Whether to show full observation details.
+	 */
+	public boolean getShowObservations()
+	{
+		return showObservations.orElse(true);
 	}
 
 	/**
