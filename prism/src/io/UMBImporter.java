@@ -28,9 +28,10 @@ package io;
 
 import common.Interval;
 import common.SafeCast;
-import io.umb.UMBException;
-import io.umb.UMBIndex;
-import io.umb.UMBReader;
+import io.github.pmctools.umbj.UMBBitPacking;
+import io.github.pmctools.umbj.UMBException;
+import io.github.pmctools.umbj.UMBIndex;
+import io.github.pmctools.umbj.UMBReader;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.doubles.DoubleList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -48,7 +49,6 @@ import prism.ModelInfo;
 import prism.ModelType;
 import prism.Prism;
 import prism.PrismException;
-import prism.PrismNotSupportedException;
 import prism.RewardInfo;
 
 import java.io.File;

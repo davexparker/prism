@@ -1,39 +1,27 @@
-//==============================================================================
-//
-//	Copyright (c) 2025-
-//	Authors:
-//	* Dave Parker <david.parker@cs.ox.ac.uk> (University of Oxford)
-//
-//------------------------------------------------------------------------------
-//
-//	This file is part of PRISM.
-//
-//	PRISM is free software; you can redistribute it and/or modify
-//	it under the terms of the GNU General Public License as published by
-//	the Free Software Foundation; either version 2 of the License, or
-//	(at your option) any later version.
-//
-//	PRISM is distributed in the hope that it will be useful,
-//	but WITHOUT ANY WARRANTY; without even the implied warranty of
-//	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//	GNU General Public License for more details.
-//
-//	You should have received a copy of the GNU General Public License
-//	along with PRISM; if not, write to the Free Software Foundation,
-//	Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-//
-//==============================================================================
+/*
+ * Copyright 2025 Dave Parker (University of Oxford)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-package io.umb;
+package io.github.pmctools.umbj;
 
-import io.UMBBitPacking;
 import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorInputStream;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
-import prism.PrismException;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -446,7 +434,7 @@ public class UMBReader
 	 * @param bitPacking The bit-packing for the valuations
 	 * @param i Index of the variable (in the bit-packing)
 	 */
-	public UMBReader.IntRange getValuationIntRange(UMBIndex.UMBEntity entity, UMBBitPacking bitPacking, int i) throws PrismException
+	public UMBReader.IntRange getValuationIntRange(UMBIndex.UMBEntity entity, UMBBitPacking bitPacking, int i) throws UMBException
 	{
 		UMBReader.IntRangeComputer varRange = new UMBReader.IntRangeComputer();
 		try {
@@ -467,7 +455,7 @@ public class UMBReader
 				}
 			});
 		} catch (UMBException | RuntimeException e) {
-			throw new PrismException("UMB import problem: " + e.getMessage());
+			throw new UMBException("UMB import problem: " + e.getMessage());
 		}
 		return varRange;
 	}
