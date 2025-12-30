@@ -1220,7 +1220,7 @@ public class UMBIndex
 	}
 
 	/**
-	 * Get a {@link UMBBitPacking} object for the {@ocde i}th valuation description for the specified entity.
+	 * Get a {@link UMBBitPacking} object for the {@code i}th valuation description for the specified entity.
 	 * Throws an exception if no such metadata is present.
 	 */
 	public UMBBitPacking getValuationBitPacking(UMBEntity entity, int i) throws UMBException
