@@ -268,65 +268,33 @@ public class UMBImporter extends ExplicitModelImporter
 		}
 	}
 
+	/**
+	 * Determine ModelType from UMBIndex metadata.
+	 */
 	private static ModelType getModelTypeFromIndex(UMBIndex umbIndex) throws PrismException
 	{
-		if (umbIndex.getNumPlayers() == 0) {
-			if (umbIndex.getBranchProbabilityType() == null) {
-				throw new PrismException("Unsupported model type in UMB file");
-			}
-			if (umbIndex.getNumObservations() > 0) {
-				throw new PrismException("Unsupported model type in UMB file");
-			}
-			switch (umbIndex.getBranchProbabilityType()) {
-				case DOUBLE:
-				case RATIONAL:
-					switch (umbIndex.getTime()) {
-						case DISCRETE:
-							return ModelType.DTMC;
-						case STOCHASTIC:
-							return ModelType.CTMC;
-						case URGENT_STOCHASTIC:
-							throw new PrismException("Unsupported model type in UMB file");
-					}
-				case DOUBLE_INTERVAL:
-				case RATIONAL_INTERVAL:
-					switch (umbIndex.getTime()) {
-						case DISCRETE:
-							return ModelType.IDTMC;
-						case STOCHASTIC:
-						case URGENT_STOCHASTIC:
-							throw new PrismException("Unsupported model type in UMB file");
-					}
-			}
-		} else if (umbIndex.getNumPlayers() == 1) {
-			if (umbIndex.getBranchProbabilityType() == null) {
-				return ModelType.LTS;
-			}
-			switch (umbIndex.getBranchProbabilityType()) {
-				case DOUBLE:
-				case RATIONAL:
-					switch (umbIndex.getTime()) {
-						case DISCRETE:
-							return (umbIndex.getNumObservations() > 0) ? ModelType.POMDP: ModelType.MDP;
-						case STOCHASTIC:
-						case URGENT_STOCHASTIC:
-							throw new PrismException("Unsupported model type in UMB file");
-					}
-				case DOUBLE_INTERVAL:
-				case RATIONAL_INTERVAL:
-					if (umbIndex.getNumObservations() > 0) {
-						throw new PrismException("Unsupported model type in UMB file");
-					}
-					switch (umbIndex.getTime()) {
-						case DISCRETE:
-							return ModelType.IMDP;
-						case STOCHASTIC:
-						case URGENT_STOCHASTIC:
-							throw new PrismException("Unsupported model type in UMB file");
-					}
-			}
+		UMBIndex.ModelType modelType = umbIndex.getModelType();
+		if (modelType == null) {
+			throw new PrismException("Unsupported model type in UMB file");
 		}
-		throw new PrismException("Unsupported model type in UMB file");
+		switch (modelType) {
+			case DTMC:
+				return ModelType.DTMC;
+			case CTMC:
+				return ModelType.CTMC;
+			case MDP:
+				return ModelType.MDP;
+			case POMDP:
+				return ModelType.POMDP;
+			case LTS:
+				return ModelType.LTS;
+			case IDTMC:
+				return ModelType.IDTMC;
+			case IMDP:
+				return ModelType.IMDP;
+			default:
+				throw new PrismException("Unsupported model type " + modelType + " in UMB file");
+		}
 	}
 
 	/**

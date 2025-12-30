@@ -121,6 +121,13 @@ public class UMBIndex
 		DISCRETE, STOCHASTIC, URGENT_STOCHASTIC
 	}
 
+	/** Common model types */
+	public enum ModelType implements UMBField
+	{
+		DTMC, CTMC, MDP, POMDP, CTMDP, MA, TSG, LTS, TG,
+		IDTMC, IMDP, IPOMDP, ITSG
+	}
+
 	// Index contents
 
 	/** Model metadata */
@@ -588,6 +595,86 @@ public class UMBIndex
 	}
 
 	/**
+	 * Convenience method to set model metadata for a range of common models,
+	 * i.e., those that are included in the {@link ModelType} enum.
+	 * For some models (games, POMDPs), further configuration will be needed
+	 * since fields are just set to defaults (players = 2, observations = 1).
+	 * @param modelType The model type
+	 * @param rational Are probabilities rationals (as opposed to doubles)?
+	 */
+	public void setModelType(ModelType modelType, boolean rational) throws UMBException
+	{
+		switch (modelType) {
+			case DTMC:
+			case IDTMC:
+				setTime(Time.DISCRETE);
+				setNumPlayers(0);
+				setBranchProbabilityType(rational ? ContinuousNumericType.RATIONAL : ContinuousNumericType.DOUBLE);
+				setExitRateType(null);
+				break;
+			case CTMC:
+				setTime(Time.STOCHASTIC);
+				setNumPlayers(0);
+				setBranchProbabilityType(rational ? ContinuousNumericType.RATIONAL : ContinuousNumericType.DOUBLE);
+				setExitRateType(rational ? ContinuousNumericType.RATIONAL : ContinuousNumericType.DOUBLE);
+				break;
+			case MDP:
+			case POMDP:
+				setTime(Time.DISCRETE);
+				setNumPlayers(1);
+				setBranchProbabilityType(rational ? ContinuousNumericType.RATIONAL : ContinuousNumericType.DOUBLE);
+				setExitRateType(null);
+				break;
+			case IMDP:
+			case IPOMDP:
+				setTime(Time.DISCRETE);
+				setNumPlayers(1);
+				setBranchProbabilityType(rational ? ContinuousNumericType.RATIONAL_INTERVAL : ContinuousNumericType.DOUBLE_INTERVAL);
+				setExitRateType(null);
+				break;
+			case CTMDP:
+				setTime(Time.STOCHASTIC);
+				setNumPlayers(1);
+				setBranchProbabilityType(rational ? ContinuousNumericType.RATIONAL : ContinuousNumericType.DOUBLE);
+				setExitRateType(rational ? ContinuousNumericType.RATIONAL : ContinuousNumericType.DOUBLE);
+				break;
+			case MA:
+				setTime(Time.URGENT_STOCHASTIC);
+				setNumPlayers(1);
+				setBranchProbabilityType(rational ? ContinuousNumericType.RATIONAL : ContinuousNumericType.DOUBLE);
+				setExitRateType(rational ? ContinuousNumericType.RATIONAL : ContinuousNumericType.DOUBLE);
+				break;
+			case TSG:
+			case ITSG:
+				setTime(Time.DISCRETE);
+				setNumPlayers(2);
+				setBranchProbabilityType(null);
+				setExitRateType(null);
+				break;
+			case LTS:
+				setTime(Time.DISCRETE);
+				setNumPlayers(1);
+				setBranchProbabilityType(null);
+				setExitRateType(null);
+				break;
+			case TG:
+				setTime(Time.DISCRETE);
+				setNumPlayers(2);
+				setBranchProbabilityType(null);
+				setExitRateType(null);
+				break;
+			default:
+				throw new UMBException("Unsupported model type \"" + modelType + "\"");
+		}
+		if (EnumSet.of(ModelType.POMDP, ModelType.IPOMDP).contains(modelType)) {
+			setNumObservations(1);
+			setObservationsApplyTo(UMBEntity.STATES);
+		} else {
+			setNumObservations(0);
+		}
+	}
+
+	/**
 	 * Add a new annotation, for now without any data attached.
 	 * If an alias is provided, there should not already exist
 	 * an annotation in the same group with the same alias.
@@ -761,6 +848,99 @@ public class UMBIndex
 				return getNumObservations();
 			default:
 				throw new UMBException("Unsupported entity \"" + entity + "\"");
+		}
+	}
+
+	/**
+	 * Convenience method to get the model type, for a range of common models,
+	 * i.e., those that are included in the {@link ModelType} enum.
+	 * Returns null if the model type is not one of the common types.
+	 */
+	public ModelType getModelType()
+	{
+		boolean prob = transitionSystem.branchProbabilityType != null;
+		int numPlayers = getNumPlayers();
+		boolean pObs = getNumObservations() > 0;
+		Time time = getTime();
+		boolean intv = transitionSystem.branchProbabilityType != null && transitionSystem.branchProbabilityType.intervals();
+
+		ModelType modelType = null;
+		// Probabilistic models
+		if (prob) {
+			if (numPlayers == 0) {
+				if (pObs) {
+					return null;
+				}
+				switch (time) {
+					case DISCRETE:
+						modelType = ModelType.DTMC;
+						break;
+					case STOCHASTIC:
+						modelType = ModelType.CTMC;
+						break;
+					case URGENT_STOCHASTIC:
+						return null;
+				}
+			} else if (numPlayers == 1) {
+				switch (time) {
+					case DISCRETE:
+						modelType = pObs ? ModelType.POMDP : ModelType.MDP;
+						break;
+					case STOCHASTIC:
+						modelType = pObs ? null: ModelType.CTMDP;
+						break;
+					case URGENT_STOCHASTIC:
+						modelType = pObs ? null: ModelType.MA;
+						break;
+				}
+			} else {
+				if (pObs) {
+					return null;
+				}
+				switch (time) {
+					case DISCRETE:
+						modelType = ModelType.TSG;
+						break;
+					case STOCHASTIC:
+					case URGENT_STOCHASTIC:
+						return null;
+				}
+			}
+		}
+		// Non-probabilistic models
+		else {
+			if (pObs) {
+				return null;
+			}
+			// Ignore time/intervals
+			if (numPlayers == 0) {
+				return null;
+			} else if (numPlayers == 1) {
+				return ModelType.LTS;
+			} else {
+				return ModelType.TG;
+			}
+		}
+		// If still unknown, give up
+		if (modelType == null) {
+			return null;
+		}
+		// Deal with interval variants
+		if (!intv) {
+			return modelType;
+		} else {
+			switch (modelType) {
+				case DTMC:
+					return ModelType.IDTMC;
+				case MDP:
+					return ModelType.IMDP;
+				case POMDP:
+					return ModelType.IPOMDP;
+				case TSG:
+					return ModelType.ITSG;
+				default:
+					return null;
+			}
 		}
 	}
 
