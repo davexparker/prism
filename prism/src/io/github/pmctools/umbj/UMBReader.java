@@ -138,7 +138,7 @@ public class UMBReader
 	 */
 	public void extractInitialStates(LongConsumer longConsumer) throws UMBException
 	{
-		extractBooleanArraySparse(UMBFormat.INITIAL_STATES_FILE, longConsumer);
+		extractBooleanArraySparse(UMBFormat.INITIAL_STATES_FILE, umbIndex.getNumStates(), longConsumer);
 	}
 
 	/**
@@ -352,7 +352,7 @@ public class UMBReader
 	public void extractBooleanAnnotationSparse(UMBIndex.Annotation annotation, UMBIndex.UMBEntity appliesTo, LongConsumer longConsumer) throws UMBException
 	{
 		String filename = annotation.getFilename(appliesTo);
-		extractBooleanArraySparse(filename, longConsumer);
+		extractBooleanArraySparse(filename, getUMBIndex().getAnnotationDataSize(appliesTo), longConsumer);
 	}
 
 	public void extractIndexedBooleanAnnotation(String group, String id, UMBIndex.UMBEntity appliesTo, LongBooleanConsumer longBooleanConsumer) throws UMBException
@@ -474,15 +474,20 @@ public class UMBReader
 		return true;
 	}
 
-	private void extractBooleanArraySparse(String filename, LongConsumer longConsumer) throws UMBException
+	private void extractBooleanArraySparse(String filename, long size, LongConsumer longConsumer) throws UMBException
 	{
 		UMBIn umbIn = open();
-		umbIn.findArchiveEntry(filename);
+		long entrySize = umbIn.findArchiveEntry(filename);
+		long minExpectedSize = (size + 7) / 8;
+		long maxExpectedSize = ((size + 63) / 64) * 8;
+		if (entrySize < minExpectedSize && entrySize > maxExpectedSize) {
+			throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes)");
+		}
 		ByteBuffer bytes;
 		// Extract index of each 1 bit
 		long index = 0;
 		int blockSize = Long.BYTES * 8;
-		while ((bytes = umbIn.readBytes(Long.BYTES)) != null) {
+		while ((bytes = umbIn.readBytesPadded(Long.BYTES)) != null) {
 			long l = bytes.getLong();
 			// Find local index i of each 1 bit within 64-bit block
 			for (int i = 0; i < blockSize; i++) {
@@ -499,14 +504,15 @@ public class UMBReader
 	{
 		UMBIn umbIn = open();
 		long entrySize = umbIn.findArchiveEntry(filename);
-		long expectedSize = ((size + 63) / 64) * 8;
-		if (entrySize != expectedSize) {
-			throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes, not " + expectedSize + ")");
+		long minExpectedSize = (size + 7) / 8;
+		long maxExpectedSize = ((size + 63) / 64) * 8;
+		if (entrySize < minExpectedSize && entrySize > maxExpectedSize) {
+			throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes)");
 		}
 		ByteBuffer bytes;
 		// Extract index of each 1 bit
 		long index = 0;
-		while ((bytes = umbIn.readBytes(Long.BYTES)) != null) {
+		while ((bytes = umbIn.readBytesPadded(Long.BYTES)) != null) {
 			long l = bytes.getLong();
 			// Find local index i of each 1 bit within 64-bit block
 			int blockSize = index + Long.BYTES * 8 <= size ? Long.BYTES * 8 : (int) (size - index);
@@ -690,6 +696,37 @@ public class UMBReader
 				byteBuffer.position(numBytes);
 				if (bytesRead < numBytes) {
 					return null;
+				}
+				// Prepare buffer for reading and return
+				byteBuffer.flip();
+				return byteBuffer;
+			} catch (IOException e) {
+				throw new UMBException("I/O error extracting " + numBytes + " bytes from UMB entry \"" + tarIn.getCurrentEntry().getName() + "\"");
+			}
+		}
+
+		/**
+		 * Read the specified number of bytes from the current entry (file) of the archive.
+		 * Returns the bytes in a {@link ByteBuffer}. Returns null if there are no bytes
+		 * to read (or none were requested). If there are less than {@code numBytes} bytes,
+		 * the result is padded with zero bytes.
+		 */
+		public ByteBuffer readBytesPadded(int numBytes) throws UMBException
+		{
+			// Ensure buffer is big enough
+			if (numBytes > byteBuffer.capacity()) {
+				byteBuffer = ByteBuffer.allocate(numBytes).order(ByteOrder.LITTLE_ENDIAN);
+			}
+			try {
+				byte[] bytes = byteBuffer.array();
+				int bytesRead = tarIn.read(bytes, 0, numBytes);
+				byteBuffer.position(numBytes);
+				if (bytesRead <= 0) {
+					return null;
+				} else if (bytesRead < numBytes) {
+					for (int i = bytesRead; i < numBytes; i++) {
+						bytes[i] = (byte) 0;
+					}
 				}
 				// Prepare buffer for reading and return
 				byteBuffer.flip();
