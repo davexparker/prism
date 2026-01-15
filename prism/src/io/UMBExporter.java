@@ -35,7 +35,7 @@ import io.github.pmctools.umbj.UMBBitString;
 import io.github.pmctools.umbj.UMBException;
 import io.github.pmctools.umbj.UMBWriter;
 import io.github.pmctools.umbj.UMBIndex;
-import it.unimi.dsi.fastutil.doubles.DoubleIterators;
+import parser.EvaluateContext;
 import parser.State;
 import parser.VarList;
 import parser.ast.DeclarationBool;
@@ -44,6 +44,7 @@ import parser.ast.DeclarationInt;
 import parser.ast.DeclarationIntUnbounded;
 import parser.ast.DeclarationType;
 import parser.type.Type;
+import parser.type.TypeInt;
 import prism.Evaluator;
 import prism.ModelType;
 import prism.Prism;
@@ -133,8 +134,8 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 		if (modelType.uncertain() && !modelType.intervals()) {
 			throw new PrismNotSupportedException(modelType + "s cannot yet be exported to UMB");
 		}
-		if (!(model.getEvaluator().one() instanceof Double)) {
-			throw new PrismNotSupportedException("UMB export currently only supported for doubles");
+		if (model.getEvaluator().isSymbolic()) {
+			throw new PrismNotSupportedException("Parametric models cannot yet be exported to UMB");
 		}
 
 		// Create a ModelAccess object to access the model data in a uniform way
@@ -160,9 +161,9 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 				umbWriter.addChoiceBranchOffsets(modelAccess.getStateTransitionOffsets());
 			}
 			if (model.getModelType().isProbabilistic()) {
-				umbWriter.addBranchProbabilities(DoubleIterators.asDoubleIterator(modelAccess.getTransitionProbabilities()));
+				umbWriter.addBranchProbabilities(modelAccess.getTransitionProbabilitiesAsPrimitives());
 				if (model.getModelType() == ModelType.CTMC) {
-					umbWriter.addExitRates(DoubleIterators.asDoubleIterator(modelAccess.getExitRates()));
+					umbWriter.addExitRates(modelAccess.getExitRatesAsPrimitives());
 				}
 			}
 			umbWriter.addBranchTargets(modelAccess.getTransitionSuccessors());
@@ -202,20 +203,20 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 			int numRewards = getNumRewards();
 			for (int r = 0; r < numRewards; r++) {
 				Rewards<Value> reward = getReward(r);
-				String id = umbWriter.addRewards(getRewardName(r));
+				String id = umbWriter.addRewards(getRewardName(r), evalRewards.exact());
 				if (reward.hasStateRewards()) {
-					umbWriter.addStateRewardsByID(id, DoubleIterators.asDoubleIterator(modelAccess.getStateRewards(getReward(r))));
+					umbWriter.addStateRewardsByID(id, modelAccess.getStateRewardsAsPrimitives(getReward(r)));
 				}
 				if (reward.hasTransitionRewards()) {
 					if (modelType.nondeterministic()) {
-						umbWriter.addChoiceRewardsByID(id, DoubleIterators.asDoubleIterator(modelAccess.getTransitionRewards(getReward(r))));
+						umbWriter.addChoiceRewardsByID(id, modelAccess.getTransitionRewardsAsPrimitives(getReward(r)));
 					} else {
-						umbWriter.addBranchRewardsByID(id, DoubleIterators.asDoubleIterator(modelAccess.getTransitionRewards(getReward(r))));
+						umbWriter.addBranchRewardsByID(id, modelAccess.getTransitionRewardsAsPrimitives(getReward(r)));
 					}
 				}
 				// If there are no rewards, add some dummy zero state rewards
 				if (!(reward.hasStateRewards() || reward.hasTransitionRewards())) {
-					umbWriter.addStateRewardsByID(id, DoubleIterators.asDoubleIterator(Collections.nCopies(numStates, 0.0).iterator()));
+					umbWriter.addStateRewardsByID(id, Collections.nCopies(numStates, 0.0).iterator());
 				}
 			}
 
@@ -277,16 +278,17 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 		if (model.getNumObservations() > 0) {
 			umbIndex.setObservationsApplyTo(UMBIndex.UMBEntity.STATES);
 		}
+		boolean rational = model.getEvaluator().exact();
 		if (modelType.intervals()) {
-			umbIndex.setBranchProbabilityType(UMBIndex.ContinuousNumericType.DOUBLE_INTERVAL);
+			umbIndex.setBranchProbabilityType(rational ? UMBIndex.ContinuousNumericType.RATIONAL_INTERVAL : UMBIndex.ContinuousNumericType.DOUBLE_INTERVAL);
 		} else if (modelType.isProbabilistic()) {
-			umbIndex.setBranchProbabilityType(UMBIndex.ContinuousNumericType.DOUBLE);
+			umbIndex.setBranchProbabilityType(rational ? UMBIndex.ContinuousNumericType.RATIONAL : UMBIndex.ContinuousNumericType.DOUBLE);
 		}
 		if (modelType.isProbabilistic() && !modelType.choicesSumToOne()) {
 			if (modelType.intervals()) {
-				umbIndex.setExitRateType(UMBIndex.ContinuousNumericType.DOUBLE_INTERVAL);
+				umbIndex.setExitRateType(rational ? UMBIndex.ContinuousNumericType.RATIONAL_INTERVAL : UMBIndex.ContinuousNumericType.DOUBLE_INTERVAL);
 			} else {
-				umbIndex.setExitRateType(UMBIndex.ContinuousNumericType.DOUBLE);
+				umbIndex.setExitRateType(rational ? UMBIndex.ContinuousNumericType.RATIONAL : UMBIndex.ContinuousNumericType.DOUBLE);
 			}
 		}
 	}
@@ -369,21 +371,26 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 			Iterator<UMBBitString> iter = statesList.stream()
 					.map(s -> {
 						UMBBitString bitString = bitPacking.newBitString();
+						Object v = null;
 						try {
 							for (int i = 0; i < numVars; i++) {
 								String varTypeUMB = bitPacking.getVariable(i).type;
+								v = s.varValues[i];
+								v = varList.getType(i).castValueTo(v, EvaluateContext.EvalMode.FP);
 								if (varTypeUMB.equals("bool")) {
-									bitPacking.setBooleanVariableValue(bitString, i, (boolean) s.varValues[i]);
+									bitPacking.setBooleanVariableValue(bitString, i, (boolean) v);
 								} else if (varTypeUMB.equals("int")) {
-									bitPacking.setIntVariableValue(bitString, i, (int) s.varValues[i]);
+									bitPacking.setIntVariableValue(bitString, i, (int) v);
 								} else if (varTypeUMB.equals("uint")) {
-									bitPacking.setUIntVariableValue(bitString, i, (int) s.varValues[i]);
+									bitPacking.setUIntVariableValue(bitString, i, (int) v);
 								} else if (varTypeUMB.equals("double")) {
-									bitPacking.setDoubleVariableValue(bitString, i, (double) s.varValues[i]);
+									bitPacking.setDoubleVariableValue(bitString, i, (double) v);
 								} else {
 									throw new PrismException("Unsupported variable type in UMB export: " + varTypeUMB);
 								}
 							}
+						} catch (ClassCastException e) {
+							throw new RuntimeException("Was not expecting data as " + v.getClass().getSimpleName());
 						} catch (UMBException | PrismException e) {
 							throw new RuntimeException(e);
 						}
@@ -391,7 +398,7 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 					})
 					.iterator();
 			umbWriter.addValuations(entity, iter, bitPacking);
-	} catch (UMBException e) {
+	} catch (UMBException | RuntimeException e) {
 			throw new PrismException("UMB export problem: " + e.getMessage());
 		}
 	}

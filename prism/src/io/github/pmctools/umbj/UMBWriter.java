@@ -16,6 +16,8 @@
 
 package io.github.pmctools.umbj;
 
+import it.unimi.dsi.fastutil.doubles.DoubleIterators;
+import it.unimi.dsi.fastutil.longs.LongIterators;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
@@ -27,6 +29,7 @@ import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -122,21 +125,20 @@ public class UMBWriter
 	}
 
 	/**
-	 * Add the branch targets, as an iterator of doubles
+	 * Add the branch probabilities, as an iterator of values
 	 * For an interval model, two values (lower/upper bound, successively) should be supplied for each branch.
 	 */
-	public void addBranchProbabilities(PrimitiveIterator.OfDouble branchValues)
+	public void addBranchProbabilities(Iterator<?> branchValues) throws UMBException
 	{
-		long numProbs = umbIndex.getBranchProbabilityType().intervals() ? umbIndex.getNumBranches() * 2 : umbIndex.getNumBranches();
-		addDoubleArray(UMBFormat.BRANCH_PROBABILITIES_FILE, branchValues, numProbs);
+		addContinuousNumericArray(UMBFormat.BRANCH_PROBABILITIES_FILE, branchValues, umbIndex.getBranchProbabilityType(), umbIndex.getNumBranches());
 	}
 
 	/**
 	 * Add the exit rates for each state of a CTMC, as an iterator of doubles
 	 */
-	public void addExitRates(PrimitiveIterator.OfDouble exitRates)
+	public void addExitRates(Iterator<?> exitRates) throws UMBException
 	{
-		addDoubleArray(UMBFormat.EXIT_RATES_FILE, exitRates, umbIndex.getNumStates());
+		addContinuousNumericArray(UMBFormat.EXIT_RATES_FILE, exitRates, umbIndex.getExitRateType(), umbIndex.getNumStates());
 	}
 
 	/**
@@ -256,10 +258,12 @@ public class UMBWriter
 	 * Add a new reward annotation, for now without any data attached.
 	 * If the alias (name) is non-empty, there should not already exist a reward annotation with the same alias.
 	 * @param rewardAlias Optional alias (name) for the rewards (can be omitted: "" or null)
+	 * @param rational Whether the reward values are rational numbers
 	 */
-	public String addRewards(String rewardAlias) throws UMBException
+	public String addRewards(String rewardAlias, boolean rational) throws UMBException
 	{
-		UMBIndex.Annotation annotation = umbIndex.addAnnotation(UMBFormat.REWARD_ANNOTATIONS_GROUP, rewardAlias, UMBIndex.UMBType.DOUBLE);
+		UMBIndex.UMBType type = rational ? UMBIndex.UMBType.RATIONAL : UMBIndex.UMBType.DOUBLE;
+		UMBIndex.Annotation annotation = umbIndex.addAnnotation(UMBFormat.REWARD_ANNOTATIONS_GROUP, rewardAlias, type);
 		return annotation.id;
 	}
 
@@ -268,10 +272,10 @@ public class UMBWriter
 	 * @param rewardID Reward annotation ID
 	 * @param stateRewards Iterator providing values defining the reward
 	 */
-	public void addStateRewardsByID(String rewardID, PrimitiveIterator.OfDouble stateRewards) throws UMBException
+	public void addStateRewardsByID(String rewardID, Iterator<?> stateRewards) throws UMBException
 	{
 		UMBIndex.Annotation annotation = umbIndex.getAnnotation(UMBFormat.REWARD_ANNOTATIONS_GROUP, rewardID);
-		addDoubleDataToAnnotation(annotation, UMBIndex.UMBEntity.STATES, stateRewards);
+		addContinuousNumericDataToAnnotation(annotation, UMBIndex.UMBEntity.STATES, stateRewards, annotation.getContinuousNumericType());
 	}
 
 	/**
@@ -279,10 +283,10 @@ public class UMBWriter
 	 * @param rewardID Reward annotation ID
 	 * @param choiceRewards Iterator providing values defining the reward
 	 */
-	public void addChoiceRewardsByID(String rewardID, PrimitiveIterator.OfDouble choiceRewards) throws UMBException
+	public void addChoiceRewardsByID(String rewardID, Iterator<?> choiceRewards) throws UMBException
 	{
 		UMBIndex.Annotation annotation = umbIndex.getAnnotation(UMBFormat.REWARD_ANNOTATIONS_GROUP, rewardID);
-		addDoubleDataToAnnotation(annotation, UMBIndex.UMBEntity.CHOICES, choiceRewards);
+		addContinuousNumericDataToAnnotation(annotation, UMBIndex.UMBEntity.CHOICES, choiceRewards, annotation.getContinuousNumericType());
 	}
 
 	/**
@@ -290,52 +294,55 @@ public class UMBWriter
 	 * @param rewardID Reward annotation ID
 	 * @param branchRewards Iterator providing values defining the reward
 	 */
-	public void addBranchRewardsByID(String rewardID, PrimitiveIterator.OfDouble branchRewards) throws UMBException
+	public void addBranchRewardsByID(String rewardID, Iterator<?> branchRewards) throws UMBException
 	{
 		UMBIndex.Annotation annotation = umbIndex.getAnnotation(UMBFormat.REWARD_ANNOTATIONS_GROUP, rewardID);
-		addDoubleDataToAnnotation(annotation, UMBIndex.UMBEntity.BRANCHES, branchRewards);
+		addContinuousNumericDataToAnnotation(annotation, UMBIndex.UMBEntity.BRANCHES, branchRewards, annotation.getContinuousNumericType());
 	}
 
 	/**
 	 * Add a new reward annotation, applied to states.
 	 * If the alias (name) is non-empty, there should not already exist a reward annotation with the same alias.
 	 * If you want to add a reward annotation that applies to multiple entities,
-	 * e.g., to both states and branches, use first {@link #addRewards(String)}
+	 * e.g., to both states and branches, use first {@link #addRewards(String, boolean)}
 	 * and then {@link #addStateRewardsByID} and {@link #addBranchRewardsByID}.
 	 * @param rewardAlias Optional alias (name) for the rewards (can be omitted: "" or null)
+	 * @param rational Whether the reward values are rational numbers
 	 * @param stateRewards Iterator providing values defining the reward
 	 */
-	public void addStateRewards(String rewardAlias, PrimitiveIterator.OfDouble stateRewards) throws UMBException
+	public void addStateRewards(String rewardAlias, boolean rational, Iterator<?> stateRewards) throws UMBException
 	{
-		addStateRewardsByID(addRewards(rewardAlias), stateRewards);
+		addStateRewardsByID(addRewards(rewardAlias, rational), stateRewards);
 	}
 
 	/**
 	 * Add a new reward annotation, applied to choices.
 	 * If the alias (name) is non-empty, there should not already exist a reward annotation with the same alias.
 	 * If you want to add a reward annotation that applies to multiple entities,
-	 * e.g., to both states and branches, use first {@link #addRewards(String)}
+	 * e.g., to both states and branches, use first {@link #addRewards(String, boolean)}
 	 * and then {@link #addStateRewardsByID} and {@link #addBranchRewardsByID}.
 	 * @param rewardAlias Optional alias (name) for the rewards (can be omitted: "" or null)
+	 * @param rational Whether the reward values are rational numbers
 	 * @param choiceRewards Iterator providing values defining the reward
 	 */
-	public void addChoiceRewards(String rewardAlias, PrimitiveIterator.OfDouble choiceRewards) throws UMBException
+	public void addChoiceRewards(String rewardAlias, boolean rational, Iterator<?> choiceRewards) throws UMBException
 	{
-		addChoiceRewardsByID(addRewards(rewardAlias), choiceRewards);
+		addChoiceRewardsByID(addRewards(rewardAlias, rational), choiceRewards);
 	}
 
 	/**
 	 * Add a new reward annotation, applied to branches.
 	 * If the alias (name) is non-empty, there should not already exist a reward annotation with the same alias.
 	 * If you want to add a reward annotation that applies to multiple entities,
-	 * e.g., to both states and branches, use first {@link #addRewards(String)}
+	 * e.g., to both states and branches, use first {@link #addRewards(String, boolean)}
 	 * and then {@link #addStateRewardsByID} and {@link #addBranchRewardsByID}.
 	 * @param rewardAlias Optional alias (name) for the rewards (can be omitted: "" or null)
+	 * @param rational Whether the reward values are rational numbers
 	 * @param branchRewards Iterator providing values defining the reward
 	 */
-	public void addBranchRewards(String rewardAlias, PrimitiveIterator.OfDouble branchRewards) throws UMBException
+	public void addBranchRewards(String rewardAlias, boolean rational, Iterator<?> branchRewards) throws UMBException
 	{
-		addBranchRewardsByID(addRewards(rewardAlias), branchRewards);
+		addBranchRewardsByID(addRewards(rewardAlias, rational), branchRewards);
 	}
 
 	// Methods to add annotations
@@ -429,6 +436,16 @@ public class UMBWriter
 		annotation.addAppliesTo(appliesTo);
 		long annotationSize = umbIndex.getAnnotationDataSize(appliesTo);
 		addDoubleArray(annotation.getFilename(appliesTo), doubleValues, annotationSize);
+	}
+
+	public void addContinuousNumericDataToAnnotation(UMBIndex.Annotation annotation, UMBIndex.UMBEntity appliesTo, Iterator<?> values, UMBIndex.ContinuousNumericType valueType) throws UMBException
+	{
+		if (annotation.appliesTo(appliesTo)) {
+			throw new UMBException("Duplicate data for " + appliesTo + "s in annotation \"" + annotation.id + "\" in group \"" + annotation.group + "\"");
+		}
+		annotation.addAppliesTo(appliesTo);
+		long annotationSize = umbIndex.getAnnotationDataSize(appliesTo);
+		addContinuousNumericArray(annotation.getFilename(appliesTo), values, valueType, annotationSize);
 	}
 
 	// Methods to add valuations
@@ -556,6 +573,23 @@ public class UMBWriter
 		umbDataFiles.add(new DoubleArray(doubleValues, size, name));
 	}
 
+	public void addBigIntegerArray(String name, Iterator<BigInteger> bigIntegerValues, int numLongs, long size)
+	{
+		umbDataFiles.add(new BigIntegerArray(bigIntegerValues, numLongs, size, name));
+	}
+
+	private void addContinuousNumericArray(String name, Iterator<?> values, UMBIndex.ContinuousNumericType type, long size) throws UMBException
+	{
+		long sizeNew = type.intervals() ? size * 2 : size;
+		if (type.doubles()) {
+			addDoubleArray(name, DoubleIterators.asDoubleIterator(values), sizeNew);
+		} else if (type.rationals()) {
+			addLongArray(name, LongIterators.asLongIterator(values), sizeNew * 2);
+		} else {
+			throw new UMBException("Unsupported continuous numeric type " + type);
+		}
+	}
+
 	public void addBitStringArray(String name, Iterator<UMBBitString> bitStrings, int numBytes, long size)
 	{
 		umbDataFiles.add(new BitStringArray(bitStrings, numBytes, size, name));
@@ -633,14 +667,19 @@ public class UMBWriter
 
 	private void exportUMBFile(UMBDataFile umbDataFile, UMBOut umbOut) throws UMBException
 	{
-		umbOut.createArchiveEntry(umbDataFile.name, umbDataFile.totalBytes());
-		Iterator<ByteBuffer> byteIter = umbDataFile.byteIterator();
-		ByteBuffer buffer;
-		while (byteIter.hasNext()) {
-			buffer = byteIter.next();
-			umbOut.write(buffer.array(), 0, buffer.position());
+		try {
+			umbOut.createArchiveEntry(umbDataFile.name, umbDataFile.totalBytes());
+			Iterator<ByteBuffer> byteIter = umbDataFile.byteIterator();
+			ByteBuffer buffer;
+			while (byteIter.hasNext()) {
+				buffer = byteIter.next();
+				umbOut.write(buffer.array(), 0, buffer.position());
+			}
+			umbOut.closeArchiveEntry();
+		} catch (RuntimeException e) {
+			// Errors may occur in iterators so catch runtime exceptions here
+			throw new UMBException("Error exporting UMB file: " + e.getMessage());
 		}
-		umbOut.closeArchiveEntry();
 	}
 
 	/*private void exportIntArrayToTarBuffered(PrimitiveIterator.OfInt intValues, int size, File file) throws IOException
@@ -671,11 +710,16 @@ public class UMBWriter
 		sb.append("\n");
 	}
 
-	private void exportUMBFileToText(UMBDataFile umbDataFile, StringBuffer sb)
+	private void exportUMBFileToText(UMBDataFile umbDataFile, StringBuffer sb) throws UMBException
 	{
-		sb.append("/" + umbDataFile.name + ":\n");
-		sb.append(umbDataFile.toText());
-		sb.append("\n");
+		try {
+			sb.append("/" + umbDataFile.name + ":\n");
+			sb.append(umbDataFile.toText());
+			sb.append("\n");
+		} catch (RuntimeException e) {
+			// Errors may occur in iterators so catch runtime exceptions here
+			throw new UMBException("Error exporting UMB file: " + e.getMessage());
+		}
 	}
 
 	private static String toArrayString(Iterator<?> iter)
@@ -840,7 +884,7 @@ public class UMBWriter
 		@Override
 		public Iterator<ByteBuffer> byteIterator()
 		{
-			return new Iterator<ByteBuffer>()
+			return new Iterator<>()
 			{
 				{
 					buffer = ByteBuffer.allocate(numBytes()).order(ByteOrder.LITTLE_ENDIAN);
@@ -990,7 +1034,7 @@ public class UMBWriter
 	}
 
 	/**
-	 * A UMB data file to be stored containing an array of doubles.
+	 * A UMB data file to be stored containing an array of longs.
 	 */
 	static class LongArray extends Array
 	{
@@ -1025,6 +1069,51 @@ public class UMBWriter
 		public void encodeNextBytes()
 		{
 			buffer.putLong(longValues.nextLong());
+		}
+	}
+
+	/**
+	 * A UMB data file to be stored containing an array of BigIntegers.
+	 */
+	static class BigIntegerArray extends Array
+	{
+		protected Iterator<BigInteger> bigIntegerValues;
+		protected int intSize;
+
+		public BigIntegerArray(Iterator<BigInteger> bigIntegerValues, int numLongs, long size, String name)
+		{
+			this.bigIntegerValues = bigIntegerValues;
+			this.intSize = numLongs;
+			this.size = size;
+			this.name = name;
+		}
+
+		@Override
+		public Iterator<BigInteger> iterator()
+		{
+			return bigIntegerValues;
+		}
+
+		@Override
+		public int numBytes()
+		{
+			return intSize * Long.BYTES;
+		}
+
+		@Override
+		public boolean hasNextBytes()
+		{
+			return bigIntegerValues.hasNext();
+		}
+
+		@Override
+		public void encodeNextBytes()
+		{
+			BigInteger b = bigIntegerValues.next();
+			for (int i = 0; i < intSize; i++) {
+				buffer.putLong(b.longValue());
+				b = b.shiftRight(64);
+			}
 		}
 	}
 

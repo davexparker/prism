@@ -119,18 +119,17 @@ public class UMBReader
 	 * Extract the branch probabilities.
 	 * For an interval model, this will extract two values (lower/upper bound, successively) for each branch.
 	 */
-	public void extractBranchProbabilities(DoubleConsumer doubleConsumer) throws UMBException
+	public void extractBranchProbabilities(Consumer<?> consumer) throws UMBException
 	{
-		long numProbs = umbIndex.getBranchProbabilityType().intervals() ? umbIndex.getNumBranches() * 2 : umbIndex.getNumBranches();
-		extractDoubleArray(UMBFormat.BRANCH_PROBABILITIES_FILE, numProbs, doubleConsumer);
+		extractContinuousNumericArray(UMBFormat.BRANCH_PROBABILITIES_FILE, umbIndex.getBranchProbabilityType(), umbIndex.getNumBranches(), consumer);
 	}
 
 	/**
 	 * Extract the exit rates.
 	 */
-	public void extractExitRates(DoubleConsumer doubleConsumer) throws UMBException
+	public void extractExitRates(Consumer<?> consumer) throws UMBException
 	{
-		extractDoubleArray(UMBFormat.EXIT_RATES_FILE, umbIndex.getNumStates(), doubleConsumer);
+		extractContinuousNumericArray(UMBFormat.EXIT_RATES_FILE, umbIndex.getExitRateType(), umbIndex.getNumStates(), consumer);
 	}
 
 	/**
@@ -279,67 +278,67 @@ public class UMBReader
 	/**
 	 * Extract a state reward annotation via its index.
 	 * @param i Reward annotation index
-	 * @param doubleConsumer Consumer to receive the values of the rewards
+	 * @param consumer Consumer to receive the values of the rewards
 	 */
-	public void extractStateRewards(int i, DoubleConsumer doubleConsumer) throws UMBException
+	public void extractStateRewards(int i, Consumer<?> consumer) throws UMBException
 	{
 		UMBIndex.Annotation annotation = getUMBIndex().getRewardAnnotation(i);
-		extractDoubleAnnotation(annotation, UMBIndex.UMBEntity.STATES, doubleConsumer);
+		extractContinuousNumericAnnotation(annotation, UMBIndex.UMBEntity.STATES, consumer);
 	}
 
 	/**
 	 * Extract a state reward annotation from its alias.
 	 * @param rewardID Reward annotation ID
-	 * @param doubleConsumer Consumer to receive the values of the rewards
+	 * @param consumer Consumer to receive the values of the rewards
 	 */
-	public void extractStateRewards(String rewardID, DoubleConsumer doubleConsumer) throws UMBException
+	public void extractStateRewards(String rewardID, Consumer<?> consumer) throws UMBException
 	{
 		UMBIndex.Annotation annotation = getUMBIndex().getRewardAnnotationByID(rewardID);
-		extractDoubleAnnotation(annotation, UMBIndex.UMBEntity.STATES, doubleConsumer);
+		extractContinuousNumericAnnotation(annotation, UMBIndex.UMBEntity.STATES, consumer);
 	}
 
 	/**
 	 * Extract a choice reward annotation via its index.
 	 * @param i Reward annotation index
-	 * @param doubleConsumer Consumer to receive the values of the rewards
+	 * @param consumer Consumer to receive the values of the rewards
 	 */
-	public void extractChoiceRewards(int i, DoubleConsumer doubleConsumer) throws UMBException
+	public void extractChoiceRewards(int i, Consumer<?> consumer) throws UMBException
 	{
 		UMBIndex.Annotation annotation = getUMBIndex().getRewardAnnotation(i);
-		extractDoubleAnnotation(annotation, UMBIndex.UMBEntity.CHOICES, doubleConsumer);
+		extractContinuousNumericAnnotation(annotation, UMBIndex.UMBEntity.CHOICES, consumer);
 	}
 
 	/**
 	 * Extract a choice reward annotation via its ID.
 	 * @param rewardID Reward annotation ID
-	 * @param doubleConsumer Consumer to receive the values of the rewards
+	 * @param consumer Consumer to receive the values of the rewards
 	 */
-	public void extractChoiceRewards(String rewardID, DoubleConsumer doubleConsumer) throws UMBException
+	public void extractChoiceRewards(String rewardID, Consumer<?> consumer) throws UMBException
 	{
 		UMBIndex.Annotation annotation = getUMBIndex().getRewardAnnotationByID(rewardID);
-		extractDoubleAnnotation(annotation, UMBIndex.UMBEntity.CHOICES, doubleConsumer);
+		extractContinuousNumericAnnotation(annotation, UMBIndex.UMBEntity.CHOICES, consumer);
 	}
 
 	/**
 	 * Extract a branch reward annotation via its index.
 	 * @param i Reward annotation index
-	 * @param doubleConsumer Consumer to receive the values of the rewards
+	 * @param consumer Consumer to receive the values of the rewards
 	 */
-	public void extractBranchRewards(int i, DoubleConsumer doubleConsumer) throws UMBException
+	public void extractBranchRewards(int i, Consumer<?> consumer) throws UMBException
 	{
 		UMBIndex.Annotation annotation = getUMBIndex().getRewardAnnotation(i);
-		extractDoubleAnnotation(annotation, UMBIndex.UMBEntity.BRANCHES, doubleConsumer);
+		extractContinuousNumericAnnotation(annotation, UMBIndex.UMBEntity.BRANCHES, consumer);
 	}
 
 	/**
 	 * Extract a branch reward annotation via its ID.
 	 * @param rewardID Reward annotation ID
-	 * @param doubleConsumer Consumer to receive the values of the rewards
+	 * @param consumer Consumer to receive the values of the rewards
 	 */
-	public void extractBranchRewards(String rewardID, DoubleConsumer doubleConsumer) throws UMBException
+	public void extractBranchRewards(String rewardID, Consumer<?> consumer) throws UMBException
 	{
 		UMBIndex.Annotation annotation = getUMBIndex().getRewardAnnotationByID(rewardID);
-		extractDoubleAnnotation(annotation, UMBIndex.UMBEntity.BRANCHES, doubleConsumer);
+		extractContinuousNumericAnnotation(annotation, UMBIndex.UMBEntity.BRANCHES, consumer);
 	}
 
 	// Methods to extract annotations
@@ -397,6 +396,12 @@ public class UMBReader
 	{
 		String filename = annotation.getFilename(appliesTo);
 		extractDoubleArray(filename, getUMBIndex().getAnnotationDataSize(appliesTo), doubleConsumer);
+	}
+
+	public void extractContinuousNumericAnnotation(UMBIndex.Annotation annotation, UMBIndex.UMBEntity appliesTo, Consumer<?> consumer) throws UMBException
+	{
+		String filename = annotation.getFilename(appliesTo);
+		extractContinuousNumericArray(filename, annotation.getContinuousNumericType(), getUMBIndex().getAnnotationDataSize(appliesTo), consumer);
 	}
 
 	/**
@@ -465,143 +470,193 @@ public class UMBReader
 	private boolean fileExists(String filename) throws UMBException
 	{
 		UMBIn umbIn = open();
-		try {
-			umbIn.findArchiveEntry(filename);
-		} catch (UMBException e) {
-			return false;
-		}
+		boolean exists = umbIn.archiveEntryExists(filename);
 		umbIn.close();
-		return true;
+		return exists;
 	}
 
 	private void extractBooleanArraySparse(String filename, long size, LongConsumer longConsumer) throws UMBException
 	{
 		UMBIn umbIn = open();
-		long entrySize = umbIn.findArchiveEntry(filename);
-		long minExpectedSize = (size + 7) / 8;
-		long maxExpectedSize = ((size + 63) / 64) * 8;
-		if (entrySize < minExpectedSize && entrySize > maxExpectedSize) {
-			throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes)");
-		}
-		ByteBuffer bytes;
-		// Extract index of each 1 bit
-		long index = 0;
-		int blockSize = Long.BYTES * 8;
-		while ((bytes = umbIn.readBytesPadded(Long.BYTES)) != null) {
-			long l = bytes.getLong();
-			// Find local index i of each 1 bit within 64-bit block
-			for (int i = 0; i < blockSize; i++) {
-				if ((l & (1L << i)) != 0) {
-					longConsumer.accept(index + i);
-				}
+		try {
+			long entrySize = umbIn.findArchiveEntry(filename);
+			long minExpectedSize = (size + 7) / 8;
+			long maxExpectedSize = ((size + 63) / 64) * 8;
+			if (entrySize < minExpectedSize && entrySize > maxExpectedSize) {
+				throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes)");
 			}
-			index += Long.BYTES * 8;
+			ByteBuffer bytes;
+			// Extract index of each 1 bit
+			long index = 0;
+			int blockSize = Long.BYTES * 8;
+			while ((bytes = umbIn.readBytesPadded(Long.BYTES)) != null) {
+				long l = bytes.getLong();
+				// Find local index i of each 1 bit within 64-bit block
+				for (int i = 0; i < blockSize; i++) {
+					if ((l & (1L << i)) != 0) {
+						longConsumer.accept(index + i);
+					}
+				}
+				index += Long.BYTES * 8;
+			}
+		} catch (RuntimeException e) {
+			// Errors may occur in consumers so catch runtime exceptions here
+			throw new UMBException("Error extracting from UMB file: " + e.getMessage());
+		} finally {
+			umbIn.close();
 		}
-		umbIn.close();
 	}
 
 	private void extractBooleanArray(String filename, long size, BooleanConsumer booleanConsumer) throws UMBException
 	{
 		UMBIn umbIn = open();
-		long entrySize = umbIn.findArchiveEntry(filename);
-		long minExpectedSize = (size + 7) / 8;
-		long maxExpectedSize = ((size + 63) / 64) * 8;
-		if (entrySize < minExpectedSize && entrySize > maxExpectedSize) {
-			throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes)");
-		}
-		ByteBuffer bytes;
-		// Extract index of each 1 bit
-		long index = 0;
-		while ((bytes = umbIn.readBytesPadded(Long.BYTES)) != null) {
-			long l = bytes.getLong();
-			// Find local index i of each 1 bit within 64-bit block
-			int blockSize = index + Long.BYTES * 8 <= size ? Long.BYTES * 8 : (int) (size - index);
-			for (int i = 0; i < blockSize; i++) {
-				booleanConsumer.accept((l & (1L << i)) != 0);
+		try {
+			long entrySize = umbIn.findArchiveEntry(filename);
+			long minExpectedSize = (size + 7) / 8;
+			long maxExpectedSize = ((size + 63) / 64) * 8;
+			if (entrySize < minExpectedSize && entrySize > maxExpectedSize) {
+				throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes)");
 			}
-			index += Long.BYTES * 8;
+			ByteBuffer bytes;
+			// Extract index of each 1 bit
+			long index = 0;
+			while ((bytes = umbIn.readBytesPadded(Long.BYTES)) != null) {
+				long l = bytes.getLong();
+				// Find local index i of each 1 bit within 64-bit block
+				int blockSize = index + Long.BYTES * 8 <= size ? Long.BYTES * 8 : (int) (size - index);
+				for (int i = 0; i < blockSize; i++) {
+					booleanConsumer.accept((l & (1L << i)) != 0);
+				}
+				index += Long.BYTES * 8;
+			}
+		} catch (RuntimeException e) {
+			// Errors may occur in consumers so catch runtime exceptions here
+			throw new UMBException("Error extracting from UMB file: " + e.getMessage());
+		} finally {
+			umbIn.close();
 		}
-		umbIn.close();
 	}
 
 	private void extractIntArray(String filename, long size, IntConsumer intConsumer) throws UMBException
 	{
 		UMBIn umbIn = open();
-		long entrySize = umbIn.findArchiveEntry(filename);
-		if (entrySize != size * Integer.BYTES) {
-			throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes, not " + (size * Integer.BYTES) + ")");
+		try {
+			long entrySize = umbIn.findArchiveEntry(filename);
+			if (entrySize != size * Integer.BYTES) {
+				throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes, not " + (size * Integer.BYTES) + ")");
+			}
+			ByteBuffer bytes;
+			while ((bytes = umbIn.readBytes(Integer.BYTES)) != null) {
+				intConsumer.accept(bytes.getInt());
+			}
+		} catch (RuntimeException e) {
+			// Errors may occur in consumers so catch runtime exceptions here
+			throw new UMBException("Error extracting from UMB file: " + e.getMessage());
+		} finally {
+			umbIn.close();
 		}
-		ByteBuffer bytes;
-		while ((bytes = umbIn.readBytes(Integer.BYTES)) != null){
-			intConsumer.accept(bytes.getInt());
-		}
-		umbIn.close();
 	}
 
 	private void extractLongArray(String filename, long size, LongConsumer longConsumer) throws UMBException
 	{
 		UMBIn umbIn = open();
-		long entrySize = umbIn.findArchiveEntry(filename);
-		if (entrySize != size * Long.BYTES) {
-			throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes, not " + (size * Long.BYTES) + ")");
+		try {
+			long entrySize = umbIn.findArchiveEntry(filename);
+			if (entrySize != size * Long.BYTES) {
+				throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes, not " + (size * Long.BYTES) + ")");
+			}
+			ByteBuffer bytes;
+			while ((bytes = umbIn.readBytes(Long.BYTES)) != null) {
+				longConsumer.accept(bytes.getLong());
+			}
+		} catch (RuntimeException e) {
+			// Errors may occur in consumers so catch runtime exceptions here
+			throw new UMBException("Error extracting from UMB file: " + e.getMessage());
+		} finally {
+			umbIn.close();
 		}
-		ByteBuffer bytes;
-		while ((bytes = umbIn.readBytes(Long.BYTES)) != null) {
-			longConsumer.accept(bytes.getLong());
-		}
-		umbIn.close();
 	}
 
 	private void extractDoubleArray(String filename, long size, DoubleConsumer doubleConsumer) throws UMBException
 	{
 		UMBIn umbIn = open();
-		long entrySize = umbIn.findArchiveEntry(filename);
-		if (entrySize != size * Double.BYTES) {
-			throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes, not " + (size * Double.BYTES) + ")");
+		try {
+			long entrySize = umbIn.findArchiveEntry(filename);
+			if (entrySize != size * Double.BYTES) {
+				throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes, not " + (size * Double.BYTES) + ")");
+			}
+			ByteBuffer bytes;
+			while ((bytes = umbIn.readBytes(Double.BYTES)) != null) {
+				doubleConsumer.accept(bytes.getDouble());
+			}
+		} catch (RuntimeException e) {
+			// Errors may occur in consumers so catch runtime exceptions here
+			throw new UMBException("Error extracting from UMB file: " + e.getMessage());
+		} finally {
+			umbIn.close();
 		}
-		ByteBuffer bytes;
-		while ((bytes = umbIn.readBytes(Double.BYTES)) != null) {
-			doubleConsumer.accept(bytes.getDouble());
+	}
+
+	private void extractContinuousNumericArray(String filename, UMBIndex.ContinuousNumericType type, long size, Consumer<?> consumer) throws UMBException
+	{
+		long sizeNew = type.intervals() ? size * 2 : size;
+		if (type.doubles()) {
+			extractDoubleArray(filename, sizeNew, (it.unimi.dsi.fastutil.doubles.DoubleConsumer) ((Consumer<Double>) consumer)::accept);
+		} else if (type.rationals()) {
+			extractLongArray(filename, sizeNew * 2, (it.unimi.dsi.fastutil.longs.LongConsumer) ((Consumer<Long>) consumer)::accept);
+		} else {
+			throw new UMBException("Unsupported continuous numeric type " + type);
 		}
-		umbIn.close();
 	}
 
 	private void extractBitStringArray(String filename, long size, int numBytes, Consumer<UMBBitString> bitstringConsumer) throws UMBException
 	{
 		UMBIn umbIn = open();
-		long entrySize = umbIn.findArchiveEntry(filename);
-		if (entrySize != size * numBytes) {
-			throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes, not " + (size * numBytes) + ")");
+		try {
+			long entrySize = umbIn.findArchiveEntry(filename);
+			if (entrySize != size * numBytes) {
+				throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes, not " + (size * numBytes) + ")");
+			}
+			ByteBuffer bytes;
+			UMBBitString bitstring = new UMBBitString(numBytes);
+			while ((bytes = umbIn.readBytes(numBytes)) != null) {
+				bytes.get(bitstring.bytes);
+				bitstringConsumer.accept(bitstring);
+			}
+		} catch (RuntimeException e) {
+			// Errors may occur in consumers so catch runtime exceptions here
+			throw new UMBException("Error extracting from UMB file: " + e.getMessage());
+		} finally {
+			umbIn.close();
 		}
-		ByteBuffer bytes;
-		UMBBitString bitstring = new UMBBitString(numBytes);
-		while ((bytes = umbIn.readBytes(numBytes)) != null) {
-			bytes.get(bitstring.bytes);
-			bitstringConsumer.accept(bitstring);
-		}
-		umbIn.close();
 	}
 
 	private void extractStringList(String filename, List<Long> stringOffsets, Consumer<String> stringConsumer) throws UMBException
 	{
-		int numStrings = stringOffsets.size() - 1;
 		UMBIn umbIn = open();
-		long entrySize = umbIn.findArchiveEntry(filename);
-		if (entrySize != stringOffsets.get(numStrings)) {
-			throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes, not " + stringOffsets.get(numStrings) + ")");
-		}
-		for (int i = 0; i < numStrings; i++) {
-			long sLen = stringOffsets.get(i + 1) - stringOffsets.get(i);
-			if (sLen > Integer.MAX_VALUE) {
-				throw new UMBException("Could not read overlength string (" + sLen + "bytes) from file " + filename);
+		try {
+			int numStrings = stringOffsets.size() - 1;
+			long entrySize = umbIn.findArchiveEntry(filename);
+			if (entrySize != stringOffsets.get(numStrings)) {
+				throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes, not " + stringOffsets.get(numStrings) + ")");
 			}
-			String s = umbIn.readString((int) sLen);
-			if (s == null) {
-				throw new UMBException("Could not read string of length " + sLen + " from file " + filename);
+			for (int i = 0; i < numStrings; i++) {
+				long sLen = stringOffsets.get(i + 1) - stringOffsets.get(i);
+				if (sLen > Integer.MAX_VALUE) {
+					throw new UMBException("Could not read overlength string (" + sLen + "bytes) from file " + filename);
+				}
+				String s = umbIn.readString((int) sLen);
+				if (s == null) {
+					throw new UMBException("Could not read string of length " + sLen + " from file " + filename);
+				}
+				stringConsumer.accept(s);
 			}
-			stringConsumer.accept(s);
+		} catch (RuntimeException e) {
+			// Errors may occur in consumers so catch runtime exceptions here
+			throw new UMBException("Error extracting from UMB file: " + e.getMessage());
+		} finally {
+			umbIn.close();
 		}
-		umbIn.close();
 	}
 
 	private UMBIn open() throws UMBException
@@ -649,6 +704,28 @@ public class UMBReader
 			} catch (IOException e) {
 				throw new UMBException("Could not open UMB file: " + e.getMessage());
 			}
+		}
+
+		/**
+		 * Check if an entry (file) exists within the archive.
+		 * @param name Name of the file
+		 */
+		public boolean archiveEntryExists(String name) throws UMBException
+		{
+			try {
+				TarArchiveEntry entry;
+				while ((entry = tarIn.getNextTarEntry()) != null) {
+					if (!tarIn.canReadEntryData(entry)) {
+						continue;
+					}
+					if (entry.getName().equals(name)) {
+						return true;
+					}
+				}
+			} catch (IOException e) {
+				throw new UMBException("I/O error extracting from UMB file");
+			}
+			return false;
 		}
 
 		/**

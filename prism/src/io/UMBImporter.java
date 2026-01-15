@@ -32,10 +32,9 @@ import io.github.pmctools.umbj.UMBBitPacking;
 import io.github.pmctools.umbj.UMBException;
 import io.github.pmctools.umbj.UMBIndex;
 import io.github.pmctools.umbj.UMBReader;
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import it.unimi.dsi.fastutil.doubles.DoubleList;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
+import parser.EvaluateContext;
 import parser.VarList;
 import parser.ast.DeclarationBool;
 import parser.ast.DeclarationDoubleUnbounded;
@@ -106,6 +105,13 @@ public class UMBImporter extends ExplicitModelImporter
 		} catch (UMBException e) {
 			throw new PrismException("Error importing from UMB: " + e.getMessage());
 		}
+	}
+
+	@Override
+	public boolean modelIsExact()
+	{
+		// For now, assume that if transition probabilities are rationals, so is everything else
+		return umbIndex.getBranchProbabilityType() != null && umbIndex.getBranchProbabilityType().rationals();
 	}
 
 	@Override
@@ -455,15 +461,17 @@ public class UMBImporter extends ExplicitModelImporter
 			umbReader.extractChoiceBranchOffsets(l -> choiceTransitionOffsets.add((int) l));
 			IntList transitionSuccessors = new IntArrayList(numTransitions);
 			umbReader.extractBranchTargets(l -> transitionSuccessors.add((int) l));
-			DoubleList transitionProbabilities = new DoubleArrayList(numTransitions);
-			umbReader.extractBranchProbabilities(d -> transitionProbabilities.add(d));
+			ModelAccess.ValueListFromPrimitives<Value> valueListFromPrimitives = new ModelAccess.ValueListFromPrimitives<>(eval, numTransitions);
+			List<Value> transitionProbabilities = valueListFromPrimitives.valueList;
+			umbReader.extractBranchProbabilities(valueListFromPrimitives.primitiveConsumer);
 
 			// For CTMCs, extract exit rates
-			DoubleList exitRates = null;
+			List<Value> exitRates = null;
 			boolean ctmc = getModelInfo().getModelType() == ModelType.CTMC;
 			if (ctmc) {
-				exitRates = new DoubleArrayList(numStates);
-				umbReader.extractExitRates(exitRates::add);
+				valueListFromPrimitives = new ModelAccess.ValueListFromPrimitives<>(eval, numStates);
+				exitRates = valueListFromPrimitives.valueList;
+				umbReader.extractExitRates(valueListFromPrimitives.primitiveConsumer);
 			}
 
 			// Extract action info
@@ -476,23 +484,21 @@ public class UMBImporter extends ExplicitModelImporter
 			}
 
 			// Convert sparse storage to transitions and store
-			// (assume doubles for now)
 			int jLo = 0, jHi = 0;
 			for (int s = 0; s < numStates; s++) {
 				jLo = jHi;
 				jHi = choiceTransitionOffsets.getInt(s + 1);
 				for (int j = jLo; j < jHi; j++) {
-					//Value v = eval.fromString(Double.toString(d));
 					Object action = hasActions ? getModelInfo().getActions().get(transitionActionIndices.getInt(j)) : firstAction;
 					if (getModelInfo().getModelType() == ModelType.IDTMC) {
-						Interval<Double> dIntv = new Interval<>(transitionProbabilities.getDouble(2 * j), transitionProbabilities.getDouble(2 * j + 1));
+						Interval<Double> dIntv = new Interval<>((Double) transitionProbabilities.get(2 * j), (Double) transitionProbabilities.get(2 * j + 1));
 						((IOUtils.MCTransitionConsumer<Interval<Double>>) storeTransition).accept(s, transitionSuccessors.getInt(j), dIntv, action);
 					} else {
-						double d = transitionProbabilities.getDouble(j);
+						Value v = transitionProbabilities.get(j);
 						if (ctmc) {
-							d *= exitRates.getDouble(s);
+							v = eval.multiply(v, exitRates.get(s));
 						}
-						((IOUtils.MCTransitionConsumer<Double>) storeTransition).accept(s, transitionSuccessors.getInt(j), d, action);
+						storeTransition.accept(s, transitionSuccessors.getInt(j), v, action);
 					}
 				}
 			}
@@ -513,8 +519,9 @@ public class UMBImporter extends ExplicitModelImporter
 			umbReader.extractChoiceBranchOffsets(l -> choiceTransitionOffsets.add((int) l));
 			IntList transitionSuccessors = new IntArrayList(numTransitions);
 			umbReader.extractBranchTargets(l -> transitionSuccessors.add((int) l));
-			DoubleList transitionProbabilities = new DoubleArrayList(numTransitions);
-			umbReader.extractBranchProbabilities(d -> transitionProbabilities.add(d));
+			ModelAccess.ValueListFromPrimitives<Value> valueListFromPrimitives = new ModelAccess.ValueListFromPrimitives<>(eval, numTransitions);
+			List<Value> transitionProbabilities = valueListFromPrimitives.valueList;
+			umbReader.extractBranchProbabilities(valueListFromPrimitives.primitiveConsumer);
 
 			// Extract action info
 			Object firstAction = getModelInfo().getActions().get(0);
@@ -526,7 +533,6 @@ public class UMBImporter extends ExplicitModelImporter
 			}
 
 			// Convert sparse storage to transitions and store
-			// (assume doubles for now)
 			int iLo = 0, iHi = 0;
 			int jLo = 0, jHi = 0;
 			for (int s = 0; s < numStates; s++) {
@@ -539,11 +545,11 @@ public class UMBImporter extends ExplicitModelImporter
 					for (int j = jLo; j < jHi; j++) {
 						Object action = hasActions ? getModelInfo().getActions().get(choiceActionIndices.getInt(i)) : firstAction;
 						if (getModelInfo().getModelType() == ModelType.IMDP) {
-							Interval<Double> dIntv = new Interval<>(transitionProbabilities.getDouble(2 * j), transitionProbabilities.getDouble(2 * j + 1));
+							Interval<Double> dIntv = new Interval<>((Double) transitionProbabilities.get(2 * j), (Double) transitionProbabilities.get(2 * j + 1));
 							((IOUtils.MDPTransitionConsumer<Interval<Double>>) storeTransition).accept(s, iCount, transitionSuccessors.getInt(j), dIntv, action);
 						} else {
-							double d = transitionProbabilities.getDouble(j);
-							((IOUtils.MDPTransitionConsumer<Double>) storeTransition).accept(s, iCount, transitionSuccessors.getInt(j), d, action);
+							Value v = transitionProbabilities.get(j);
+							storeTransition.accept(s, iCount, transitionSuccessors.getInt(j), v, action);
 						}
 
 					}
@@ -645,7 +651,7 @@ public class UMBImporter extends ExplicitModelImporter
 			if (!basicRewardInfo.rewardStructHasStateRewards(rewardIndex)) {
 				return;
 			}
-			umbReader.extractStateRewards(rewardIndex, new IndexedDoubleConsumer((BiConsumer<Integer, Double>) storeReward));
+			umbReader.extractStateRewards(rewardIndex, ModelAccess.primitivesToValues(eval, new IndexedConsumer<>(storeReward)));
 		} catch (UMBException e) {
 			throw new PrismException("UMB import problem: " + e.getMessage());
 		}
@@ -660,12 +666,11 @@ public class UMBImporter extends ExplicitModelImporter
 
 		try {
 			// Extract transition rewards from UMB
-			DoubleList transRewards = new DoubleArrayList(numTransitions);
-			umbReader.extractBranchRewards(rewardIndex, transRewards::add);
+			ModelAccess.ValueListFromPrimitives<Value> valueListFromPrimitives = new ModelAccess.ValueListFromPrimitives<>(eval, numTransitions);
+			List<Value> transRewards = valueListFromPrimitives.valueList;
+			umbReader.extractBranchRewards(rewardIndex, valueListFromPrimitives.primitiveConsumer);
 
 			// Convert sparse storage to reward list and store
-			IOUtils.TransitionRewardConsumer<Double> storeRewardDoubles = (IOUtils.TransitionRewardConsumer<Double>) storeReward;
-
 			// If the model has already been built and provided, use this to look for transition indexing
 			if (modelLookup != null) {
 				ModelAccess<Value> modelAccess = ModelAccess.wrap(modelLookup);
@@ -674,14 +679,14 @@ public class UMBImporter extends ExplicitModelImporter
 					iLo = iHi;
 					iHi = iLo + modelAccess.getNumTransitions(s, 0);
 					for (int i = iLo; i < iHi; i++) {
-						double d = transRewards.getDouble(i);
-						if (d > 0) {
+						Value v = transRewards.get(i);
+						if (eval.gt(v, eval.zero())) {
 							switch (transitionRewardIndexing) {
 								case STATE:
-									storeRewardDoubles.accept(s, modelAccess.getTransitionSuccessor(s, 0, i - iLo), d);
+									storeReward.accept(s, modelAccess.getTransitionSuccessor(s, 0, i - iLo), v);
 									break;
 								case OFFSET:
-									storeRewardDoubles.accept(s, i - iLo, d);
+									storeReward.accept(s, i - iLo, v);
 									break;
 								default:
 									throw new PrismException("Unknown transition reward indexing " + transitionRewardIndexing);
@@ -707,14 +712,14 @@ public class UMBImporter extends ExplicitModelImporter
 					iLo = iHi;
 					iHi = stateTransitionOffsets.getInt(s + 1);
 					for (int i = iLo; i < iHi; i++) {
-						double d = transRewards.getDouble(i);
-						if (d > 0) {
+						Value v = transRewards.get(i);
+						if (eval.gt(v, eval.zero())) {
 							switch (transitionRewardIndexing) {
 								case STATE:
-									storeRewardDoubles.accept(s, transitionSuccessors.getInt(i), d);
+									storeReward.accept(s, transitionSuccessors.getInt(i), v);
 									break;
 								case OFFSET:
-									storeRewardDoubles.accept(s, i - iLo, d);
+									storeReward.accept(s, i - iLo, v);
 									break;
 								default:
 									throw new PrismException("Unknown transition reward indexing " + transitionRewardIndexing);
@@ -737,12 +742,11 @@ public class UMBImporter extends ExplicitModelImporter
 
 		try {
 			// Extract transition rewards from UMB
-			DoubleList transRewards = new DoubleArrayList(numChoices);
-			umbReader.extractChoiceRewards(rewardIndex, transRewards::add);
+			ModelAccess.ValueListFromPrimitives<Value> valueListFromPrimitives = new ModelAccess.ValueListFromPrimitives<>(eval, numChoices);
+			List<Value> transRewards = valueListFromPrimitives.valueList;
+			umbReader.extractChoiceRewards(rewardIndex, valueListFromPrimitives.primitiveConsumer);
 
 			// Convert sparse storage to reward list and store
-			IOUtils.TransitionRewardConsumer<Double> storeRewardDoubles = (IOUtils.TransitionRewardConsumer<Double>) storeReward;
-
 			// If the model has already been built and provided, use this to look for transition indexing
 			ModelAccess<Value> modelAccess = null;
 			IntList stateChoiceOffsets;
@@ -766,9 +770,9 @@ public class UMBImporter extends ExplicitModelImporter
 					iHi = stateChoiceOffsets.getInt(s + 1);
 				}
 				for (int i = iLo; i < iHi; i++) {
-					double d = transRewards.getDouble(i);
-					if (d > 0) {
-						storeRewardDoubles.accept(s, i - iLo, d);
+					Value v = transRewards.get(i);
+					if (eval.gt(v, eval.zero())) {
+						storeReward.accept(s, i - iLo, v);
 					}
 				}
 			}
@@ -799,7 +803,7 @@ public class UMBImporter extends ExplicitModelImporter
 	}
 
 	/**
-	 * Class to add an increasing index to values from a double consumer.
+	 * Class to add an increasing index to values from a Value consumer.
 	 */
 	private static class IndexedConsumer<Value> implements Consumer<Value>
 	{

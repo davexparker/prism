@@ -27,11 +27,14 @@
 package io;
 
 import common.Interval;
+import it.unimi.dsi.fastutil.longs.LongConsumer;
+import param.BigRational;
 
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.PrimitiveIterator;
+import java.util.function.Consumer;
 
 public class ModelAccessIterators
 {
@@ -484,6 +487,69 @@ public class ModelAccessIterators
 			} else {
 				first = true;
 				return next.getUpper();
+			}
+		}
+	}
+
+	/**
+	 * Class to unpack big rationals, supplied as an iterator, and return
+	 * as an iterator over longs, i.e., both the numerator and denominator.
+	 */
+	public static class UnpackBigRationals implements PrimitiveIterator.OfLong
+	{
+		Iterator<BigRational> iter;
+		BigRational next;
+		boolean first = true;
+
+		public UnpackBigRationals(Iterator<BigRational> iter)
+		{
+			this.iter = iter;
+		}
+
+		@Override
+		public boolean hasNext()
+		{
+			return !first || iter.hasNext();
+		}
+
+		@Override
+		public long nextLong()
+		{
+			if (first) {
+				next = iter.next();
+				first = false;
+				return next.getNum().longValueExact();
+			} else {
+				first = true;
+				return next.getDen().longValueExact();
+			}
+		}
+	}
+
+	/**
+	 * Class to provide a list of big rationals, provided as a list of longs
+	 * representing the numerators and denominators, successively.
+	 */
+	public static class PackBigRationals implements LongConsumer
+	{
+		Consumer<BigRational> cons;
+		long num;
+		boolean first = true;
+
+		public PackBigRationals(Consumer<BigRational> cons)
+		{
+			this.cons = cons;
+		}
+
+		@Override
+		public void accept(long value)
+		{
+			if (first) {
+				num = value;
+				first = false;
+			} else {
+				first = true;
+				cons.accept(new BigRational(num, value));
 			}
 		}
 	}

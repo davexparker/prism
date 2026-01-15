@@ -88,7 +88,7 @@ public class UMBIndex
 	/** UMB data types */
 	public enum UMBType implements UMBField
 	{
-		INT, BOOL, DOUBLE;
+		INT, BOOL, DOUBLE, RATIONAL;
 		@Override
 		public String toString()
 		{
@@ -96,6 +96,7 @@ public class UMBIndex
 				case INT: return "int";
 				case BOOL: return "bool";
 				case DOUBLE: return "double";
+				case RATIONAL: return "rational";
 				default: return "?";
 			}
 		}
@@ -106,9 +107,19 @@ public class UMBIndex
 	{
 		DOUBLE, RATIONAL, DOUBLE_INTERVAL, RATIONAL_INTERVAL;
 
-		/**
-		 * Returns true if values are defined as intervals.
-		 */
+		/** Returns true if values are defined in terms of doubles (or intervals over). */
+		public boolean doubles()
+		{
+			return this == DOUBLE || this == DOUBLE_INTERVAL;
+		}
+
+		/** Returns true if values are defined in terms of rationals (or intervals over). */
+		public boolean rationals()
+		{
+			return this == RATIONAL || this == RATIONAL_INTERVAL;
+		}
+
+		/** Returns true if values are defined as intervals. */
 		public boolean intervals()
 		{
 			return this == DOUBLE_INTERVAL || this == RATIONAL_INTERVAL;
@@ -323,6 +334,26 @@ public class UMBIndex
 		public String getFilename(UMBEntity entity)
 		{
 			return UMBFormat.annotationFile(group, id, entity);
+		}
+
+		/**
+		 * Get the type of the values stored in the annotation
+		 */
+		public UMBType getType()
+		{
+			return type;
+		}
+
+		public ContinuousNumericType getContinuousNumericType() throws UMBException
+		{
+			switch (type) {
+				case DOUBLE:
+					return ContinuousNumericType.DOUBLE;
+				case RATIONAL:
+					return ContinuousNumericType.RATIONAL;
+				default:
+					throw new UMBException("Annotation \"" + id + "\" in group \"" + group + "\" is not of a continuous numeric type");
+			}
 		}
 	}
 

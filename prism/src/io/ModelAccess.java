@@ -40,15 +40,16 @@ import explicit.NondetModel;
 import explicit.PartiallyObservableModel;
 import explicit.Utils;
 import explicit.rewards.Rewards;
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.doubles.DoubleIterators;
+import it.unimi.dsi.fastutil.doubles.DoubleList;
 import it.unimi.dsi.fastutil.ints.IntIterators;
+import param.BigRational;
+import prism.Evaluator;
 import prism.ModelType;
 
-import java.util.AbstractMap;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.PrimitiveIterator;
+import java.util.*;
+import java.util.function.Consumer;
 
 /**
  * Interface for (read-only) access to model data, unified across all model types.
@@ -61,6 +62,11 @@ public interface ModelAccess<Value>
 	 * Get the type of this model.
 	 */
 	ModelType getModelType();
+
+	/**
+	 * Get an Evaluator for the values stored in this Model for probabilities etc.
+	 */
+	Evaluator<Value> getEvaluator();
 
 	/**
 	 * Get a list of the action labels attached to choices/transitions.
@@ -217,6 +223,12 @@ public interface ModelAccess<Value>
 			public ModelType getModelType()
 			{
 				return model.getModelType();
+			}
+
+			@Override
+			public Evaluator<Value> getEvaluator()
+			{
+				return model.getEvaluator();
 			}
 
 			@Override
@@ -498,6 +510,16 @@ public interface ModelAccess<Value>
 	}
 
 	/**
+	 * Get the probabilities for all transitions, as an iterator,
+	 * encoded into primitive types (see {@link #valuesToPrimitives(Iterator)}).
+	 * For interval models, this returns two probabilities (lower then upper bound) for each transition.
+	 */
+	default Iterator<?> getTransitionProbabilitiesAsPrimitives()
+	{
+		return valuesToPrimitives(getTransitionProbabilities());
+	}
+
+	/**
 	 * Get the successor states for all transitions, as an iterator.
 	 */
 	default PrimitiveIterator.OfInt getTransitionSuccessors()
@@ -525,6 +547,15 @@ public interface ModelAccess<Value>
 				return model.getExitRate(s);
 			}
 		};
+	}
+
+	/**
+	 * Get the exit rates for all states, as an iterator,
+	 * encoded into primitive types (see {@link #valuesToPrimitives(Iterator)}).
+	 */
+	default Iterator<?> getExitRatesAsPrimitives()
+	{
+		return valuesToPrimitives(getExitRates());
 	}
 
 	/**
@@ -612,6 +643,16 @@ public interface ModelAccess<Value>
 	}
 
 	/**
+	 * Get all state rewards from a {@link Rewards} object, as an iterator,
+	 * encoded into primitive types (see {@link #valuesToPrimitives(Iterator)}).
+	 * @param rewards The rewards
+	 */
+	default <E> Iterator<?> getStateRewardsAsPrimitives(Rewards<E> rewards)
+	{
+		return valuesToPrimitives(getStateRewards(rewards));
+	}
+
+	/**
 	 * Get all transition rewards from a {@link Rewards} object, as an iterator.
 	 * @param rewards The rewards
 	 */
@@ -635,6 +676,77 @@ public interface ModelAccess<Value>
 					return rewards.getTransitionReward(s, j);
 				}
 			};
+		}
+	}
+
+	/**
+	 * Get all transition rewards from a {@link Rewards} object, as an iterator,
+	 * encoded into primitive types (see {@link #valuesToPrimitives(Iterator)}).
+	 * @param rewards The rewards
+	 */
+	default <E> Iterator<?> getTransitionRewardsAsPrimitives(Rewards<E> rewards)
+	{
+		return valuesToPrimitives(getTransitionRewards(rewards));
+	}
+
+	// Utility methods
+
+	/**
+	 * Convert (continuous numerical) values, supplied via an iterator,
+	 * to an encoding into primitive types, also as an iterator.
+	 * Double values are returned as-is, while BigRational values are unpacked into pairs of longs
+	 * @param values The values to encode
+	 */
+	default Iterator<?> valuesToPrimitives(Iterator<?> values)
+	{
+		if (getEvaluator().exact()) {
+			return new ModelAccessIterators.UnpackBigRationals((Iterator<BigRational>) values);
+		} else {
+			return DoubleIterators.asDoubleIterator(values);
+		}
+	}
+
+	/**
+	 * Decode (continuous numerical) values, supplied via a consumer,
+	 * from an encoding into primitive types, and pass to a Value consumer.
+	 * Double values are passed as-is, while BigRational values are converted to pairs of longs
+	 * @param eval Evaluator for the values
+	 * @param valueConsumer The consumer for the values to encode
+	 */
+	static <Value> Consumer<?> primitivesToValues(Evaluator<Value> eval, Consumer<Value> valueConsumer)
+	{
+		if (eval.exact()) {
+			Consumer<BigRational> consumerBigRationals = (Consumer<BigRational>) valueConsumer;
+			return new ModelAccessIterators.PackBigRationals(consumerBigRationals);
+		} else {
+			return valueConsumer;
+		}
+	}
+
+	// Utility classes
+
+	/**
+	 * Helper class to create a list of Values, decoded from their
+	 * encoding into primitives (see {@link #valuesToPrimitives(Iterator)}).
+	 */
+	class ValueListFromPrimitives<Value>
+	{
+		List<Value> valueList;
+		Consumer<?> primitiveConsumer;
+
+		@SuppressWarnings("unchecked")
+		ValueListFromPrimitives(Evaluator<Value> eval, int size)
+		{
+			if (eval.exact()) {
+				//LongList valueListLongs = new LongArrayList(numTransitions);
+				List<BigRational> valueListBigRationals = new ArrayList<>(size);
+				valueList = (List<Value>) valueListBigRationals;
+				primitiveConsumer = new ModelAccessIterators.PackBigRationals(valueListBigRationals::add);
+			} else {
+				DoubleList valueListDoubles = new DoubleArrayList(size);
+				valueList = (List<Value>) valueListDoubles;
+				primitiveConsumer = (it.unimi.dsi.fastutil.doubles.DoubleConsumer) valueListDoubles::add;
+			}
 		}
 	}
 }
