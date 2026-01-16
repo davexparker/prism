@@ -262,7 +262,16 @@ public class UMBWriter
 	}
 
 	/**
-	 * Add the (deterministic) observations for all states
+	 * Add the (deterministic) observations for all states, as an iterator of longs
+	 * @param stateObservations Iterator providing the observations for all states
+	 */
+	public void addStateObservations(PrimitiveIterator.OfLong stateObservations) throws UMBException
+	{
+		addObservations(UMBIndex.UMBEntity.STATES, stateObservations);
+	}
+
+	/**
+	 * Add the (deterministic) observations for all states, as an iterator of ints
 	 * @param stateObservations Iterator providing the observations for all states
 	 */
 	public void addStateObservations(PrimitiveIterator.OfInt stateObservations) throws UMBException
@@ -271,7 +280,16 @@ public class UMBWriter
 	}
 
 	/**
-	 * Add the (deterministic) observations for all branches
+	 * Add the (deterministic) observations for all branches, as an iterator of longs
+	 * @param branchObservations Iterator providing the observations for all branches
+	 */
+	public void addBranchObservations(PrimitiveIterator.OfLong branchObservations) throws UMBException
+	{
+		addObservations(UMBIndex.UMBEntity.BRANCHES, branchObservations);
+	}
+
+	/**
+	 * Add the (deterministic) observations for all branches, as an iterator of ints
 	 * @param branchObservations Iterator providing the observations for all branches
 	 */
 	public void addBranchObservations(PrimitiveIterator.OfInt branchObservations) throws UMBException
@@ -280,13 +298,23 @@ public class UMBWriter
 	}
 
 	/**
-	 * Add the (deterministic) observations for some entity (states, branches)
+	 * Add the (deterministic) observations for some entity (states, branches), as an iterator of longs
+	 * @param entity The entity for which observations are being added
+	 * @param observations Iterator providing the observations
+	 */
+	public void addObservations(UMBIndex.UMBEntity entity, PrimitiveIterator.OfLong observations) throws UMBException
+	{
+		addLongDataToAnnotation(umbIndex.observationsAnnotation, entity, observations);
+	}
+
+	/**
+	 * Add the (deterministic) observations for some entity (states, branches), as an iterator of ints
 	 * @param entity The entity for which observations are being added
 	 * @param observations Iterator providing the observations
 	 */
 	public void addObservations(UMBIndex.UMBEntity entity, PrimitiveIterator.OfInt observations) throws UMBException
 	{
-		addLongArray(UMBFormat.observationsFile(entity), new UMBUtils.IntToLongIteratorAdapter(observations), umbIndex.getNumStates());
+		addLongDataToAnnotation(umbIndex.observationsAnnotation, entity, new UMBUtils.IntToLongIteratorAdapter(observations));
 	}
 
 	// Methods to add standard annotations
@@ -468,6 +496,22 @@ public class UMBWriter
 		annotation.addAppliesTo(appliesTo);
 		long annotationSize = umbIndex.getAnnotationDataSize(appliesTo);
 		addIntArray(annotation.getFilename(appliesTo), intValues, annotationSize);
+	}
+
+	/**
+	 * Add new long-valued data to an existing annotation.
+	 * @param annotation The annotation
+	 * @param appliesTo The entity to which the annotation applies
+	 * @param longValues Iterator providing data
+	 */
+	public void addLongDataToAnnotation(UMBIndex.Annotation annotation, UMBIndex.UMBEntity appliesTo, PrimitiveIterator.OfLong longValues) throws UMBException
+	{
+		if (annotation.appliesTo(appliesTo)) {
+			throw new UMBException("Duplicate data for " + appliesTo + "s in annotation \"" + annotation.id + "\" in group \"" + annotation.group + "\"");
+		}
+		annotation.addAppliesTo(appliesTo);
+		long annotationSize = umbIndex.getAnnotationDataSize(appliesTo);
+		addLongArray(annotation.getFilename(appliesTo), longValues, annotationSize);
 	}
 
 	/**

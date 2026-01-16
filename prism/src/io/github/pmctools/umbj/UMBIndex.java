@@ -70,6 +70,8 @@ public class UMBIndex
 
 	/** Annotation object for actions (stored in a similar way to annotations) */
 	public transient Annotation actionsAnnotation = createStandaloneAnnotation(UMBFormat.ACTIONS_FOLDER, UMBIndex.UMBType.STRING);
+	/** Annotation object for observations (stored in a similar way to annotations) */
+	public transient Annotation observationsAnnotation = createStandaloneAnnotation(UMBFormat.OBSERVATIONS_FOLDER, UMBIndex.UMBType.LONG);
 
 	// Enums
 
@@ -93,12 +95,13 @@ public class UMBIndex
 	/** UMB data types */
 	public enum UMBType implements UMBField
 	{
-		INT, BOOL, DOUBLE, RATIONAL, STRING;
+		INT, LONG, BOOL, DOUBLE, RATIONAL, STRING;
 		@Override
 		public String toString()
 		{
 			switch (this) {
 				case INT: return "int";
+				case LONG: return "long";
 				case BOOL: return "bool";
 				case DOUBLE: return "double";
 				case RATIONAL: return "rational";
@@ -230,6 +233,8 @@ public class UMBIndex
 		public ContinuousNumericType branchProbabilityType;
 		/** Type of exit rates */
 		public ContinuousNumericType exitRateType;
+		/** Type of probabilities for stochastic observations */
+		public ContinuousNumericType observationProbabilityType;
 
 		/**
 		 * Check this object is valid; throw an exception if not.
@@ -271,7 +276,7 @@ public class UMBIndex
 			}
 			if (numObservations > 0) {
 				checkFieldExists(observationsApplyTo, "observationsApplyTo");
-				if (!EnumSet.of(UMBEntity.STATES, UMBEntity.CHOICES, UMBEntity.BRANCHES).contains(observationsApplyTo)) {
+				if (!EnumSet.of(UMBEntity.STATES, UMBEntity.BRANCHES).contains(observationsApplyTo)) {
 					throw new UMBException("Invalid value \" + observationsApplyTo" + "\" for " + fieldNameToUMB("observationsApplyTo"));
 				}
 			}
@@ -682,6 +687,15 @@ public class UMBIndex
 	}
 
 	/**
+	 * Set the type of probabilities for stochastic observations in the model.
+	 * @param observationProbabilityType The type of observation probabilities
+	 */
+	public void setObservationProbabilityType(ContinuousNumericType observationProbabilityType)
+	{
+		transitionSystem.observationProbabilityType = observationProbabilityType;
+	}
+
+	/**
 	 * Convenience method to set model metadata for a range of common models,
 	 * i.e., those that are included in the {@link ModelType} enum.
 	 * For some models (games, POMDPs), further configuration will be needed
@@ -928,6 +942,14 @@ public class UMBIndex
 	public ContinuousNumericType getExitRateType()
 	{
 		return transitionSystem.exitRateType;
+	}
+
+	/**
+	 * Get the type of probabilities for stochastic observations in the model.
+	 */
+	public ContinuousNumericType getObservationProbabilityType()
+	{
+		return transitionSystem.observationProbabilityType;
 	}
 
 	/**

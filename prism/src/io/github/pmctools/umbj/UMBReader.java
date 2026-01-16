@@ -254,7 +254,7 @@ public class UMBReader
 	 */
 	public void extractObservations(UMBIndex.UMBEntity entity, LongConsumer longConsumer) throws UMBException
 	{
-		extractLongArray(UMBFormat.observationsFile(entity), umbIndex.getEntityCount(entity), longConsumer);
+		extractLongArray(umbIndex.observationsAnnotation.getFilename(entity), umbIndex.getEntityCount(entity), longConsumer);
 	}
 
 	// Utility methods for extracting date
