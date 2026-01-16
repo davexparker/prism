@@ -215,8 +215,6 @@ public class ExplicitFiles2MTBDD
 		// construct labels and init state info
 		buildLabelsAndInitialStates();
 
-		Values constantValues = new Values(); // no constants
-
 		// create new Model object to be returned
 		// they need a module name list, so we fake that
 		int numModules = 1;
@@ -233,7 +231,7 @@ public class ExplicitFiles2MTBDD
 			model = new StochModel(trans, start, allDDRowVars, allDDColVars, modelVariables,
 					varList, varDDRowVars, varDDColVars);
 		}
-		model.setConstantValues(constantValues);
+		model.setConstantValues(modelInfo.getConstantValues());
 
 		// compute/set rewards
 		buildStateRewards();
