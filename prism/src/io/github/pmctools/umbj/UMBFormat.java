@@ -40,8 +40,8 @@ public class UMBFormat
 	public static final String CHOICE_BRANCH_OFFSETS_FILE = "choice-to-branches" + BIN_FILE_EXT;
 	public static final String BRANCH_TARGETS_FILE = "branch-to-target" + BIN_FILE_EXT;
 	public static final String BRANCH_PROBABILITIES_FILE = "branch-to-probability" + BIN_FILE_EXT;
-	public static final String ACTIONS_DIR = "actions";
-	public static final String OBSERVATIONS_DIR = "observations";
+	public static final String ACTIONS_FOLDER = "actions";
+	public static final String OBSERVATIONS_FOLDER = "observations";
 	public static final String OBSERVATIONS_FILE = "values" + BIN_FILE_EXT;
 
 	// String list storage info
@@ -51,21 +51,21 @@ public class UMBFormat
 
 	// Annotations
 
-	/** Location for annotations (directory in zip) */
-	public static final String ANNOTATIONS_DIR = "annotations";
+	/** Location for annotations (folder in zip) */
+	public static final String ANNOTATIONS_FOLDER = "annotations";
 
 	/** Filename for storing an annotation's values */
 	public static final String ANNOTATION_VALUES_FILE = "values" + BIN_FILE_EXT;
 
-	// Subdirectories for built-in annotation groups
+	// Subfolders for built-in annotation groups
 
 	public static final String AP_ANNOTATIONS_GROUP = "aps";
 	public static final String REWARD_ANNOTATIONS_GROUP = "rewards";
 
 	// Valuations
 
-	/** Location for valuations (directory in zip) */
-	public static final String VALUATIONS_DIR = "valuations";
+	/** Location for valuations (folder in zip) */
+	public static final String VALUATIONS_FOLDER = "valuations";
 
 	/** Filename for storing valuation variable values */
 	public static final String VALUATIONS_FILE = "valuations" + BIN_FILE_EXT;
@@ -91,27 +91,27 @@ public class UMBFormat
 	public static final CompressionFormat DEFAULT_COMPRESSION_FORMAT = CompressionFormat.XZ;
 
 	/**
-	 * Get the filename for the offsets mapping string indices to string data within some directory
+	 * Get the filename for the offsets mapping string indices to string data within some folder
 	 */
-	public static String stringOffsetsFile(String dirName)
+	public static String stringOffsetsFile(String folderName)
 	{
-		return dirName + "/" + STRING_OFFSETS_FILE;
+		return folderName + "/" + STRING_OFFSETS_FILE;
 	}
 
 	/**
-	 * Get the filename for the string data within some directory
+	 * Get the filename for the string data within some folder
 	 */
-	public static String stringsFile(String dirName)
+	public static String stringsFile(String folderName)
 	{
-		return dirName + "/" + STRINGS_FILE;
+		return folderName + "/" + STRINGS_FILE;
 	}
 
 	/**
-	 * Get the directory name for observations
+	 * Get the folder name for observations
 	 */
-	public static String observationsDir(UMBIndex.UMBEntity entity)
+	public static String observationsFolder(UMBIndex.UMBEntity entity)
 	{
-		return OBSERVATIONS_DIR + "/" + entity;
+		return OBSERVATIONS_FOLDER + "/" + entity;
 	}
 
 	/**
@@ -119,15 +119,15 @@ public class UMBFormat
 	 */
 	public static String observationsFile(UMBIndex.UMBEntity entity)
 	{
-		return observationsDir(entity) + "/" + OBSERVATIONS_FILE;
+		return observationsFolder(entity) + "/" + OBSERVATIONS_FILE;
 	}
 
 	/**
-	 * Get the directory name for an annotation
+	 * Get the folder name for an annotation
 	 */
-	public static String annotationDir(String group, String id, UMBIndex.UMBEntity entity)
+	public static String annotationFolder(String group, String id, UMBIndex.UMBEntity entity)
 	{
-		return ANNOTATIONS_DIR + "/" + group + "/" + id + "/" + entity;
+		return ANNOTATIONS_FOLDER + "/" + group + "/" + id + "/" + entity;
 	}
 
 	/**
@@ -135,15 +135,15 @@ public class UMBFormat
 	 */
 	public static String annotationFile(String group, String id, UMBIndex.UMBEntity entity)
 	{
-		return annotationDir(group, id, entity) + "/" + ANNOTATION_VALUES_FILE;
+		return annotationFolder(group, id, entity) + "/" + ANNOTATION_VALUES_FILE;
 	}
 
 	/**
-	 * Get the directory name for a set of valuations
+	 * Get the folder name for a set of valuations
 	 */
-	public static String valuationsDir(UMBIndex.UMBEntity entity)
+	public static String valuationsFolder(UMBIndex.UMBEntity entity)
 	{
-		return VALUATIONS_DIR + "/" + entity;
+		return VALUATIONS_FOLDER + "/" + entity;
 	}
 
 	/**
@@ -151,7 +151,7 @@ public class UMBFormat
 	 */
 	public static String valuationsFile(UMBIndex.UMBEntity entity)
 	{
-		return valuationsDir(entity) + "/" + VALUATIONS_FILE;
+		return valuationsFolder(entity) + "/" + VALUATIONS_FILE;
 	}
 
 	// Utility functions

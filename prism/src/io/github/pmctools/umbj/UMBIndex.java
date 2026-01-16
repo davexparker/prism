@@ -69,7 +69,7 @@ public class UMBIndex
 	// Fake annotation objects for some data
 
 	/** Annotation object for actions (stored in a similar way to annotations) */
-	public transient Annotation actionsAnnotation = createStandaloneAnnotation(UMBFormat.ACTIONS_DIR, UMBIndex.UMBType.STRING);
+	public transient Annotation actionsAnnotation = createStandaloneAnnotation(UMBFormat.ACTIONS_FOLDER, UMBIndex.UMBType.STRING);
 
 	// Enums
 
@@ -361,12 +361,12 @@ public class UMBIndex
 		}
 
 		/**
-		 * Get the name of the directory to store this annotation, for the specified entity.
+		 * Get the name of the folder to store this annotation, for the specified entity.
 		 * @param entity The entity
 		 */
-		public String getDirName(UMBEntity entity)
+		public String getFolderName(UMBEntity entity)
 		{
-			return UMBFormat.annotationDir(group, id, entity);
+			return UMBFormat.annotationFolder(group, id, entity);
 		}
 
 		/**
@@ -393,23 +393,23 @@ public class UMBIndex
 
 	/**
 	 * Annotation object for data stored in the same style as an annotation,
-	 * but without the usual conventions regarding group, id, directory, etc.
+	 * but without the usual conventions regarding group, id, folder, etc.
 	 */
 	public static class StandaloneAnnotation extends Annotation
 	{
-		/** Directory where data is stored */
-		public String dirName;
+		/** Folder where data is stored */
+		public String folderName;
 
 		@Override
-		public String getDirName(UMBEntity entity)
+		public String getFolderName(UMBEntity entity)
 		{
-			return dirName + "/" + entity;
+			return folderName + "/" + entity;
 		}
 
 		@Override
 		public String getFilename(UMBEntity entity)
 		{
-			return getDirName(entity) + "/" + UMBFormat.ANNOTATION_VALUES_FILE;
+			return getFolderName(entity) + "/" + UMBFormat.ANNOTATION_VALUES_FILE;
 		}
 	}
 
@@ -807,11 +807,11 @@ public class UMBIndex
 	/**
 	 * Create a standalone annotation object without adding it to the index.
 	 */
-	public static Annotation createStandaloneAnnotation(String dirName, UMBType type)
+	public static Annotation createStandaloneAnnotation(String folderName, UMBType type)
 	{
 		StandaloneAnnotation annotation = new StandaloneAnnotation();
 		annotation.type = type;
-		annotation.dirName = dirName;
+		annotation.folderName = folderName;
 		return annotation;
 	}
 

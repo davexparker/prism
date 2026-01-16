@@ -35,7 +35,6 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.*;
-import java.util.stream.Stream;
 
 /**
  * Class to handle writing to UMB files.
@@ -503,8 +502,8 @@ public class UMBWriter
 			throw new UMBException("Duplicate data for " + appliesTo + "s in annotation \"" + annotation.id + "\" in group \"" + annotation.group + "\"");
 		}
 		annotation.addAppliesTo(appliesTo);
-		String dirName = annotation.getDirName(appliesTo);
-		addStringsFiles(strings, UMBFormat.stringOffsetsFile(dirName), UMBFormat.stringsFile(dirName));
+		String folderName = annotation.getFolderName(appliesTo);
+		addStringsFiles(strings, UMBFormat.stringOffsetsFile(folderName), UMBFormat.stringsFile(folderName));
 		if (indices != null) {
 			long annotationSize = umbIndex.getAnnotationDataSize(appliesTo);
 			addIntArray(annotation.getFilename(appliesTo), indices, annotationSize);
