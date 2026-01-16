@@ -146,10 +146,6 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 			// Create the writer and build the index
 			UMBWriter umbWriter = new UMBWriter();
 			buildIndex(modelAccess, umbWriter.getUmbIndex());
-			if (!showActions) {
-				umbWriter.getUmbIndex().setNumChoiceActions(0);
-				umbWriter.getUmbIndex().setNumBranchActions(0);
-			}
 
 			// Add core transition info
 			if (modelType.nondeterministic()) {
@@ -304,12 +300,17 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 		umbIndex.setNumInitialStates(model.getNumInitialStates());
 		umbIndex.setNumChoices(model.getNumChoices());
 		umbIndex.setNumBranches(model.getNumTransitions());
-		if (model.getModelType().nondeterministic()) {
-			umbIndex.setNumChoiceActions(model.getActions().size());
-			umbIndex.setNumBranchActions(0);
+		if (modelExportOptions.getShowActions()) {
+			if (model.getModelType().nondeterministic()) {
+				umbIndex.setNumChoiceActions(model.getActions().size());
+				umbIndex.setNumBranchActions(0);
+			} else {
+				umbIndex.setNumChoiceActions(0);
+				umbIndex.setNumBranchActions(model.getActions().size());
+			}
 		} else {
 			umbIndex.setNumChoiceActions(0);
-			umbIndex.setNumBranchActions(model.getActions().size());
+			umbIndex.setNumBranchActions(0);
 		}
 	}
 
