@@ -100,6 +100,39 @@ public class UMBReader
 	}
 
 	/**
+	 * Extract the players that own states (turn-based game models)
+	 */
+	public void extractStatePlayers(IntConsumer intConsumer) throws UMBException
+	{
+		extractIntArray(UMBFormat.STATE_PLAYERS, umbIndex.getNumStates(), intConsumer);
+	}
+
+	/**
+	 * Extract the initial states, in sparse form, i.e., a list of state indices
+	 */
+	public void extractInitialStates(LongConsumer longConsumer) throws UMBException
+	{
+		extractBooleanArraySparse(UMBFormat.INITIAL_STATES_FILE, umbIndex.getNumStates(), longConsumer);
+	}
+
+	/**
+	 * Extract the Markovian states (for Markov automata), in sparse form, i.e., a list of state indices
+	 */
+	public void extractMarkovianStates(LongConsumer longConsumer) throws UMBException
+	{
+		extractBooleanArraySparse(UMBFormat.MARKOVIAN_STATES_FILE, umbIndex.getNumStates(), longConsumer);
+	}
+
+	/**
+	 * Extract the exit rates for all states (for continuous-time models).
+	 * The type of the values depends on {@link UMBIndex#getExitRateType()}.
+	 */
+	public void extractExitRates(Consumer<?> consumer) throws UMBException
+	{
+		extractContinuousNumericArray(UMBFormat.STATE_EXIT_RATES_FILE, umbIndex.getExitRateType(), umbIndex.getNumStates(), consumer);
+	}
+
+	/**
 	 * Extract the choice branch offsets.
 	 */
 	public void extractChoiceBranchOffsets(LongConsumer longConsumer) throws UMBException
@@ -117,27 +150,13 @@ public class UMBReader
 
 	/**
 	 * Extract the branch probabilities.
-	 * For an interval model, this will extract two values (lower/upper bound, successively) for each branch.
+	 * The type (and number) of values provided depends on {@link UMBIndex#getBranchProbabilityType()}.
+	 * For interval types, this method will extract two values (lower/upper bound, successively) for each branch.
+	 * If values are rationals, this method will extract two values (numerator/denominator, successively) for each one.
 	 */
 	public void extractBranchProbabilities(Consumer<?> consumer) throws UMBException
 	{
 		extractContinuousNumericArray(UMBFormat.BRANCH_PROBABILITIES_FILE, umbIndex.getBranchProbabilityType(), umbIndex.getNumBranches(), consumer);
-	}
-
-	/**
-	 * Extract the exit rates.
-	 */
-	public void extractExitRates(Consumer<?> consumer) throws UMBException
-	{
-		extractContinuousNumericArray(UMBFormat.EXIT_RATES_FILE, umbIndex.getExitRateType(), umbIndex.getNumStates(), consumer);
-	}
-
-	/**
-	 * Extract the initial states, in sparse form, i.e., a list of (int) state indices
-	 */
-	public void extractInitialStates(LongConsumer longConsumer) throws UMBException
-	{
-		extractBooleanArraySparse(UMBFormat.INITIAL_STATES_FILE, umbIndex.getNumStates(), longConsumer);
 	}
 
 	/**

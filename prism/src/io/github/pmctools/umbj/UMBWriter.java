@@ -93,6 +93,81 @@ public class UMBWriter
 	}
 
 	/**
+	 * Add the players that own states (turn-based game models)
+	 */
+	public void addStatePlayers(PrimitiveIterator.OfInt statePlayers)
+	{
+		addIntArray(UMBFormat.STATE_PLAYERS, statePlayers, umbIndex.getNumStates());
+	}
+
+	/**
+	 * Add the initial states, as a BitSet
+	 */
+	public void addInitialStates(BitSet initialStates) throws UMBException
+	{
+		addBooleanArray(UMBFormat.INITIAL_STATES_FILE, initialStates, umbIndex.getNumStates());
+	}
+
+	/**
+	 * Add the initial states, in sparse form, i.e., a list of (long) state indices
+	 */
+	public void addInitialStates(PrimitiveIterator.OfLong initStates) throws UMBException
+	{
+		// TODO - can't use BitSet; need BooleanArraySparse
+		BitSet bsInitStates = new BitSet();
+		initStates.forEachRemaining((long s) -> bsInitStates.set((int) s));
+		addBooleanArray(UMBFormat.INITIAL_STATES_FILE, bsInitStates, umbIndex.getNumStates());
+	}
+
+	/**
+	 * Add the initial states, in sparse form, i.e., a list of (int) state indices
+	 */
+	public void addInitialStates(PrimitiveIterator.OfInt initStates) throws UMBException
+	{
+		BitSet bsInitStates = new BitSet();
+		initStates.forEachRemaining((int s) -> bsInitStates.set(s));
+		addBooleanArray(UMBFormat.INITIAL_STATES_FILE, bsInitStates, umbIndex.getNumStates());
+	}
+
+	/**
+	 * Add the Markovian states (for Markov automata), as a BitSet
+	 */
+	public void addMarkovianStates(BitSet markovianStates) throws UMBException
+	{
+		addBooleanArray(UMBFormat.MARKOVIAN_STATES_FILE, markovianStates, umbIndex.getNumStates());
+	}
+
+	/**
+	 * Add the Markovian states (for Markov automata), in sparse form, i.e., a list of (long) state indices
+	 */
+	public void addMarkovianStates(PrimitiveIterator.OfLong markovianStates) throws UMBException
+	{
+		// TODO - can't use BitSet; need BooleanArraySparse
+		BitSet bsMarkovianStates = new BitSet();
+		markovianStates.forEachRemaining((long s) -> bsMarkovianStates.set((int) s));
+		addBooleanArray(UMBFormat.MARKOVIAN_STATES_FILE, bsMarkovianStates, umbIndex.getNumStates());
+	}
+
+	/**
+	 * Add the Markovian states (for Markov automata), in sparse form, i.e., a list of (int) state indices
+	 */
+	public void addMarkovianStates(PrimitiveIterator.OfInt markovianStates) throws UMBException
+	{
+		BitSet bsMarkovianStates = new BitSet();
+		markovianStates.forEachRemaining((int s) -> bsMarkovianStates.set(s));
+		addBooleanArray(UMBFormat.MARKOVIAN_STATES_FILE, bsMarkovianStates, umbIndex.getNumStates());
+	}
+
+	/**
+	 * Add the exit rates for each state of a CTMC.
+	 * The type of the values depends on {@link UMBIndex#getExitRateType()}.
+	 */
+	public void addExitRates(Iterator<?> exitRates) throws UMBException
+	{
+		addContinuousNumericArray(UMBFormat.STATE_EXIT_RATES_FILE, exitRates, umbIndex.getExitRateType(), umbIndex.getNumStates());
+	}
+
+	/**
 	 * Add the choice branch offsets, as an iterator of longs
 	 */
 	public void addChoiceBranchOffsets(PrimitiveIterator.OfLong choiceBranchOffsets)
@@ -109,14 +184,6 @@ public class UMBWriter
 	}
 
 	/**
-	 * Add the branch targets, as an iterator of ints
-	 */
-	public void addBranchTargets(PrimitiveIterator.OfInt branchTargets)
-	{
-		addLongArray(UMBFormat.BRANCH_TARGETS_FILE, new UMBUtils.IntToLongIteratorAdapter(branchTargets), umbIndex.getNumBranches());
-	}
-
-	/**
 	 * Add the branch targets, as an iterator of long
 	 */
 	public void addBranchTargets(PrimitiveIterator.OfLong branchTargets)
@@ -125,38 +192,22 @@ public class UMBWriter
 	}
 
 	/**
+	 * Add the branch targets, as an iterator of ints
+	 */
+	public void addBranchTargets(PrimitiveIterator.OfInt branchTargets)
+	{
+		addLongArray(UMBFormat.BRANCH_TARGETS_FILE, new UMBUtils.IntToLongIteratorAdapter(branchTargets), umbIndex.getNumBranches());
+	}
+
+	/**
 	 * Add the branch probabilities, as an iterator of values
-	 * For an interval model, two values (lower/upper bound, successively) should be supplied for each branch.
+	 * The type (and number) of values provided depends on {@link UMBIndex#getBranchProbabilityType()}.
+	 * For interval types, this method will expect two values (lower/upper bound, successively) for each branch.
+	 * If values are rationals, this method will expect two values (numerator/denominator, successively) for each one.
 	 */
 	public void addBranchProbabilities(Iterator<?> branchValues) throws UMBException
 	{
 		addContinuousNumericArray(UMBFormat.BRANCH_PROBABILITIES_FILE, branchValues, umbIndex.getBranchProbabilityType(), umbIndex.getNumBranches());
-	}
-
-	/**
-	 * Add the exit rates for each state of a CTMC, as an iterator of doubles
-	 */
-	public void addExitRates(Iterator<?> exitRates) throws UMBException
-	{
-		addContinuousNumericArray(UMBFormat.EXIT_RATES_FILE, exitRates, umbIndex.getExitRateType(), umbIndex.getNumStates());
-	}
-
-	/**
-	 * Add the initial states, as a BitSet
-	 */
-	public void addInitialStates(BitSet initStates) throws UMBException
-	{
-		addBooleanArray(UMBFormat.INITIAL_STATES_FILE, initStates, umbIndex.getNumStates());
-	}
-
-	/**
-	 * Add the initial states, in sparse form, i.e., a list of (int) state indices
-	 */
-	public void addInitialStates(PrimitiveIterator.OfInt initStates) throws UMBException
-	{
-		BitSet bsInitStates = new BitSet();
-		initStates.forEachRemaining((int s) -> bsInitStates.set(s));
-		addBooleanArray(UMBFormat.INITIAL_STATES_FILE, bsInitStates, umbIndex.getNumStates());
 	}
 
 	/**

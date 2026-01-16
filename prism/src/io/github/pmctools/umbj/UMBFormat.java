@@ -32,12 +32,14 @@ public class UMBFormat
 
 	// Core model information
 
-	public static final String STATE_CHOICE_OFFSETS_FILE = "state-to-choice" + BIN_FILE_EXT;
-	public static final String CHOICE_BRANCH_OFFSETS_FILE = "choice-to-branch" + BIN_FILE_EXT;
+	public static final String STATE_CHOICE_OFFSETS_FILE = "state-to-choices" + BIN_FILE_EXT;
+	public static final String STATE_PLAYERS = "state-to-player" + BIN_FILE_EXT;
+	public static final String INITIAL_STATES_FILE = "state-is-initial" + BIN_FILE_EXT;
+	public static final String MARKOVIAN_STATES_FILE = "state-is-markovian" + BIN_FILE_EXT;
+	public static final String STATE_EXIT_RATES_FILE = "state-to-exit-rate" + BIN_FILE_EXT;
+	public static final String CHOICE_BRANCH_OFFSETS_FILE = "choice-to-branches" + BIN_FILE_EXT;
 	public static final String BRANCH_TARGETS_FILE = "branch-to-target" + BIN_FILE_EXT;
-	public static final String BRANCH_PROBABILITIES_FILE = "branch-probabilities" + BIN_FILE_EXT;
-	public static final String EXIT_RATES_FILE = "exit-rates" + BIN_FILE_EXT;
-	public static final String INITIAL_STATES_FILE = "initial-states" + BIN_FILE_EXT;
+	public static final String BRANCH_PROBABILITIES_FILE = "branch-to-probability" + BIN_FILE_EXT;
 	public static final String CHOICE_ACTIONS_FILE = "choice-to-choice-action" + BIN_FILE_EXT;
 	public static final String BRANCH_ACTIONS_FILE = "branch-to-branch-action" + BIN_FILE_EXT;
 	public static final String CHOICE_ACTION_STRING_OFFSETS_FILE = "choice-action-to-string" + BIN_FILE_EXT;
@@ -93,7 +95,7 @@ public class UMBFormat
 	 */
 	public static String observationsDir(UMBIndex.UMBEntity entity)
 	{
-		return OBSERVATIONS_DIR + "/" + "for-" + entity;
+		return OBSERVATIONS_DIR + "/" + entity;
 	}
 
 	/**
@@ -109,7 +111,7 @@ public class UMBFormat
 	 */
 	public static String annotationDir(String group, String id, UMBIndex.UMBEntity entity)
 	{
-		return ANNOTATIONS_DIR + "/" + group + "/" + id + "/" + "for-" + entity;
+		return ANNOTATIONS_DIR + "/" + group + "/" + id + "/" + entity;
 	}
 
 	/**
@@ -125,7 +127,7 @@ public class UMBFormat
 	 */
 	public static String valuationsDir(UMBIndex.UMBEntity entity)
 	{
-		return VALUATIONS_DIR + "/" + "for-" + entity;
+		return VALUATIONS_DIR + "/" + entity;
 	}
 
 	/**
