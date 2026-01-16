@@ -30,11 +30,7 @@ import com.google.gson.annotations.SerializedName;
 
 import java.lang.reflect.Type;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -235,6 +231,8 @@ public class UMBIndex
 		public ContinuousNumericType exitRateType;
 		/** Type of probabilities for stochastic observations */
 		public ContinuousNumericType observationProbabilityType;
+		/** Names of players (for games) */
+		public List<String> playerNames;
 
 		/**
 		 * Check this object is valid; throw an exception if not.
@@ -282,6 +280,20 @@ public class UMBIndex
 			}
 			if (time == Time.STOCHASTIC || time == Time.URGENT_STOCHASTIC) {
 				checkFieldExists(exitRateType, "exitRateType");
+			}
+			if (numPlayers > 1) {
+				checkFieldExists(playerNames, "playerNames");
+				if (playerNames.size() != numPlayers) {
+					throw new UMBException("Player name list does not match number of players");
+				}
+				// check names are unique
+				if (!playerNames.stream().allMatch(new HashSet<>()::add)) {
+					throw new UMBException("Player names must be unique");
+				}
+			} else {
+				if (playerNames != null) {
+					throw new UMBException("Player names should be omitted in non-game models");
+				}
 			}
 		}
 	}
@@ -711,6 +723,15 @@ public class UMBIndex
 	}
 
 	/**
+	 * Set the names of players in the model (for games
+	 * @param playerNames The list of player names
+	 */
+	public void setPlayerNames(List<String> playerNames)
+	{
+		transitionSystem.playerNames = new ArrayList<>(playerNames);
+	}
+
+	/**
 	 * Convenience method to set model metadata for a range of common models,
 	 * i.e., those that are included in the {@link ModelType} enum.
 	 * For some models (games, POMDPs), further configuration will be needed
@@ -992,6 +1013,15 @@ public class UMBIndex
 	public ContinuousNumericType getObservationProbabilityType()
 	{
 		return transitionSystem.observationProbabilityType;
+	}
+
+	/**
+	 * Get the names of the players in the model (for games).
+	 * Only present if {@link #getNumPlayers()} is greater than one.
+	 */
+	public List<String> getPlayerNames()
+	{
+		return transitionSystem.playerNames;
 	}
 
 	/**
