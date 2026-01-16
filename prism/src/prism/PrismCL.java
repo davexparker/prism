@@ -1229,6 +1229,10 @@ public class PrismCL implements PrismModelListener
 					test = true;
 					testExitsOnFail = false;
 				}
+				// enable UMB test mode
+				else if (sw.equals("test:umb")) {
+					prism.setTestUMB(true);
+				}
 
 				// DD Debugging options
 				else if (sw.equals("dddebug")) {

@@ -92,6 +92,7 @@ import symbolic.comp.SCCComputer;
 import symbolic.comp.StateModelChecker;
 import symbolic.comp.StochModelChecker;
 import symbolic.model.Model;
+import symbolic.model.ModelSymbolic;
 import symbolic.model.NondetModel;
 import symbolic.states.StateList;
 import symbolic.states.StateListMTBDD;
@@ -215,6 +216,9 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 
 	// Method to use for (symbolic) state-space reachability
 	private int reachMethod = REACH_BFS;
+
+	// Test mode(s)
+	private boolean testUMB = false;
 
 	//------------------------------------------------------------------------------
 	// Parsers/translators/model checkers/simulators/etc.
@@ -727,6 +731,11 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 	public void setReachMethod(int reachMethod)
 	{
 		this.reachMethod = reachMethod;
+	}
+
+	public void setTestUMB(boolean testUMB)
+	{
+		this.testUMB = testUMB;
 	}
 
 	// Get methods
@@ -2317,6 +2326,28 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 
 			l = System.currentTimeMillis() - l;
 			mainLog.println("\nTime for model construction: " + l / 1000.0 + " seconds.");
+
+			// In UMB test mode, to an export/import roundtrip
+			if (testUMB && !(getModelSource() == ModelSource.EXPLICIT_FILES)) {
+				File umbTestFile;
+				try {
+					umbTestFile = File.createTempFile("built", ".umb");
+					exportBuiltModel(umbTestFile, ModelExportFormat.UMB);
+				} catch(java.io.IOException | PrismNotSupportedException e){
+					umbTestFile = null;
+					mainLog.printWarning("UMB export failed; skipping testing");
+				}
+				if (umbTestFile != null) {
+					Values constantsCached = getModelInfo().getConstantValues();
+					clearBuiltModel();
+					loadModelFromUMBFile(umbTestFile);
+					buildModel();
+					getModelInfo().setSomeUndefinedConstants(constantsCached);
+					if (getBuiltModelType() == ModelBuildType.SYMBOLIC) {
+						((ModelSymbolic) getBuiltModelSymbolic()).setConstantValues(constantsCached);
+					}
+				}
+			}
 
 			// For digital clocks, do some extra checks on the built model
 			if (isModelSourceDigitalClocks()) {
