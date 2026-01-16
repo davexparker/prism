@@ -164,7 +164,7 @@ public class UMBReader
 	 */
 	public boolean hasChoiceActionIndices() throws UMBException
 	{
-		return fileExists(UMBFormat.CHOICE_ACTIONS_FILE);
+		return fileExists(umbIndex.actionsAnnotation.getFilename(UMBIndex.UMBEntity.CHOICES));
 	}
 
 	/**
@@ -172,7 +172,8 @@ public class UMBReader
 	 */
 	public void extractChoiceActionIndices(IntConsumer intConsumer) throws UMBException
 	{
-		extractIntArray(UMBFormat.CHOICE_ACTIONS_FILE, umbIndex.getNumChoices(), intConsumer);
+		// ACTIONS_ANNOTATION is a string annotation but we just extract the indices here
+		extractIntAnnotation(umbIndex.actionsAnnotation, UMBIndex.UMBEntity.CHOICES, intConsumer);
 	}
 
 	/**
@@ -180,7 +181,7 @@ public class UMBReader
 	 */
 	public boolean hasBranchActionIndices() throws UMBException
 	{
-		return fileExists(UMBFormat.BRANCH_ACTIONS_FILE);
+		return fileExists(umbIndex.actionsAnnotation.getFilename(UMBIndex.UMBEntity.BRANCHES));
 	}
 
 	/**
@@ -188,7 +189,8 @@ public class UMBReader
 	 */
 	public void extractBranchActionIndices(IntConsumer intConsumer) throws UMBException
 	{
-		extractIntArray(UMBFormat.BRANCH_ACTIONS_FILE, umbIndex.getNumBranches(), intConsumer);
+		// ACTIONS_ANNOTATION is a string annotation but we just extract the indices here
+		extractIntAnnotation(umbIndex.actionsAnnotation, UMBIndex.UMBEntity.BRANCHES, intConsumer);
 	}
 
 	/**
@@ -196,7 +198,8 @@ public class UMBReader
 	 */
 	public boolean hasChoiceActionStrings() throws UMBException
 	{
-		return fileExists(UMBFormat.CHOICE_ACTION_STRING_OFFSETS_FILE) && fileExists(UMBFormat.CHOICE_ACTION_STRINGS_FILE);
+		return fileExists(UMBFormat.stringOffsetsFile(umbIndex.actionsAnnotation.getDirName(UMBIndex.UMBEntity.CHOICES)))
+			&& fileExists(UMBFormat.stringsFile(umbIndex.actionsAnnotation.getDirName(UMBIndex.UMBEntity.CHOICES)));
 	}
 
 	/**
@@ -204,10 +207,8 @@ public class UMBReader
 	 */
 	public void extractChoiceActionStrings(Consumer<String> stringConsumer) throws UMBException
 	{
-		int numActions = umbIndex.getNumChoiceActions();
-		List<Long> actionStringOffsets = new ArrayList<>(numActions);
-		extractLongArray(UMBFormat.CHOICE_ACTION_STRING_OFFSETS_FILE, numActions + 1, actionStringOffsets::add);
-		extractStringList(UMBFormat.CHOICE_ACTION_STRINGS_FILE, actionStringOffsets, stringConsumer);
+		String dirName = umbIndex.actionsAnnotation.getDirName(UMBIndex.UMBEntity.CHOICES);
+		extractStrings(dirName, umbIndex.getNumChoiceActions(), stringConsumer);
 	}
 
 	/**
@@ -215,7 +216,8 @@ public class UMBReader
 	 */
 	public boolean hasBranchActionStrings() throws UMBException
 	{
-		return fileExists(UMBFormat.BRANCH_ACTION_STRING_OFFSETS_FILE) && fileExists(UMBFormat.BRANCH_ACTION_STRINGS_FILE);
+		return fileExists(UMBFormat.stringOffsetsFile(umbIndex.actionsAnnotation.getDirName(UMBIndex.UMBEntity.BRANCHES)))
+				&& fileExists(UMBFormat.stringsFile(umbIndex.actionsAnnotation.getDirName(UMBIndex.UMBEntity.BRANCHES)));
 	}
 
 	/**
@@ -223,10 +225,8 @@ public class UMBReader
 	 */
 	public void extractBranchActionStrings(Consumer<String> stringConsumer) throws UMBException
 	{
-		int numActions = umbIndex.getNumBranchActions();
-		List<Long> actionStringOffsets = new ArrayList<>(numActions);
-		extractLongArray(UMBFormat.BRANCH_ACTION_STRING_OFFSETS_FILE, numActions + 1, actionStringOffsets::add);
-		extractStringList(UMBFormat.BRANCH_ACTION_STRINGS_FILE, actionStringOffsets, stringConsumer);
+		String dirName = umbIndex.actionsAnnotation.getDirName(UMBIndex.UMBEntity.BRANCHES);
+		extractStrings(dirName, umbIndex.getNumBranchActions(), stringConsumer);
 	}
 
 	/**
@@ -421,6 +421,12 @@ public class UMBReader
 	{
 		String filename = annotation.getFilename(appliesTo);
 		extractContinuousNumericArray(filename, annotation.getContinuousNumericType(), getUMBIndex().getAnnotationDataSize(appliesTo), consumer);
+	}
+
+	public void extractStringAnnotation(UMBIndex.Annotation annotation, UMBIndex.UMBEntity appliesTo, Consumer<String> stringConsumer) throws UMBException
+	{
+		String dirName = annotation.getDirName(appliesTo);
+		extractStrings(dirName, annotation.getNumStrings(), stringConsumer);
 	}
 
 	/**
@@ -648,6 +654,16 @@ public class UMBReader
 		} finally {
 			umbIn.close();
 		}
+	}
+
+	/**
+	 * Extract strings, as stored in a files for string offsets and data in directory
+	 */
+	private void extractStrings(String dirName, int numStrings, Consumer<String> stringConsumer) throws UMBException
+	{
+		List<Long> stringOffsets = new ArrayList<>(numStrings);
+		extractLongArray(UMBFormat.stringOffsetsFile(dirName), numStrings + 1, stringOffsets::add);
+		extractStringList(UMBFormat.stringsFile(dirName), stringOffsets, stringConsumer);
 	}
 
 	private void extractStringList(String filename, List<Long> stringOffsets, Consumer<String> stringConsumer) throws UMBException

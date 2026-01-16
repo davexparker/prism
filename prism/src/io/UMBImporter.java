@@ -209,27 +209,22 @@ public class UMBImporter extends ExplicitModelImporter
 		ArrayList<Object> actionStrings = new ArrayList<>();
 		try {
 			if (modelType.nondeterministic()) {
-				if (umbReader.hasChoiceActionIndices()) {
-					if (umbReader.hasChoiceActionStrings()) {
-						umbReader.extractChoiceActionStrings(actionStrings::add);
-					} else {
-						// No strings provided: use default action strings _1, _2, ...
-						IntStream.rangeClosed(1, umbIndex.getNumChoiceActions()).mapToObj(i -> "_" + i).forEach(actionStrings::add);
-					}
+				if (umbReader.hasChoiceActionStrings()) {
+					umbReader.extractChoiceActionStrings(actionStrings::add);
 				} else {
-					actionStrings.add(null);
+					// No strings provided: use default action strings _1, _2, ...
+					IntStream.rangeClosed(1, umbIndex.getNumChoiceActions()).mapToObj(i -> "_" + i).forEach(actionStrings::add);
 				}
 			} else {
-				if (umbReader.hasBranchActionIndices()) {
-					if (umbReader.hasBranchActionStrings()) {
-						umbReader.extractBranchActionStrings(actionStrings::add);
-					} else {
-						// No strings provided: use default action strings _1, _2, ...
-						IntStream.rangeClosed(1, umbIndex.getNumBranchActions()).mapToObj(i -> "_" + i).forEach(actionStrings::add);
-					}
+				if (umbReader.hasBranchActionStrings()) {
+					umbReader.extractBranchActionStrings(actionStrings::add);
 				} else {
-					actionStrings.add(null);
+					// No strings provided: use default action strings _1, _2, ...
+					IntStream.rangeClosed(1, umbIndex.getNumBranchActions()).mapToObj(i -> "_" + i).forEach(actionStrings::add);
 				}
+			}
+			if (actionStrings.isEmpty()) {
+				actionStrings.add(null);
 			}
 		} catch (UMBException e) {
 			throw new PrismException("Could not extract actions from UMB file");

@@ -40,22 +40,22 @@ public class UMBFormat
 	public static final String CHOICE_BRANCH_OFFSETS_FILE = "choice-to-branches" + BIN_FILE_EXT;
 	public static final String BRANCH_TARGETS_FILE = "branch-to-target" + BIN_FILE_EXT;
 	public static final String BRANCH_PROBABILITIES_FILE = "branch-to-probability" + BIN_FILE_EXT;
-	public static final String CHOICE_ACTIONS_FILE = "choice-to-choice-action" + BIN_FILE_EXT;
-	public static final String BRANCH_ACTIONS_FILE = "branch-to-branch-action" + BIN_FILE_EXT;
-	public static final String CHOICE_ACTION_STRING_OFFSETS_FILE = "choice-action-to-string" + BIN_FILE_EXT;
-	public static final String CHOICE_ACTION_STRINGS_FILE = "choice-action-strings" + BIN_FILE_EXT;
-	public static final String BRANCH_ACTION_STRING_OFFSETS_FILE = "branch-action-to-string" + BIN_FILE_EXT;
-	public static final String BRANCH_ACTION_STRINGS_FILE = "branch-action-strings" + BIN_FILE_EXT;
+	public static final String ACTIONS_DIR = "actions";
 	public static final String OBSERVATIONS_DIR = "observations";
 	public static final String OBSERVATIONS_FILE = "values" + BIN_FILE_EXT;
 
-	// Annotations
+	// String list storage info
 
-	/** Filename for storing an annotation's values */
-	public static final String ANNOTATION_VALUES_FILE = "values" + BIN_FILE_EXT;
+	public static final String STRING_OFFSETS_FILE = "string-mapping" + BIN_FILE_EXT;
+	public static final String STRINGS_FILE = "strings" + BIN_FILE_EXT;
+
+	// Annotations
 
 	/** Location for annotations (directory in zip) */
 	public static final String ANNOTATIONS_DIR = "annotations";
+
+	/** Filename for storing an annotation's values */
+	public static final String ANNOTATION_VALUES_FILE = "values" + BIN_FILE_EXT;
 
 	// Subdirectories for built-in annotation groups
 
@@ -89,6 +89,22 @@ public class UMBFormat
 
 	/** Default compression format */
 	public static final CompressionFormat DEFAULT_COMPRESSION_FORMAT = CompressionFormat.XZ;
+
+	/**
+	 * Get the filename for the offsets mapping string indices to string data within some directory
+	 */
+	public static String stringOffsetsFile(String dirName)
+	{
+		return dirName + "/" + STRING_OFFSETS_FILE;
+	}
+
+	/**
+	 * Get the filename for the string data within some directory
+	 */
+	public static String stringsFile(String dirName)
+	{
+		return dirName + "/" + STRINGS_FILE;
+	}
 
 	/**
 	 * Get the directory name for observations

@@ -130,6 +130,12 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 		int numStates = model.getNumStates();
 		boolean showActions = modelExportOptions.getShowActions();
 
+		// Omit action export if missing or all null
+		List<Object> actions = model.getActions();
+		if (actions.isEmpty() || actions.size() == 1 && actions.get(0) == null) {
+			showActions = false;
+		}
+
 		// Check for currently unsupported cases
 		if (modelType.uncertain() && !modelType.intervals()) {
 			throw new PrismNotSupportedException(modelType + "s cannot yet be exported to UMB");
@@ -170,16 +176,16 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 			// Add action labelling info
 			if (showActions) {
 				if (modelType.nondeterministic()) {
-					umbWriter.addChoiceActionStrings(modelAccess.getActionStrings());
-					// Only store choice-to-action mapping if there are multiple actions
 					if (model.getActions().size() > 1) {
-						umbWriter.addChoiceActionIndices(modelAccess.getChoiceActionIndices());
+						umbWriter.addChoiceActions(modelAccess.getChoiceActionIndices(), modelAccess.getActionStrings());
+					} else {
+						umbWriter.addSingleChoiceAction(modelAccess.getActionStrings().get(0));
 					}
 				} else {
-					umbWriter.addBranchActionStrings(modelAccess.getActionStrings());
-					// Only store transition-to-action mapping if there are multiple actions
 					if (model.getActions().size() > 1) {
-						umbWriter.addBranchActionIndices(modelAccess.getTransitionActionIndices());
+						umbWriter.addBranchActions(modelAccess.getTransitionActionIndices(), modelAccess.getActionStrings());
+					} else {
+						umbWriter.addSingleBranchAction(modelAccess.getActionStrings().get(0));
 					}
 				}
 			}
@@ -301,12 +307,18 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 		umbIndex.setNumChoices(model.getNumChoices());
 		umbIndex.setNumBranches(model.getNumTransitions());
 		if (modelExportOptions.getShowActions()) {
+			List<Object> actions = model.getActions();
+			int numActions = actions.size();
+			// Treat a single 'null' action as no actions
+			if (numActions == 1 && actions.get(0) == null) {
+				numActions = 0;
+			}
 			if (model.getModelType().nondeterministic()) {
-				umbIndex.setNumChoiceActions(model.getActions().size());
+				umbIndex.setNumChoiceActions(numActions);
 				umbIndex.setNumBranchActions(0);
 			} else {
 				umbIndex.setNumChoiceActions(0);
-				umbIndex.setNumBranchActions(model.getActions().size());
+				umbIndex.setNumBranchActions(numActions);
 			}
 		} else {
 			umbIndex.setNumChoiceActions(0);

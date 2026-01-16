@@ -34,14 +34,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.BitSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
-import java.util.PrimitiveIterator;
-import java.util.StringJoiner;
+import java.util.*;
+import java.util.stream.Stream;
 
 /**
  * Class to handle writing to UMB files.
@@ -211,57 +205,61 @@ public class UMBWriter
 	}
 
 	/**
-	 * Add the indices for actions of all choices
+	 * Add actions for all choices
+	 * @param choiceActionIndices Iterator providing the indices for actions of all choices
+	 * @param choiceActionStrings Names of the actions
+	 */
+	public void addChoiceActions(PrimitiveIterator.OfInt choiceActionIndices, List<String> choiceActionStrings) throws UMBException
+	{
+		addStringDataToAnnotation(umbIndex.actionsAnnotation, UMBIndex.UMBEntity.CHOICES, choiceActionIndices, choiceActionStrings);
+	}
+
+	/**
+	 * Add (unnamed) actions for all choices
 	 * @param choiceActionIndices Iterator providing the indices for actions of all choices
 	 */
-	public void addChoiceActionIndices(PrimitiveIterator.OfInt choiceActionIndices) throws UMBException
+	public void addChoiceActions(PrimitiveIterator.OfInt choiceActionIndices) throws UMBException
 	{
-		addIntArray(UMBFormat.CHOICE_ACTIONS_FILE, choiceActionIndices, umbIndex.getNumChoices());
+		// ACTIONS_ANNOTATION is a string annotation but we can just store the indices in this case
+		addIntDataToAnnotation(umbIndex.actionsAnnotation, UMBIndex.UMBEntity.CHOICES, choiceActionIndices);
 	}
 
 	/**
-	 * Add the indices for actions of all branches
+	 * Add the same action for all choices
+	 * @param choiceActionString Name of the action
+	 */
+	public void addSingleChoiceAction(String choiceActionString) throws UMBException
+	{
+		addChoiceActions(null, Collections.singletonList(choiceActionString));
+	}
+
+	/**
+	 * Add actions for all branches
+	 * @param branchActionIndices Iterator providing the indices for actions of all branches
+	 * @param branchActionStrings Names of the actions
+	 */
+	public void addBranchActions(PrimitiveIterator.OfInt branchActionIndices, List<String> branchActionStrings) throws UMBException
+	{
+		addStringDataToAnnotation(umbIndex.actionsAnnotation, UMBIndex.UMBEntity.BRANCHES, branchActionIndices, branchActionStrings);
+	}
+
+	/**
+	 * Add (unnamed) actions for all branches
 	 * @param branchActionIndices Iterator providing the indices for actions of all branches
 	 */
-	public void addBranchActionIndices(PrimitiveIterator.OfInt branchActionIndices) throws UMBException
+	public void addBranchActions(PrimitiveIterator.OfInt branchActionIndices) throws UMBException
 	{
-		addIntArray(UMBFormat.BRANCH_ACTIONS_FILE, branchActionIndices, umbIndex.getNumBranches());
+		// ACTIONS_ANNOTATION is a string annotation but we can just store the indices in this case
+		addIntDataToAnnotation(umbIndex.actionsAnnotation, UMBIndex.UMBEntity.BRANCHES, branchActionIndices);
 	}
 
 	/**
-	 * Add the names of all choice actions as strings (can include "")
-	 * @param actionStrings Iterator providing the names for all actions
+	 * Add the same action for all branches
+	 * @param branchActionString Name of the action
 	 */
-	public void addChoiceActionStrings(List<String> actionStrings) throws UMBException
+	public void addSingleBranchAction(String branchActionString) throws UMBException
 	{
-		addActionStrings(actionStrings, UMBFormat.CHOICE_ACTION_STRING_OFFSETS_FILE, UMBFormat.CHOICE_ACTION_STRINGS_FILE);
-	}
-
-	/**
-	 * Add the names of all branch actions as strings (can include "")
-	 * @param actionStrings Iterator providing the names for all actions
-	 */
-	public void addBranchActionStrings(List<String> actionStrings) throws UMBException
-	{
-		addActionStrings(actionStrings, UMBFormat.BRANCH_ACTION_STRING_OFFSETS_FILE, UMBFormat.BRANCH_ACTION_STRINGS_FILE);
-	}
-
-	/**
-	 * Add the names of some actions as strings (can include "")
-	 * @param actionStrings Iterator providing the names for the actions
-	 *
-	 */
-	private void addActionStrings(List<String> actionStrings, String actionStringOffsetsFile, String actionStringsFile) throws UMBException
-	{
-		int numStrings = actionStrings.size();
-		long[] stringOffsets = new long[numStrings + 1];
-		stringOffsets[0] = 0;
-		for (int i = 0; i < numStrings; i++) {
-			stringOffsets[i + 1] = stringOffsets[i] + actionStrings.get(i).getBytes().length;
-		}
-		PrimitiveIterator.OfLong it = Arrays.stream(stringOffsets).iterator();
-		addLongArray(actionStringOffsetsFile, it, actionStrings.size() + 1);
-		addStringList(actionStringsFile, actionStrings);
+		addBranchActions(null, Collections.singletonList(branchActionString));
 	}
 
 	/**
@@ -497,6 +495,39 @@ public class UMBWriter
 		annotation.addAppliesTo(appliesTo);
 		long annotationSize = umbIndex.getAnnotationDataSize(appliesTo);
 		addContinuousNumericArray(annotation.getFilename(appliesTo), values, valueType, annotationSize);
+	}
+
+	public void addStringDataToAnnotation(UMBIndex.Annotation annotation, UMBIndex.UMBEntity appliesTo, PrimitiveIterator.OfInt indices, List<String> strings) throws UMBException
+	{
+		if (annotation.appliesTo(appliesTo)) {
+			throw new UMBException("Duplicate data for " + appliesTo + "s in annotation \"" + annotation.id + "\" in group \"" + annotation.group + "\"");
+		}
+		annotation.addAppliesTo(appliesTo);
+		String dirName = annotation.getDirName(appliesTo);
+		addStringsFiles(strings, UMBFormat.stringOffsetsFile(dirName), UMBFormat.stringsFile(dirName));
+		if (indices != null) {
+			long annotationSize = umbIndex.getAnnotationDataSize(appliesTo);
+			addIntArray(annotation.getFilename(appliesTo), indices, annotationSize);
+		}
+	}
+
+	/**
+	 * Add the files encoding a list of strings.
+	 * @param strings The strings
+	 * @param stringOffsetsFilename The name of the file to contain the string offsets
+	 * @param stringsFilename The name of file to contain the string data
+	 */
+	private void addStringsFiles(List<String> strings, String stringOffsetsFilename, String stringsFilename) throws UMBException
+	{
+		int numStrings = strings.size();
+		long[] stringOffsets = new long[numStrings + 1];
+		stringOffsets[0] = 0;
+		for (int i = 0; i < numStrings; i++) {
+			stringOffsets[i + 1] = stringOffsets[i] + strings.get(i).getBytes().length;
+		}
+		PrimitiveIterator.OfLong it = Arrays.stream(stringOffsets).iterator();
+		addLongArray(stringOffsetsFilename, it, strings.size() + 1);
+		addStringList(stringsFilename, strings);
 	}
 
 	// Methods to add valuations

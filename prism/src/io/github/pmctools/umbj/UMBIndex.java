@@ -66,6 +66,11 @@ public class UMBIndex
 	/** Map from annotation aliases to IDs for each annotation group */
 	public transient Map<String, Map<String, String>> annotationAliasMaps = new LinkedHashMap<>();
 
+	// Fake annotation objects for some data
+
+	/** Annotation object for actions (stored in a similar way to annotations) */
+	public transient Annotation actionsAnnotation = createStandaloneAnnotation(UMBFormat.ACTIONS_DIR, UMBIndex.UMBType.STRING);
+
 	// Enums
 
 	/** UMB file entities which can be annotated/indexed */
@@ -88,7 +93,7 @@ public class UMBIndex
 	/** UMB data types */
 	public enum UMBType implements UMBField
 	{
-		INT, BOOL, DOUBLE, RATIONAL;
+		INT, BOOL, DOUBLE, RATIONAL, STRING;
 		@Override
 		public String toString()
 		{
@@ -97,6 +102,7 @@ public class UMBIndex
 				case BOOL: return "bool";
 				case DOUBLE: return "double";
 				case RATIONAL: return "rational";
+				case STRING: return "string";
 				default: return "?";
 			}
 		}
@@ -284,10 +290,15 @@ public class UMBIndex
 		public transient String id;
 		/** Alias (name) */
 		public String alias;
+		/** Description */
+		public String description;
 		/** List of entities to which this annotation applies */
 		public List<UMBEntity> appliesTo = new ArrayList<>();
 		/** Type of values stored */
 		public UMBType type;
+		/** For string annotations, the number of strings */
+		@SerializedName("#states")
+		public Integer numStrings;
 
 		/**
 		 * Add an entity to which this annotation applies.
@@ -308,6 +319,12 @@ public class UMBIndex
 				throw new UMBException("Annotation \"" + id + "\" in group \"" + group + "\" is empty");
 			}
 			checkFieldExists(type, "type");
+			if (type == UMBType.STRING) {
+				checkFieldExists(numStrings, "numStrings");
+				if (numStrings <= 0) {
+					throw new UMBException("Number of strings must be positive");
+				}
+			}
 		}
 
 		/**
@@ -328,20 +345,37 @@ public class UMBIndex
 		}
 
 		/**
+		 * Get the type of the values stored in the annotation
+		 */
+		public UMBType getType()
+		{
+			return type;
+		}
+
+		/**
+		 * Get the number of strings (only valid for string annotations)
+		 */
+		public int getNumStrings()
+		{
+			return numStrings;
+		}
+
+		/**
+		 * Get the name of the directory to store this annotation, for the specified entity.
+		 * @param entity The entity
+		 */
+		public String getDirName(UMBEntity entity)
+		{
+			return UMBFormat.annotationDir(group, id, entity);
+		}
+
+		/**
 		 * Get the name of the file to store this annotation, for the specified entity.
 		 * @param entity The entity
 		 */
 		public String getFilename(UMBEntity entity)
 		{
 			return UMBFormat.annotationFile(group, id, entity);
-		}
-
-		/**
-		 * Get the type of the values stored in the annotation
-		 */
-		public UMBType getType()
-		{
-			return type;
 		}
 
 		public ContinuousNumericType getContinuousNumericType() throws UMBException
@@ -354,6 +388,28 @@ public class UMBIndex
 				default:
 					throw new UMBException("Annotation \"" + id + "\" in group \"" + group + "\" is not of a continuous numeric type");
 			}
+		}
+	}
+
+	/**
+	 * Annotation object for data stored in the same style as an annotation,
+	 * but without the usual conventions regarding group, id, directory, etc.
+	 */
+	public static class StandaloneAnnotation extends Annotation
+	{
+		/** Directory where data is stored */
+		public String dirName;
+
+		@Override
+		public String getDirName(UMBEntity entity)
+		{
+			return dirName + "/" + entity;
+		}
+
+		@Override
+		public String getFilename(UMBEntity entity)
+		{
+			return getDirName(entity) + "/" + UMBFormat.ANNOTATION_VALUES_FILE;
 		}
 	}
 
@@ -745,6 +801,17 @@ public class UMBIndex
 		annotation.id = id;
 		annotation.type = type;
 		grpAnnotations.put(id, annotation);
+		return annotation;
+	}
+
+	/**
+	 * Create a standalone annotation object without adding it to the index.
+	 */
+	public static Annotation createStandaloneAnnotation(String dirName, UMBType type)
+	{
+		StandaloneAnnotation annotation = new StandaloneAnnotation();
+		annotation.type = type;
+		annotation.dirName = dirName;
 		return annotation;
 	}
 
