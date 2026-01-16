@@ -448,6 +448,16 @@ public class UMBReader
 	}
 
 	/**
+	 * Extract the class of valuations (variable values) used for each one of the specified entity type.
+	 * @param entity The entity to which the valuations apply
+	 * @param intConsumer Integer class consumer
+	 */
+	public void extractValuationClasses(UMBIndex.UMBEntity entity, IntConsumer intConsumer) throws UMBException
+	{
+		extractIntArray(UMBFormat.valuationClassesFile(entity), umbIndex.getEntityCount(entity), intConsumer);
+	}
+
+	/**
 	 * Extract the valuations (variable values) for an entity, as bitstrings.
 	 * @param entity The entity to which the valuations apply
 	 * @param bitstringConsumer Bitstring consumer

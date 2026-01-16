@@ -37,7 +37,7 @@ public class UMBBitPacking
 	 * Construct a new UMBBitPacking object, based on a UMB valuation description (from JSON).
 	 * @param valuationDescr The valuation description
 	 */
-	public UMBBitPacking(UMBIndex.ValuationDescription valuationDescr)
+	public UMBBitPacking(UMBIndex.ValuationClassDescription valuationDescr)
 	{
 		for (UMBIndex.ValuationVariable item : valuationDescr.variables) {
 			if (item.isVariable()) {
@@ -106,12 +106,12 @@ public class UMBBitPacking
 	}
 
 	/**
-	 * Create a UMB valuation description corresponding to this bit packing.
+	 * Create a UMB valuation class description corresponding to this bit packing.
 	 */
-	public UMBIndex.ValuationDescription toValuationDescription()
+	public UMBIndex.ValuationClassDescription toValuationClassDescription()
 	{
-		UMBIndex.ValuationDescription valuationDescr = new UMBIndex.ValuationDescription();
-		valuationDescr.alignment = getTotalNumBytes();
+		UMBIndex.ValuationClassDescription valuationClassDescr = new UMBIndex.ValuationClassDescription();
+		valuationClassDescr.alignment = getTotalNumBytes();
 		// Create an item for each variable or padding
 		int numItems = getNumItems();
 		for (int i = 0; i < numItems; i++) {
@@ -125,15 +125,15 @@ public class UMBBitPacking
 			} else if (item instanceof BitPackedPadding) {
 				var.padding = item.size;
 			}
-			valuationDescr.variables.add(var);
+			valuationClassDescr.variables.add(var);
 		}
 		// Add final padding to align to byte boundary, if needed
 		if (getTotalNumBits() % 8 != 0) {
 			UMBIndex.ValuationVariable var = new UMBIndex.ValuationVariable();
 			var.padding = 8 - (getTotalNumBits() % 8);
-			valuationDescr.variables.add(var);
+			valuationClassDescr.variables.add(var);
 		}
-		return valuationDescr;
+		return valuationClassDescr;
 	}
 
 	// Getters for information about the packing

@@ -578,12 +578,12 @@ public class UMBWriter
 	/**
 	 * Add a new description for the valuations to be attached to states,
 	 * extracted from a {@link UMBBitPacking} object.
-	 * Returns the index of the description within those that exist for the entity.
+	 * @param unique Whether the valuations are unique across states
 	 * @param bitPacking Definition of valuation contents
 	 */
-	public int addStateValuationDescription(UMBBitPacking bitPacking) throws UMBException
+	public void addStateValuationDescription(boolean unique, UMBBitPacking bitPacking) throws UMBException
 	{
-		return addValuationDescription(UMBIndex.UMBEntity.STATES, bitPacking);
+		addValuationDescription(UMBIndex.UMBEntity.STATES, unique, bitPacking);
 	}
 
 	/**
@@ -609,12 +609,12 @@ public class UMBWriter
 	/**
 	 * Add a new description for the valuations to be attached to observations,
 	 * extracted from a {@link UMBBitPacking} object.
-	 * Returns the index of the description within those that exist for the entity.
+	 * @param unique Whether the valuations are unique across states
 	 * @param bitPacking Definition of valuation contents
 	 */
-	public int addObservationValuationDescription(UMBBitPacking bitPacking) throws UMBException
+	public void addObservationValuationDescription(boolean unique, UMBBitPacking bitPacking) throws UMBException
 	{
-		return addValuationDescription(UMBIndex.UMBEntity.OBSERVATIONS, bitPacking);
+		addValuationDescription(UMBIndex.UMBEntity.OBSERVATIONS, unique, bitPacking);
 	}
 
 	/**
@@ -640,13 +640,13 @@ public class UMBWriter
 	/**
 	 * Add a new description for the valuations to be attached to some model entity,
 	 * extracted from a {@link UMBBitPacking} object.
-	 * Returns the index of the description within those that exist for the entity.
 	 * @param entity The entity to which the valuations apply
+	 * @param unique Whether the valuations are unique across the entity
 	 * @param bitPacking Definition of valuation contents
 	 */
-	public int addValuationDescription(UMBIndex.UMBEntity entity, UMBBitPacking bitPacking) throws UMBException
+	public void addValuationDescription(UMBIndex.UMBEntity entity, boolean unique, UMBBitPacking bitPacking) throws UMBException
 	{
-		return umbIndex.addValuationDescription(entity, bitPacking);
+		umbIndex.addSingleValuationDescription(entity, unique, bitPacking);
 	}
 
 	/**

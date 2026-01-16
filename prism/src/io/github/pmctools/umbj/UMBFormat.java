@@ -67,8 +67,11 @@ public class UMBFormat
 	/** Location for valuations (folder in zip) */
 	public static final String VALUATIONS_FOLDER = "valuations";
 
-	/** Filename for storing valuation variable values */
+	/** Filename for storing valuation data (variable values) */
 	public static final String VALUATIONS_FILE = "valuations" + BIN_FILE_EXT;
+
+	/** Filename for storing valuation classes */
+	public static final String VALUATION_CLASSES = "valuation-to-class" + BIN_FILE_EXT;
 
 	// Allowable compression formats
 
@@ -139,7 +142,7 @@ public class UMBFormat
 	}
 
 	/**
-	 * Get the folder name for a set of valuations
+	 * Get the folder name for the valuations for some entity
 	 */
 	public static String valuationsFolder(UMBIndex.UMBEntity entity)
 	{
@@ -147,11 +150,19 @@ public class UMBFormat
 	}
 
 	/**
-	 * Get the filename for a set of valuations
+	 * Get the filename for the valuation data for some entity
 	 */
 	public static String valuationsFile(UMBIndex.UMBEntity entity)
 	{
 		return valuationsFolder(entity) + "/" + VALUATIONS_FILE;
+	}
+
+	/**
+	 * Get the filename for the valuation classes for some entity
+	 */
+	public static String valuationClassesFile(UMBIndex.UMBEntity entity)
+	{
+		return valuationsFolder(entity) + "/" + VALUATION_CLASSES;
 	}
 
 	// Utility functions

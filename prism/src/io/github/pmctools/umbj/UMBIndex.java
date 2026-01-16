@@ -57,7 +57,7 @@ public class UMBIndex
 	/** Annotations, arranged by group and then by annotation ID, in ordered maps */
 	public LinkedHashMap<String, LinkedHashMap<String, Annotation>> annotations = new LinkedHashMap<>();
 	/** Valuation descriptions, arranged by entity type */
-	public LinkedHashMap<String, List<ValuationDescription>> valuations = new LinkedHashMap<>();
+	public LinkedHashMap<UMBEntity, ValuationDescription> valuations = new LinkedHashMap<>();
 
 	// Further info about annotations
 
@@ -418,8 +418,22 @@ public class UMBIndex
 		}
 	}
 
-	/** Info about a valuation (of state, etc.) */
+	/** Info about valuations (for e.g. states, observations) */
 	public static class ValuationDescription
+	{
+		/** If true, valuations are unique within their entity */
+		public Boolean unique;
+		/** Descriptions for each class of valuations for an entity */
+		public List<ValuationClassDescription> classes = new ArrayList<>();
+
+		public ValuationDescription(boolean unique)
+		{
+			this.unique = unique;
+		}
+	}
+
+	/** Info about a class of valuation (for e.g. states, observations) */
+	public static class ValuationClassDescription
 	{
 		/** Alignment (in bytes) of the data */
 		public Integer alignment;
@@ -507,9 +521,10 @@ public class UMBIndex
 			}
 		}
 		if (valuations != null) {
-			for (Map.Entry<String, List<ValuationDescription>> entry : valuations.entrySet()) {
-				for (ValuationDescription valuationDescription : entry.getValue()) {
-					validateValuationDescription(valuationDescription, "valuations." + entry.getKey());
+			for (Map.Entry<UMBEntity, ValuationDescription> entry : valuations.entrySet()) {
+				checkFieldExists(entry.getValue().unique, "valuations." + entry.getKey() + ".unique");
+				for (ValuationClassDescription valuationClassDescription : entry.getValue().classes) {
+					validateValuationDescription(valuationClassDescription, "valuations.classes." + entry.getKey());
 				}
 			}
 		}
@@ -535,7 +550,7 @@ public class UMBIndex
 	/**
 	 * Perform validation of a valuation description
 	 */
-	public void validateValuationDescription(ValuationDescription valuationDescr, String fieldName) throws UMBException
+	public void validateValuationDescription(ValuationClassDescription valuationDescr, String fieldName) throws UMBException
 	{
 		checkFieldExists(valuationDescr.alignment, fieldName + ".alignment");
 		checkFieldExists(valuationDescr.variables, fieldName + ".variables");
@@ -830,20 +845,47 @@ public class UMBIndex
 	}
 
 	/**
-	 * Add a new description for the valuations to be attached to some model entity,
+	 * Add a new description for (a single class of) valuations to be attached to some model entity,
 	 * extracted from a {@link UMBBitPacking} object.
-	 * Returns the index of the description within those that exist for the entity.
+	 * @param entity The entity to which the valuations apply
+	 * @param unique Whether valuations are unique within the entity
+	 * @param bitPacking Definition of valuation contents
+	 */
+	public void addSingleValuationDescription(UMBEntity entity, boolean unique, UMBBitPacking bitPacking) throws UMBException
+	{
+		addValuationDescriptions(entity, unique);
+		addValuationDescriptionClass(entity, bitPacking);
+	}
+
+	/**
+	 * Specify that valuations are to be attached to some model entity,
+	 * and whether they are unique, without adding any descriptions.
+	 * This is done subsequently via calls to {@link #addValuationDescriptionClass(UMBEntity, UMBBitPacking)}.
+	 * extracted from a list of {@link UMBBitPacking} objects.
+	 * @param entity The entity to which the valuations apply
+	 * @param unique Whether valuations are unique within the entity
+	 */
+	public void addValuationDescriptions(UMBEntity entity, boolean unique) throws UMBException
+	{
+		if (valuations.containsKey(entity)) {
+			throw new UMBException("Valuations have already been added for " + entity + "");
+		} else {
+			valuations.put(entity, new ValuationDescription(unique));
+		}
+	}
+
+	/**
+	 * Add a new description for a class of valuations to be attached to some model entity,
+	 * extracted from a {@link UMBBitPacking} object.
+	 * Returns the index of the class within those that exist for the entity.
 	 * @param entity The entity to which the valuations apply
 	 * @param bitPacking Definition of valuation contents
 	 */
-	public int addValuationDescription(UMBEntity entity, UMBBitPacking bitPacking) throws UMBException
+	public int addValuationDescriptionClass(UMBEntity entity, UMBBitPacking bitPacking) throws UMBException
 	{
-		if (!valuations.containsKey(entity.toString())) {
-			valuations.put(entity.toString(), new ArrayList<>());
-		}
-		List<ValuationDescription> defns = valuations.get(entity.toString());
-		defns.add(bitPacking.toValuationDescription());
-		return defns.size() - 1;
+		ValuationDescription valuationDescr = valuations.get(entity);
+		valuationDescr.classes.add(bitPacking.toValuationClassDescription());
+		return valuationDescr.classes.size() - 1;
 	}
 
 	// Getters
@@ -1325,12 +1367,20 @@ public class UMBIndex
 	 */
 	public boolean hasValuations(UMBEntity entity)
 	{
-		return valuations != null && valuations.containsKey(entity.toString()) && !valuations.get(entity.toString()).isEmpty();
+		return valuations != null && valuations.containsKey(entity) && !valuations.get(entity).classes.isEmpty();
+	}
+
+	/**
+	 * Does this UMB file have unique valuations for the specified entity?
+	 */
+	public boolean areValuationsUnique(UMBEntity entity)
+	{
+		return valuations != null && valuations.containsKey(entity) && valuations.get(entity).unique;
 	}
 
 	/**
 	 * Get a {@link UMBBitPacking} object describing the valuations for the specified entity.
-	 * If there is more than one valuation description for the entity, it returns the first one.
+	 * If there is more than one class of valuation for the entity, it returns the first one.
 	 * Use {@link #getValuationBitPacking(UMBEntity, int)} to get others.
 	 * Throws an exception if no such metadata is present.
 	 */
@@ -1340,15 +1390,27 @@ public class UMBIndex
 	}
 
 	/**
-	 * Get a {@link UMBBitPacking} object for the {@code i}th valuation description for the specified entity.
+	 * Get a {@link UMBBitPacking} object for the {@code i}th class of valuation for the specified entity.
 	 * Throws an exception if no such metadata is present.
 	 */
 	public UMBBitPacking getValuationBitPacking(UMBEntity entity, int i) throws UMBException
 	{
-		if (valuations == null || !valuations.containsKey(entity.toString()) || valuations.get(entity.toString()).size() <= i) {
+		if (valuations == null || !valuations.containsKey(entity) || valuations.get(entity).classes.size() <= i) {
 			throw new UMBException("No valuation metadata present");
 		}
-		return new UMBBitPacking(valuations.get(entity.toString()).get(i));
+		return new UMBBitPacking(valuations.get(entity).classes.get(i));
+	}
+
+	/**
+	 * Get the number of classes of valuations for the specified entity.
+	 * Throws an exception if no such metadata is present.
+	 */
+	public int getNumValuationClasses(UMBEntity entity) throws UMBException
+	{
+		if (valuations == null || !valuations.containsKey(entity)) {
+			throw new UMBException("No valuation metadata present");
+		}
+		return valuations.get(entity).classes.size();
 	}
 
 	// Validation methods

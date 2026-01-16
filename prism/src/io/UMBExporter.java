@@ -378,7 +378,7 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 				bitPacking.addVariable(varList.getName(i), varSize, varTypeUMB);
 			}
 			bitPacking.padToByteBoundary();
-			umbWriter.addValuationDescription(entity, bitPacking);
+			umbWriter.addValuationDescription(entity, true, bitPacking);
 
 			// Build an iterator to supply the bit-packed variable/observable values, add data
 			Iterator<UMBBitString> iter = statesList.stream()

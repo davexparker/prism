@@ -326,6 +326,16 @@ public class UMBImporter extends ExplicitModelImporter
 	private void buildVarInfo(UMBIndex.UMBEntity entity, VarList varList) throws PrismException
 	{
 		try {
+			if (!umbIndex.hasValuations(entity)) {
+				throw new PrismException("Missing UMB valuation data for " + entity);
+			} else {
+				if (umbIndex.getNumValuationClasses(entity) > 1) {
+					throw new PrismException("Import of multiple valuation classes not yet supported");
+				}
+				if (!umbIndex.areValuationsUnique(entity)) {
+					throw new PrismException("UMB valuations for " + entity + " are not unique");
+				}
+			}
 			UMBBitPacking bitPacking = umbIndex.getValuationBitPacking(entity);
 			int numVars = bitPacking.getNumVariables();
 			for (int i = 0; i < numVars; i++) {
