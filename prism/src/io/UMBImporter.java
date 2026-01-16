@@ -28,10 +28,7 @@ package io;
 
 import common.Interval;
 import common.SafeCast;
-import io.github.pmctools.umbj.UMBBitPacking;
-import io.github.pmctools.umbj.UMBException;
-import io.github.pmctools.umbj.UMBIndex;
-import io.github.pmctools.umbj.UMBReader;
+import io.github.pmctools.umbj.*;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import parser.EvaluateContext;
@@ -111,7 +108,7 @@ public class UMBImporter extends ExplicitModelImporter
 	public boolean modelIsExact()
 	{
 		// For now, assume that if transition probabilities are rationals, so is everything else
-		return umbIndex.getBranchProbabilityType() != null && umbIndex.getBranchProbabilityType().rationals();
+		return umbIndex.getBranchProbabilityType() != null && umbIndex.getBranchProbabilityType().type.isRational();
 	}
 
 	@Override
@@ -347,12 +344,12 @@ public class UMBImporter extends ExplicitModelImporter
 				}
 				// Determine type, range, etc. of variable
 				DeclarationType varDecl = null;
-				switch (var.type) {
-					case "bool":
+				switch (var.getType().type) {
+					case BOOL:
 						varDecl = new DeclarationBool();
 						break;
-					case "int":
-					case "uint":
+					case INT:
+					case UINT:
 						boolean computeRange = true;
 						int varIntMin;
 						int varIntMax;
@@ -362,7 +359,7 @@ public class UMBImporter extends ExplicitModelImporter
 							varIntMax = varIntRange.getMax();
 						} else {
 							// Default to min/max values for (u)ints
-							if (var.type.equals("int")) {
+							if (var.getType().type == UMBType.Type.INT) {
 								varIntMin = -(1 << (bitPacking.getVariableSize(i) - 1));
 								varIntMax = (1 << (bitPacking.getVariableSize(i) - 1)) -1;
 							} else {
@@ -376,11 +373,11 @@ public class UMBImporter extends ExplicitModelImporter
 						}
 						varDecl = new DeclarationInt(Expression.Int(varIntMin), Expression.Int(varIntMax));
 						break;
-					case "double":
+					case DOUBLE:
 						varDecl = new DeclarationDoubleUnbounded();
 						break;
 					default:
-						throw new PrismException("Unknown variable type in UMB index: " + var.type);
+						throw new PrismException("Unknown variable type in UMB index: " + var.getType().type);
 				}
 				varList.addVar(varName, varDecl, -1);
 			}

@@ -420,7 +420,7 @@ public class UMBReader
 	public void extractContinuousNumericAnnotation(UMBIndex.Annotation annotation, UMBIndex.UMBEntity appliesTo, Consumer<?> consumer) throws UMBException
 	{
 		String filename = annotation.getFilename(appliesTo);
-		extractContinuousNumericArray(filename, annotation.getContinuousNumericType(), getUMBIndex().getAnnotationDataSize(appliesTo), consumer);
+		extractContinuousNumericArray(filename, annotation.getType(), getUMBIndex().getAnnotationDataSize(appliesTo), consumer);
 	}
 
 	public void extractStringAnnotation(UMBIndex.Annotation annotation, UMBIndex.UMBEntity appliesTo, Consumer<String> stringConsumer) throws UMBException
@@ -480,15 +480,15 @@ public class UMBReader
 		try {
 			extractValuations(entity, bitString -> {
 				try {
-					switch (bitPacking.getVariable(i).type) {
-						case "int":
+					switch (bitPacking.getVariable(i).getType().type) {
+						case INT:
 							varRange.accept(bitPacking.getIntVariableValue(bitString, i));
 							break;
-						case "uint":
+						case UINT:
 							varRange.accept(bitPacking.getUIntVariableValue(bitString, i));
 							break;
 						default:
-							throw new UMBException("Cannot compute the integer range of a " + bitPacking.getVariable(i).type);
+							throw new UMBException("Cannot compute the integer range of a " + bitPacking.getVariable(i).getType().type);
 					}
 				} catch (UMBException e) {
 					throw new RuntimeException(e.getMessage());
@@ -632,12 +632,15 @@ public class UMBReader
 		}
 	}
 
-	private void extractContinuousNumericArray(String filename, UMBIndex.ContinuousNumericType type, long size, Consumer<?> consumer) throws UMBException
+	private void extractContinuousNumericArray(String filename, UMBType type, long size, Consumer<?> consumer) throws UMBException
 	{
-		long sizeNew = type.intervals() ? size * 2 : size;
-		if (type.doubles()) {
+		long sizeNew = type.type.isInterval() ? size * 2 : size;
+		if (type.type.isDouble()) {
 			extractDoubleArray(filename, sizeNew, (it.unimi.dsi.fastutil.doubles.DoubleConsumer) ((Consumer<Double>) consumer)::accept);
-		} else if (type.rationals()) {
+		} else if (type.type.isRational()) {
+			if (!type.isDefaultSize()) {
+				throw new UMBException("Non-default sized rationals are not yet supported");
+			}
 			extractLongArray(filename, sizeNew * 2, (it.unimi.dsi.fastutil.longs.LongConsumer) ((Consumer<Long>) consumer)::accept);
 		} else {
 			throw new UMBException("Unsupported continuous numeric type " + type);

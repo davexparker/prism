@@ -30,11 +30,7 @@ import explicit.Model;
 
 import explicit.PartiallyObservableModel;
 import explicit.rewards.Rewards;
-import io.github.pmctools.umbj.UMBBitPacking;
-import io.github.pmctools.umbj.UMBBitString;
-import io.github.pmctools.umbj.UMBException;
-import io.github.pmctools.umbj.UMBWriter;
-import io.github.pmctools.umbj.UMBIndex;
+import io.github.pmctools.umbj.*;
 import parser.EvaluateContext;
 import parser.State;
 import parser.VarList;
@@ -44,7 +40,6 @@ import parser.ast.DeclarationInt;
 import parser.ast.DeclarationIntUnbounded;
 import parser.ast.DeclarationType;
 import parser.type.Type;
-import parser.type.TypeInt;
 import prism.Evaluator;
 import prism.ModelType;
 import prism.Prism;
@@ -281,17 +276,9 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 			umbIndex.setObservationsApplyTo(UMBIndex.UMBEntity.STATES);
 		}
 		boolean rational = model.getEvaluator().exact();
-		if (modelType.intervals()) {
-			umbIndex.setBranchProbabilityType(rational ? UMBIndex.ContinuousNumericType.RATIONAL_INTERVAL : UMBIndex.ContinuousNumericType.DOUBLE_INTERVAL);
-		} else if (modelType.isProbabilistic()) {
-			umbIndex.setBranchProbabilityType(rational ? UMBIndex.ContinuousNumericType.RATIONAL : UMBIndex.ContinuousNumericType.DOUBLE);
-		}
+		umbIndex.setBranchProbabilityType(UMBType.contNum(rational, modelType.intervals()));
 		if (modelType.isProbabilistic() && !modelType.choicesSumToOne()) {
-			if (modelType.intervals()) {
-				umbIndex.setExitRateType(rational ? UMBIndex.ContinuousNumericType.RATIONAL_INTERVAL : UMBIndex.ContinuousNumericType.DOUBLE_INTERVAL);
-			} else {
-				umbIndex.setExitRateType(rational ? UMBIndex.ContinuousNumericType.RATIONAL : UMBIndex.ContinuousNumericType.DOUBLE);
-			}
+			umbIndex.setExitRateType(UMBType.contNum(rational, modelType.intervals()));
 		}
 	}
 
@@ -342,40 +329,33 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 			UMBBitPacking bitPacking = new UMBBitPacking();
 			for (int i = 0; i < numVars; i++) {
 				DeclarationType varDecl = varList.getDeclarationType(i);
-				String varTypeUMB;
-				int varSize;
+				UMBType varTypeUMB;
 				if (varDecl instanceof DeclarationBool) {
-					varTypeUMB = "bool";
-					varSize = 1;
+					varTypeUMB = UMBType.create(UMBType.Type.BOOL, 1);
 				} else if (varDecl instanceof DeclarationInt) {
 					if (storeOffsets) {
-						varTypeUMB = "int";
-						varSize = varList.getRangeLogTwo(i); // TODO
+						varTypeUMB = UMBType.create(UMBType.Type.INT, varList.getRangeLogTwo(i)); // TODO
 					} else {
 						int varLow = varList.getLow(i);
 						int varHigh = varList.getHigh(i);
 						if (varLow < 0) {
-							varTypeUMB = "int";
 							int varMaxAbs = Math.abs(varLow);
 							if (varHigh > 0) {
 								varMaxAbs = Math.max(varMaxAbs, varHigh + 1);
 							}
-							varSize = (int) Math.ceil(PrismUtils.log2(varMaxAbs)) + 1;
+							varTypeUMB = UMBType.create(UMBType.Type.INT, (int) Math.ceil(PrismUtils.log2(varMaxAbs)) + 1);
 						} else {
-							varTypeUMB = "uint";
-							varSize = (int) Math.ceil(PrismUtils.log2(varHigh + 1));
+							varTypeUMB = UMBType.create(UMBType.Type.UINT, (int) Math.ceil(PrismUtils.log2(varHigh + 1)));
 						}
 					}
 				} else if (varDecl instanceof DeclarationIntUnbounded) {
-					varTypeUMB = "int";
-					varSize = 32;
+					varTypeUMB = UMBType.create(UMBType.Type.INT, 32);
 				} else if (varDecl instanceof DeclarationDoubleUnbounded) {
-					varTypeUMB = "double";
-					varSize = 64;
+					varTypeUMB = UMBType.create(UMBType.Type.DOUBLE, 64);
 				} else {
 					throw new PrismException("Unsupported variable type in UMB export: " + varDecl);
 				}
-				bitPacking.addVariable(varList.getName(i), varSize, varTypeUMB);
+				bitPacking.addVariable(varList.getName(i), varTypeUMB);
 			}
 			bitPacking.padToByteBoundary();
 			umbWriter.addValuationDescription(entity, true, bitPacking);
@@ -387,19 +367,24 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 						Object v = null;
 						try {
 							for (int i = 0; i < numVars; i++) {
-								String varTypeUMB = bitPacking.getVariable(i).type;
+								UMBType.Type varTypeUMB = bitPacking.getVariable(i).getType().type;
 								v = s.varValues[i];
 								v = varList.getType(i).castValueTo(v, EvaluateContext.EvalMode.FP);
-								if (varTypeUMB.equals("bool")) {
-									bitPacking.setBooleanVariableValue(bitString, i, (boolean) v);
-								} else if (varTypeUMB.equals("int")) {
-									bitPacking.setIntVariableValue(bitString, i, (int) v);
-								} else if (varTypeUMB.equals("uint")) {
-									bitPacking.setUIntVariableValue(bitString, i, (int) v);
-								} else if (varTypeUMB.equals("double")) {
-									bitPacking.setDoubleVariableValue(bitString, i, (double) v);
-								} else {
-									throw new PrismException("Unsupported variable type in UMB export: " + varTypeUMB);
+								switch (varTypeUMB) {
+									case BOOL:
+										bitPacking.setBooleanVariableValue(bitString, i, (boolean) v);
+										break;
+									case INT:
+										bitPacking.setIntVariableValue(bitString, i, (int) v);
+										break;
+									case UINT:
+										bitPacking.setUIntVariableValue(bitString, i, (int) v);
+										break;
+									case DOUBLE:
+										bitPacking.setDoubleVariableValue(bitString, i, (double) v);
+										break;
+									default:
+										throw new PrismException("Unsupported variable type in UMB export: " + varTypeUMB);
 								}
 							}
 						} catch (ClassCastException e) {

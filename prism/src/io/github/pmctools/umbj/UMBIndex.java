@@ -16,6 +16,8 @@
 
 package io.github.pmctools.umbj;
 
+import io.github.pmctools.umbj.UMBType.Type;
+
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -28,7 +30,6 @@ import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
 import com.google.gson.annotations.SerializedName;
 
-import java.lang.reflect.Type;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -65,9 +66,9 @@ public class UMBIndex
 	// Fake annotation objects for some data
 
 	/** Annotation object for actions (stored in a similar way to annotations) */
-	public transient Annotation actionsAnnotation = createStandaloneAnnotation(UMBFormat.ACTIONS_FOLDER, UMBIndex.UMBType.STRING);
+	public transient Annotation actionsAnnotation = createStandaloneAnnotation(UMBFormat.ACTIONS_FOLDER, UMBType.create(Type.STRING));
 	/** Annotation object for observations (stored in a similar way to annotations) */
-	public transient Annotation observationsAnnotation = createStandaloneAnnotation(UMBFormat.OBSERVATIONS_FOLDER, UMBIndex.UMBType.LONG);
+	public transient Annotation observationsAnnotation = createStandaloneAnnotation(UMBFormat.OBSERVATIONS_FOLDER, UMBType.create(Type.INT));
 
 	// Enums
 
@@ -85,49 +86,6 @@ public class UMBIndex
 				case OBSERVATIONS: return "observations";
 				default: return "?";
 			}
-		}
-	}
-
-	/** UMB data types */
-	public enum UMBType implements UMBField
-	{
-		INT, LONG, BOOL, DOUBLE, RATIONAL, STRING;
-		@Override
-		public String toString()
-		{
-			switch (this) {
-				case INT: return "int";
-				case LONG: return "long";
-				case BOOL: return "bool";
-				case DOUBLE: return "double";
-				case RATIONAL: return "rational";
-				case STRING: return "string";
-				default: return "?";
-			}
-		}
-	}
-
-	/** Types of continuous numerical values */
-	public enum ContinuousNumericType implements UMBField
-	{
-		DOUBLE, RATIONAL, DOUBLE_INTERVAL, RATIONAL_INTERVAL;
-
-		/** Returns true if values are defined in terms of doubles (or intervals over). */
-		public boolean doubles()
-		{
-			return this == DOUBLE || this == DOUBLE_INTERVAL;
-		}
-
-		/** Returns true if values are defined in terms of rationals (or intervals over). */
-		public boolean rationals()
-		{
-			return this == RATIONAL || this == RATIONAL_INTERVAL;
-		}
-
-		/** Returns true if values are defined as intervals. */
-		public boolean intervals()
-		{
-			return this == DOUBLE_INTERVAL || this == RATIONAL_INTERVAL;
 		}
 	}
 
@@ -226,11 +184,11 @@ public class UMBIndex
 		/** Observation style */
 		public UMBEntity observationsApplyTo;
 		/** Type of branch probabilities */
-		public ContinuousNumericType branchProbabilityType;
+		public UMBType branchProbabilityType;
 		/** Type of exit rates */
-		public ContinuousNumericType exitRateType;
+        public UMBType exitRateType;
 		/** Type of probabilities for stochastic observations */
-		public ContinuousNumericType observationProbabilityType;
+		public UMBType observationProbabilityType;
 		/** Names of players (for games) */
 		public List<String> playerNames;
 
@@ -278,8 +236,30 @@ public class UMBIndex
 					throw new UMBException("Invalid value \" + observationsApplyTo" + "\" for " + fieldNameToUMB("observationsApplyTo"));
 				}
 			}
-			if (time == Time.STOCHASTIC || time == Time.URGENT_STOCHASTIC) {
-				checkFieldExists(exitRateType, "exitRateType");
+			if (branchProbabilityType != null) {
+				if (!branchProbabilityType.type.isContinuousNumeric()) {
+					throw new UMBException("Branch probability type must be a continuous numeric type");
+				}
+				if (!branchProbabilityType.isDefaultSize()) {
+					throw new UMBException("Branch probability type must have default size");
+				}
+			}
+			checkFieldExistsIff(exitRateType, "exitRateType", time == Time.STOCHASTIC || time == Time.URGENT_STOCHASTIC);
+			if (exitRateType != null) {
+				if (!exitRateType.type.isContinuousNumeric()) {
+					throw new UMBException("Exit rate type must be a continuous numeric type");
+				}
+				if (!exitRateType.isDefaultSize()) {
+					throw new UMBException("Exit rate type must have default size");
+				}
+			}
+			if (observationProbabilityType != null) {
+				if (!observationProbabilityType.type.isContinuousNumeric()) {
+					throw new UMBException("Observation probability type must be a continuous numeric type");
+				}
+				if (!observationProbabilityType.isDefaultSize()) {
+					throw new UMBException("Observation probability type must have default size");
+				}
 			}
 			if (numPlayers > 1) {
 				checkFieldExists(playerNames, "playerNames");
@@ -336,7 +316,7 @@ public class UMBIndex
 				throw new UMBException("Annotation \"" + id + "\" in group \"" + group + "\" is empty");
 			}
 			checkFieldExists(type, "type");
-			if (type == UMBType.STRING) {
+			if (type.type == Type.STRING) {
 				checkFieldExists(numStrings, "numStrings");
 				if (numStrings <= 0) {
 					throw new UMBException("Number of strings must be positive");
@@ -393,18 +373,6 @@ public class UMBIndex
 		public String getFilename(UMBEntity entity)
 		{
 			return UMBFormat.annotationFile(group, id, entity);
-		}
-
-		public ContinuousNumericType getContinuousNumericType() throws UMBException
-		{
-			switch (type) {
-				case DOUBLE:
-					return ContinuousNumericType.DOUBLE;
-				case RATIONAL:
-					return ContinuousNumericType.RATIONAL;
-				default:
-					throw new UMBException("Annotation \"" + id + "\" in group \"" + group + "\" is not of a continuous numeric type");
-			}
 		}
 	}
 
@@ -473,10 +441,8 @@ public class UMBIndex
 		public String name;
 		/** Is the variable optional */
 		public Boolean isOptional;
-		/** Variable size (number of bits) */
-		public Integer size;
-		/** Variable type */
-		public String type;
+		/** Variable type (including size) */
+		public UMBType type;
 		// For padding
 		/** Amount of padding (number of bits) */
 		public Integer padding;
@@ -504,8 +470,8 @@ public class UMBIndex
 		{
 			if (padding != null) {
 				return padding;
-			} else if (size != null) {
-				return size;
+			} else if (type.size != null) {
+				return type.size;
 			} else {
 				return 0;
 			}
@@ -579,7 +545,7 @@ public class UMBIndex
 	{
 		// Should either be padding or a named variable
 		if (var.padding != null) {
-			if (var.name != null || var.size != null || var.type != null) {
+			if (var.name != null || var.type != null) {
 				throw new UMBException("Malformed variable/padding in state valuation metadata");
 			}
 		} else {
@@ -589,7 +555,7 @@ public class UMBIndex
 			if (var.type == null) {
 				throw new UMBException("Untyped variable in state valuation metadata");
 			}
-			if (var.size == null) {
+			if (var.type.size == null) {
 				throw new UMBException("Only fixed size variables are currently supported for state valuations");
 			}
 		}
@@ -699,7 +665,7 @@ public class UMBIndex
 	 * Set the type of branch probabilities used in the model.
 	 * @param branchProbabilityType The type of branch probabilities
 	 */
-	public void setBranchProbabilityType(ContinuousNumericType branchProbabilityType)
+	public void setBranchProbabilityType(UMBType branchProbabilityType)
 	{
 		transitionSystem.branchProbabilityType = branchProbabilityType;
 	}
@@ -708,7 +674,7 @@ public class UMBIndex
 	 * Set the type of exit rates used in the model.
 	 * @param exitRateType The type of exit rates
 	 */
-	public void setExitRateType(ContinuousNumericType exitRateType)
+	public void setExitRateType(UMBType exitRateType)
 	{
 		transitionSystem.exitRateType = exitRateType;
 	}
@@ -717,7 +683,7 @@ public class UMBIndex
 	 * Set the type of probabilities for stochastic observations in the model.
 	 * @param observationProbabilityType The type of observation probabilities
 	 */
-	public void setObservationProbabilityType(ContinuousNumericType observationProbabilityType)
+	public void setObservationProbabilityType(UMBType observationProbabilityType)
 	{
 		transitionSystem.observationProbabilityType = observationProbabilityType;
 	}
@@ -746,40 +712,40 @@ public class UMBIndex
 			case IDTMC:
 				setTime(Time.DISCRETE);
 				setNumPlayers(0);
-				setBranchProbabilityType(rational ? ContinuousNumericType.RATIONAL : ContinuousNumericType.DOUBLE);
+				setBranchProbabilityType(rational ? UMBType.create(Type.RATIONAL) : UMBType.create(Type.DOUBLE));
 				setExitRateType(null);
 				break;
 			case CTMC:
 				setTime(Time.STOCHASTIC);
 				setNumPlayers(0);
-				setBranchProbabilityType(rational ? ContinuousNumericType.RATIONAL : ContinuousNumericType.DOUBLE);
-				setExitRateType(rational ? ContinuousNumericType.RATIONAL : ContinuousNumericType.DOUBLE);
+				setBranchProbabilityType(rational ? UMBType.create(Type.RATIONAL) : UMBType.create(Type.DOUBLE));
+				setExitRateType(rational ? UMBType.create(Type.RATIONAL) : UMBType.create(Type.DOUBLE));
 				break;
 			case MDP:
 			case POMDP:
 				setTime(Time.DISCRETE);
 				setNumPlayers(1);
-				setBranchProbabilityType(rational ? ContinuousNumericType.RATIONAL : ContinuousNumericType.DOUBLE);
+				setBranchProbabilityType(rational ? UMBType.create(Type.RATIONAL) : UMBType.create(Type.DOUBLE));
 				setExitRateType(null);
 				break;
 			case IMDP:
 			case IPOMDP:
 				setTime(Time.DISCRETE);
 				setNumPlayers(1);
-				setBranchProbabilityType(rational ? ContinuousNumericType.RATIONAL_INTERVAL : ContinuousNumericType.DOUBLE_INTERVAL);
+				setBranchProbabilityType(rational ? UMBType.create(Type.RATIONAL_INTERVAL) : UMBType.create(Type.DOUBLE_INTERVAL));
 				setExitRateType(null);
 				break;
 			case CTMDP:
 				setTime(Time.STOCHASTIC);
 				setNumPlayers(1);
-				setBranchProbabilityType(rational ? ContinuousNumericType.RATIONAL : ContinuousNumericType.DOUBLE);
-				setExitRateType(rational ? ContinuousNumericType.RATIONAL : ContinuousNumericType.DOUBLE);
+				setBranchProbabilityType(rational ? UMBType.create(Type.RATIONAL) : UMBType.create(Type.DOUBLE));
+				setExitRateType(rational ? UMBType.create(Type.RATIONAL) : UMBType.create(Type.DOUBLE));
 				break;
 			case MA:
 				setTime(Time.URGENT_STOCHASTIC);
 				setNumPlayers(1);
-				setBranchProbabilityType(rational ? ContinuousNumericType.RATIONAL : ContinuousNumericType.DOUBLE);
-				setExitRateType(rational ? ContinuousNumericType.RATIONAL : ContinuousNumericType.DOUBLE);
+				setBranchProbabilityType(rational ? UMBType.create(Type.RATIONAL) : UMBType.create(Type.DOUBLE));
+				setExitRateType(rational ? UMBType.create(Type.RATIONAL) : UMBType.create(Type.DOUBLE));
 				break;
 			case TSG:
 			case ITSG:
@@ -821,6 +787,10 @@ public class UMBIndex
 	 */
 	public Annotation addAnnotation(String group, String alias, UMBType type) throws UMBException
 	{
+		// Check type
+		if (!type.type.isRational() && !type.isDefaultSize()) {
+			throw new UMBException("Annotation type must have default size unless it is rational");
+		}
 		// Check if group exists; create if not
 		if (!annotationGroups.contains(group)) {
 			if (!UMBFormat.isValidID(group)) {
@@ -994,7 +964,7 @@ public class UMBIndex
 	/**
 	 * Get the type of branch probabilities used in the model.
 	 */
-	public ContinuousNumericType getBranchProbabilityType()
+	public UMBType getBranchProbabilityType()
 	{
 		return transitionSystem.branchProbabilityType;
 	}
@@ -1002,7 +972,7 @@ public class UMBIndex
 	/**
 	 * Get the type of exit rates used in the model.
 	 */
-	public ContinuousNumericType getExitRateType()
+	public UMBType getExitRateType()
 	{
 		return transitionSystem.exitRateType;
 	}
@@ -1010,7 +980,7 @@ public class UMBIndex
 	/**
 	 * Get the type of probabilities for stochastic observations in the model.
 	 */
-	public ContinuousNumericType getObservationProbabilityType()
+	public UMBType getObservationProbabilityType()
 	{
 		return transitionSystem.observationProbabilityType;
 	}
@@ -1054,7 +1024,7 @@ public class UMBIndex
 		int numPlayers = getNumPlayers();
 		boolean pObs = getNumObservations() > 0;
 		Time time = getTime();
-		boolean intv = transitionSystem.branchProbabilityType != null && transitionSystem.branchProbabilityType.intervals();
+		boolean intv = transitionSystem.branchProbabilityType != null && transitionSystem.branchProbabilityType.type.isInterval();
 
 		ModelType modelType = null;
 		// Probabilistic models
@@ -1452,8 +1422,22 @@ public class UMBIndex
 	 */
 	private static void checkFieldExists(Object field, String fieldName) throws UMBException
 	{
-		if (field == null) {
+		checkFieldExistsIff(field, fieldName, true);
+	}
+
+	/**
+	 * Check whether a field exists (is non-null) iff {@code condition} is true and throw an exception if not.
+	 * @param field The field, as stored in {@link UMBIndex}
+	 * @param fieldName The name of the field, as stored in {@link UMBIndex} (not JSON/UMB)
+	 * @param condition The condition
+	 */
+	private static void checkFieldExistsIff(Object field, String fieldName, boolean condition) throws UMBException
+	{
+		if (condition && field == null) {
 			throw new UMBException("Required field \"" + fieldNameToUMB(fieldName) + "\" is missing");
+		}
+		if (!condition && field != null) {
+			throw new UMBException("Field \"" + fieldNameToUMB(fieldName) + "\" should not be present");
 		}
 	}
 
@@ -1553,7 +1537,7 @@ public class UMBIndex
 	static class EnumSerializer<T extends Enum<T>> implements JsonSerializer<T>
 	{
 		@Override
-		public JsonElement serialize(T t, Type type, JsonSerializationContext jsonSerializationContext)
+		public JsonElement serialize(T t, java.lang.reflect.Type type, JsonSerializationContext jsonSerializationContext)
 		{
 			// Format for UMB (lower case, hyphenated)
 			return new JsonPrimitive(UMBField.toUMB(t.name()));

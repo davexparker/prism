@@ -326,7 +326,7 @@ public class UMBWriter
 	 */
 	public void addStateAP(String apAlias, BitSet apStates) throws UMBException
 	{
-		UMBIndex.Annotation annotation = umbIndex.addAnnotation(UMBFormat.AP_ANNOTATIONS_GROUP, apAlias, UMBIndex.UMBType.BOOL);
+		UMBIndex.Annotation annotation = umbIndex.addAnnotation(UMBFormat.AP_ANNOTATIONS_GROUP, apAlias, UMBType.create(UMBType.Type.BOOL));
 		addBooleanDataToAnnotation(annotation, UMBIndex.UMBEntity.STATES, apStates);
 	}
 
@@ -338,7 +338,7 @@ public class UMBWriter
 	 */
 	public String addRewards(String rewardAlias, boolean rational) throws UMBException
 	{
-		UMBIndex.UMBType type = rational ? UMBIndex.UMBType.RATIONAL : UMBIndex.UMBType.DOUBLE;
+		UMBType type = UMBType.contNum(rational);
 		UMBIndex.Annotation annotation = umbIndex.addAnnotation(UMBFormat.REWARD_ANNOTATIONS_GROUP, rewardAlias, type);
 		return annotation.id;
 	}
@@ -351,7 +351,7 @@ public class UMBWriter
 	public void addStateRewardsByID(String rewardID, Iterator<?> stateRewards) throws UMBException
 	{
 		UMBIndex.Annotation annotation = umbIndex.getAnnotation(UMBFormat.REWARD_ANNOTATIONS_GROUP, rewardID);
-		addContinuousNumericDataToAnnotation(annotation, UMBIndex.UMBEntity.STATES, stateRewards, annotation.getContinuousNumericType());
+		addContinuousNumericDataToAnnotation(annotation, UMBIndex.UMBEntity.STATES, stateRewards, annotation.getType());
 	}
 
 	/**
@@ -362,7 +362,7 @@ public class UMBWriter
 	public void addChoiceRewardsByID(String rewardID, Iterator<?> choiceRewards) throws UMBException
 	{
 		UMBIndex.Annotation annotation = umbIndex.getAnnotation(UMBFormat.REWARD_ANNOTATIONS_GROUP, rewardID);
-		addContinuousNumericDataToAnnotation(annotation, UMBIndex.UMBEntity.CHOICES, choiceRewards, annotation.getContinuousNumericType());
+		addContinuousNumericDataToAnnotation(annotation, UMBIndex.UMBEntity.CHOICES, choiceRewards, annotation.getType());
 	}
 
 	/**
@@ -373,7 +373,7 @@ public class UMBWriter
 	public void addBranchRewardsByID(String rewardID, Iterator<?> branchRewards) throws UMBException
 	{
 		UMBIndex.Annotation annotation = umbIndex.getAnnotation(UMBFormat.REWARD_ANNOTATIONS_GROUP, rewardID);
-		addContinuousNumericDataToAnnotation(annotation, UMBIndex.UMBEntity.BRANCHES, branchRewards, annotation.getContinuousNumericType());
+		addContinuousNumericDataToAnnotation(annotation, UMBIndex.UMBEntity.BRANCHES, branchRewards, annotation.getType());
 	}
 
 	/**
@@ -431,7 +431,7 @@ public class UMBWriter
 	 * @param alias Optional alias (name) for the annotation ("" or null if not needed)
 	 * @param type The type of the values to be stored in the annotation
 	 */
-	public UMBIndex.Annotation addAnnotation(String group, String alias, UMBIndex.UMBType type) throws UMBException
+	public UMBIndex.Annotation addAnnotation(String group, String alias, UMBType type) throws UMBException
 	{
 		return umbIndex.addAnnotation(group, alias, type);
 	}
@@ -447,7 +447,7 @@ public class UMBWriter
 	 */
 	public void addBooleanAnnotation(String group, String alias, UMBIndex.UMBEntity appliesTo, BitSet bitset) throws UMBException
 	{
-		UMBIndex.Annotation annotation = addAnnotation(group, alias, UMBIndex.UMBType.BOOL);
+		UMBIndex.Annotation annotation = addAnnotation(group, alias, UMBType.create(UMBType.Type.BOOL));
 		addBooleanDataToAnnotation(annotation, appliesTo, bitset);
 	}
 
@@ -462,7 +462,7 @@ public class UMBWriter
 	 */
 	public void addDoubleAnnotation(String group, String alias, UMBIndex.UMBEntity appliesTo, PrimitiveIterator.OfDouble doubleValues) throws UMBException
 	{
-		UMBIndex.Annotation annotation = addAnnotation(group, alias, UMBIndex.UMBType.DOUBLE);
+		UMBIndex.Annotation annotation = addAnnotation(group, alias, UMBType.create(UMBType.Type.DOUBLE));
 		addDoubleDataToAnnotation(annotation, appliesTo, doubleValues);
 	}
 
@@ -530,7 +530,7 @@ public class UMBWriter
 		addDoubleArray(annotation.getFilename(appliesTo), doubleValues, annotationSize);
 	}
 
-	public void addContinuousNumericDataToAnnotation(UMBIndex.Annotation annotation, UMBIndex.UMBEntity appliesTo, Iterator<?> values, UMBIndex.ContinuousNumericType valueType) throws UMBException
+	public void addContinuousNumericDataToAnnotation(UMBIndex.Annotation annotation, UMBIndex.UMBEntity appliesTo, Iterator<?> values, UMBType valueType) throws UMBException
 	{
 		if (annotation.appliesTo(appliesTo)) {
 			throw new UMBException("Duplicate data for " + appliesTo + "s in annotation \"" + annotation.id + "\" in group \"" + annotation.group + "\"");
@@ -703,12 +703,12 @@ public class UMBWriter
 		umbDataFiles.add(new BigIntegerArray(bigIntegerValues, numLongs, size, name));
 	}
 
-	private void addContinuousNumericArray(String name, Iterator<?> values, UMBIndex.ContinuousNumericType type, long size) throws UMBException
+	private void addContinuousNumericArray(String name, Iterator<?> values, UMBType type, long size) throws UMBException
 	{
-		long sizeNew = type.intervals() ? size * 2 : size;
-		if (type.doubles()) {
+		long sizeNew = type.type.isInterval() ? size * 2 : size;
+		if (type.type.isDouble()) {
 			addDoubleArray(name, DoubleIterators.asDoubleIterator(values), sizeNew);
-		} else if (type.rationals()) {
+		} else if (type.type.isRational()) {
 			addLongArray(name, LongIterators.asLongIterator(values), sizeNew * 2);
 		} else {
 			throw new UMBException("Unsupported continuous numeric type " + type);
@@ -922,7 +922,7 @@ public class UMBWriter
 				entry.setSize(size);
 				tarOut.putArchiveEntry(entry);
 			} catch (IOException e) {
-				throw new UMBException("I/O error writing \"" + name + "\" to UMB file");
+				throw new UMBException("I/O error writing \"" + name + "\" to UMB file: " + e.getMessage());
 			}
 		}
 
@@ -934,7 +934,7 @@ public class UMBWriter
 			try {
 				tarOut.closeArchiveEntry();
 			} catch (IOException e) {
-				throw new UMBException("I/O error writing to UMB file");
+				throw new UMBException("I/O error writing to UMB file: " + e.getMessage());
 			}
 		}
 

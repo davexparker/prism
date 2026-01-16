@@ -41,7 +41,7 @@ public class UMBBitPacking
 	{
 		for (UMBIndex.ValuationVariable item : valuationDescr.variables) {
 			if (item.isVariable()) {
-				addVariable(item.name, item.size, item.type);
+				addVariable(item.name, item.type);
 			}
 			else if (item.isPadding()) {
 				addPadding(item.padding);
@@ -59,12 +59,11 @@ public class UMBBitPacking
 	/**
 	 * Add a variable.
 	 * @param name Variable name
-	 * @param size Variable size (in bits)
-	 * @param type Variable type
+	 * @param type Variable type (including size, in bits)
 	 */
-	public void addVariable(String name, int size, String type)
+	public void addVariable(String name, UMBType type)
 	{
-		addItem(new BitPackedVariable(name, size, type));
+		addItem(new BitPackedVariable(name, type));
 		varIndices.add(items.size() - 1);
 	}
 
@@ -120,7 +119,6 @@ public class UMBBitPacking
 			if (item instanceof BitPackedVariable) {
 				BitPackedVariable varItem = (BitPackedVariable) item;
 				var.name = varItem.name;
-				var.size = varItem.size;
 				var.type = varItem.type;
 			} else if (item instanceof BitPackedPadding) {
 				var.padding = item.size;
@@ -280,17 +278,17 @@ public class UMBBitPacking
 	public Object getVariableValue(UMBBitString bitString, int i) throws UMBException
 	{
 		BitPackedVariable var = getVariable(i);
-		switch (var.type) {
-			case "bool":
+		switch (var.getType().type) {
+			case BOOL:
 				return getBooleanVariableValue(bitString, i);
-			case "int":
+			case INT:
 				return getIntVariableValue(bitString, i);
-			case "uint":
+			case UINT:
 				return getUIntVariableValue(bitString, i);
-			case "double":
+			case DOUBLE:
 				return getDoubleVariableValue(bitString, i);
 			default:
-				throw new UMBException("Unknown variable type: " + var.type);
+				throw new UMBException("Unknown variable type: " + var.getType().type);
 		}
 	}
 
@@ -339,17 +337,17 @@ public class UMBBitPacking
 			BitPackedVariable var = getVariable(i);
 			int offset = getVariableOffset(i);
 			int size = getVariableSize(i);
-			switch (var.type) {
-				case "bool":
+			switch (var.getType().type) {
+				case BOOL:
 					sb.append(bitString.getBoolean(offset, size));
 					break;
-				case "int":
+				case INT:
 					sb.append(bitString.getInt(offset, size));
 					break;
-				case "uint":
+				case UINT:
 					sb.append(bitString.getUInt(offset, size));
 					break;
-				case "double":
+				case DOUBLE:
 					sb.append(bitString.getDouble(offset, size));
 					break;
 				default:
@@ -409,13 +407,23 @@ public class UMBBitPacking
 		/** Name of the variable */
 		public String name;
 		/** Type of the variable */
-		public String type;
+		private UMBType type;
 
-		public BitPackedVariable(String name, int size, String type)
+		public BitPackedVariable(String name, UMBType type)
 		{
-			this.size = size;
 			this.name = name;
+			setType(type);
+		}
+
+		public void setType(UMBType type)
+		{
 			this.type = type;
+			this.size = type.size;
+		}
+
+		public UMBType getType()
+		{
+			return type;
 		}
 	}
 
