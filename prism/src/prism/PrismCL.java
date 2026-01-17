@@ -2253,27 +2253,14 @@ public class PrismCL implements PrismModelListener
 					throw new PrismException("Unknown value \"" + optVal + "\" provided for \"" + sOpt + "\" option of -exportmodel");
 				}
 			}
-			else if (opt.startsWith(sOpt = "states")) {
-				if (!opt.startsWith(sOpt + "="))
-					throw new PrismException("No value provided for \"" + sOpt + "\" option of -exportmodel");
-				String optVal = opt.substring(sOpt.length() + 1);
-				if (optVal.equals("true")) {
-					exportOptions.setShowStates(true);
-				} else if (optVal.equals("false")) {
-					exportOptions.setShowStates(false);
-				}
-				else {
-					throw new PrismException("Unknown value \"" + optVal + "\" provided for \"" + sOpt + "\" option of -exportmodel");
-				}
-			}
 			else if (opt.startsWith(sOpt = "headers")) {
 				if (!opt.startsWith(sOpt + "="))
 					throw new PrismException("No value provided for \"" + sOpt + "\" option of -exportmodel");
 				String optVal = opt.substring(sOpt.length() + 1);
 				if (optVal.equals("true")) {
-					exportOptions.setZipped(true);
+					exportOptions.setPrintHeaders(true);
 				} else if (optVal.equals("false")) {
-					exportOptions.setZipped(false);
+					exportOptions.setPrintHeaders(false);
 				}
 				else {
 					throw new PrismException("Unknown value \"" + optVal + "\" provided for \"" + sOpt + "\" option of -exportmodel");
@@ -2298,9 +2285,9 @@ public class PrismCL implements PrismModelListener
 					throw new PrismException("No value provided for \"" + sOpt + "\" option of -exportmodel");
 				String optVal = opt.substring(sOpt.length() + 1);
 				if (optVal.equals("true")) {
-					exportOptions.setPrintHeaders(true);
+					exportOptions.setZipped(true);
 				} else if (optVal.equals("false")) {
-					exportOptions.setPrintHeaders(false);
+					exportOptions.setZipped(false);
 				}
 				else {
 					throw new PrismException("Unknown value \"" + optVal + "\" provided for \"" + sOpt + "\" option of -exportmodel");
@@ -2873,7 +2860,6 @@ public class PrismCL implements PrismModelListener
 			mainLog.println(" * states (=true/false) - include state definitions");
 			mainLog.println(" * obs (=true/false) - include observation definitions");
 			mainLog.println(" * actions (=true/false) - show actions on choices/transitions");
-			mainLog.println(" * states (=true/false) - show state definitions");
 			mainLog.println(" * headers (=true/false) - include headers when exporting rewards");
 			mainLog.println(" * precision (=n) - export probabilities/rewards with n significant decimal places");
 			mainLog.println(" * zip (=true/false) - whether to zip UMB files");
