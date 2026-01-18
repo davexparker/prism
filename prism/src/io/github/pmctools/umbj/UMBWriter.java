@@ -52,6 +52,11 @@ public class UMBWriter
 	private final List<UMBDataFile> umbDataFiles = new ArrayList<>();
 
 	/**
+	 * Default buffer size (in bytes) for writing to UMB file.
+	 */
+	private static int BUFFER_SIZE = 64 * 1024;
+
+	/**
 	 * Construct a new {@link UMBWriter} to create a UMB file.
 	 */
 	public UMBWriter()
@@ -807,27 +812,6 @@ public class UMBWriter
 		}
 	}
 
-	/*private void exportIntArrayToTarBuffered(PrimitiveIterator.OfInt intValues, int size, File file) throws IOException
-	{
-		TarArchiveEntry entry = new TarArchiveEntry(file);
-		entry.setSize((long) size * Integer.BYTES);
-		tarOut.putArchiveEntry(entry);
-		int bufferSize = 100;
-		ByteBuffer buffer = ByteBuffer.allocate(bufferSize * Integer.BYTES).order(ByteOrder.LITTLE_ENDIAN);
-		while (intValues.hasNext()) {
-			buffer.putInt(intValues.nextInt());
-			if (!buffer.hasRemaining()) {
-				tarOut.write(buffer.array(), 0, buffer.position());
-				buffer.clear();
-			}
-		}
-		if (buffer.position() > 0) {
-			tarOut.write(buffer.array(), 0, buffer.position());
-			buffer.clear();
-		}
-		tarOut.closeArchiveEntry();
-	}*/
-
 	private void exportTextToText(String text, File file, StringBuffer sb)
 	{
 		sb.append("/" + file.getName() + ":\n");
@@ -1012,7 +996,7 @@ public class UMBWriter
 			return new Iterator<>()
 			{
 				{
-					buffer = ByteBuffer.allocate(numBytes()).order(ByteOrder.LITTLE_ENDIAN);
+					buffer = ByteBuffer.allocate(BUFFER_SIZE).order(ByteOrder.LITTLE_ENDIAN);
 				}
 
 				@Override
@@ -1105,9 +1089,11 @@ public class UMBWriter
 		@Override
 		public void encodeNextBytes()
 		{
-			int posn2 = posn / 64;
-			buffer.putLong(booleanLongs.length > posn2 ? booleanLongs[posn2] : 0);
-			posn += 64;
+			while (posn < size && buffer.remaining() >= numBytes()) {
+				int posn2 = posn / 64;
+				buffer.putLong(booleanLongs.length > posn2 ? booleanLongs[posn2] : 0);
+				posn += 64;
+			}
 		}
 
 		@Override
@@ -1154,7 +1140,9 @@ public class UMBWriter
 		@Override
 		public void encodeNextBytes()
 		{
-			buffer.putInt(intValues.nextInt());
+			while (intValues.hasNext() && buffer.remaining() >= numBytes()) {
+				buffer.putInt(intValues.nextInt());
+			}
 		}
 	}
 
@@ -1193,7 +1181,9 @@ public class UMBWriter
 		@Override
 		public void encodeNextBytes()
 		{
-			buffer.putLong(longValues.nextLong());
+			while (longValues.hasNext() && buffer.remaining() >= numBytes()) {
+				buffer.putLong(longValues.nextLong());
+			}
 		}
 	}
 
@@ -1234,10 +1224,12 @@ public class UMBWriter
 		@Override
 		public void encodeNextBytes()
 		{
-			BigInteger b = bigIntegerValues.next();
-			for (int i = 0; i < intSize; i++) {
-				buffer.putLong(b.longValue());
-				b = b.shiftRight(64);
+			while (bigIntegerValues.hasNext() && buffer.remaining() >= numBytes()) {
+				BigInteger b = bigIntegerValues.next();
+				for (int i = 0; i < intSize; i++) {
+					buffer.putLong(b.longValue());
+					b = b.shiftRight(64);
+				}
 			}
 		}
 	}
@@ -1282,7 +1274,9 @@ public class UMBWriter
 		@Override
 		public void encodeNextBytes()
 		{
-			buffer.putDouble(doubleValues.nextDouble());
+			while (doubleValues.hasNext() && buffer.remaining() >= numBytes()) {
+				buffer.putDouble(doubleValues.nextDouble());
+			}
 		}
 	}
 
@@ -1340,7 +1334,9 @@ public class UMBWriter
 		@Override
 		public void encodeNextBytes()
 		{
-			buffer.put(bitStrings.next().bytes);
+			while (bitStrings.hasNext() && buffer.remaining() >= numBytes()) {
+				buffer.put(bitStrings.next().bytes);
+			}
 		}
 	}
 
