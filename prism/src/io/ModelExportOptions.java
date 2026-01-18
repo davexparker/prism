@@ -46,6 +46,16 @@ public class ModelExportOptions implements Cloneable
 	private Optional<Integer> modelPrecision = Optional.empty();
 
 	/**
+	 * Whether to show labels
+	 */
+	private Optional<Boolean> showLabels = Optional.empty();
+
+	/**
+	 * Whether to show rewards
+	 */
+	private Optional<Boolean> showRewards = Optional.empty();
+
+	/**
 	 * Whether to show full state details
 	 */
 	private Optional<Boolean> showStates = Optional.empty();
@@ -126,6 +136,24 @@ public class ModelExportOptions implements Cloneable
 	}
 
 	/**
+	 * Set whether to show labels
+	 */
+	public ModelExportOptions setShowLabels(boolean showLabels)
+	{
+		this.showLabels = Optional.of(showLabels);
+		return this;
+	}
+
+	/**
+	 * Set whether to show rewards
+	 */
+	public ModelExportOptions setShowRewards(boolean showRewards)
+	{
+		this.showRewards = Optional.of(showRewards);
+		return this;
+	}
+
+	/**
 	 * Set whether to show full state details.
 	 */
 	public ModelExportOptions setShowStates(boolean showStates)
@@ -199,6 +227,12 @@ public class ModelExportOptions implements Cloneable
 		if (other.modelPrecision.isPresent()) {
 			setModelPrecision(other.getModelPrecision());
 		}
+		if (other.showLabels.isPresent()) {
+			setShowLabels(other.getShowLabels());
+		}
+		if (other.showRewards.isPresent()) {
+			setShowRewards(other.getShowRewards());
+		}
 		if (other.showStates.isPresent()) {
 			setShowStates(other.getShowStates());
 		}
@@ -249,6 +283,22 @@ public class ModelExportOptions implements Cloneable
 	public int getModelPrecision()
 	{
 		return modelPrecision.orElse(DEFAULT_EXPORT_MODEL_PRECISION);
+	}
+
+	/**
+	 * Whether to show labels.
+	 */
+	public boolean getShowLabels()
+	{
+		return showLabels.orElse(true);
+	}
+
+	/**
+	 * Whether to show rewards.
+	 */
+	public boolean getShowRewards()
+	{
+		return showRewards.orElse(true);
 	}
 
 	/**

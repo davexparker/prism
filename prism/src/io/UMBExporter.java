@@ -191,29 +191,35 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 			}
 
 			// Add label info
-			int numLabels = getNumLabels();
-			for (int i = 0; i < numLabels; i++) {
-				umbWriter.addStateAP(getLabelName(i), getLabel(i));
+			boolean showLabels = modelExportOptions.getShowLabels();
+			if (showLabels) {
+				int numLabels = getNumLabels();
+				for (int i = 0; i < numLabels; i++) {
+					umbWriter.addStateAP(getLabelName(i), getLabel(i));
+				}
 			}
 
 			// Add reward info
-			int numRewards = getNumRewards();
-			for (int r = 0; r < numRewards; r++) {
-				Rewards<Value> reward = getReward(r);
-				String id = umbWriter.addRewards(getRewardName(r), evalRewards.exact());
-				if (reward.hasStateRewards()) {
-					umbWriter.addStateRewardsByID(id, modelAccess.getStateRewardsAsPrimitives(getReward(r)));
-				}
-				if (reward.hasTransitionRewards()) {
-					if (modelType.nondeterministic()) {
-						umbWriter.addChoiceRewardsByID(id, modelAccess.getTransitionRewardsAsPrimitives(getReward(r)));
-					} else {
-						umbWriter.addBranchRewardsByID(id, modelAccess.getTransitionRewardsAsPrimitives(getReward(r)));
+			boolean showRewards = modelExportOptions.getShowRewards();
+			if (showRewards) {
+				int numRewards = getNumRewards();
+				for (int r = 0; r < numRewards; r++) {
+					Rewards<Value> reward = getReward(r);
+					String id = umbWriter.addRewards(getRewardName(r), evalRewards.exact());
+					if (reward.hasStateRewards()) {
+						umbWriter.addStateRewardsByID(id, modelAccess.getStateRewardsAsPrimitives(getReward(r)));
 					}
-				}
-				// If there are no rewards, add some dummy zero state rewards
-				if (!(reward.hasStateRewards() || reward.hasTransitionRewards())) {
-					umbWriter.addStateRewardsByID(id, Collections.nCopies(numStates, 0.0).iterator());
+					if (reward.hasTransitionRewards()) {
+						if (modelType.nondeterministic()) {
+							umbWriter.addChoiceRewardsByID(id, modelAccess.getTransitionRewardsAsPrimitives(getReward(r)));
+						} else {
+							umbWriter.addBranchRewardsByID(id, modelAccess.getTransitionRewardsAsPrimitives(getReward(r)));
+						}
+					}
+					// If there are no rewards, add some dummy zero state rewards
+					if (!(reward.hasStateRewards() || reward.hasTransitionRewards())) {
+						umbWriter.addStateRewardsByID(id, Collections.nCopies(numStates, 0.0).iterator());
+					}
 				}
 			}
 

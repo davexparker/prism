@@ -2220,6 +2220,28 @@ public class PrismCL implements PrismModelListener
 					}
 				}
 			}
+			else if (opt.startsWith(sOpt = "labels")) {
+				if (!opt.startsWith(sOpt + "="))
+					throw new PrismException("No value provided for \"" + sOpt + "\" option of -exportmodel");
+				String optVal = opt.substring(sOpt.length() + 1);
+				if (optVal.equals("true"))
+					exportOptions.setShowLabels(true);
+				else if (optVal.equals("false"))
+					exportOptions.setShowLabels(false);
+				else
+					throw new PrismException("Unknown value \"" + optVal + "\" provided for \"" + sOpt + "\" option of -exportmodel");
+			}
+			else if (opt.startsWith(sOpt = "rewards")) {
+				if (!opt.startsWith(sOpt + "="))
+					throw new PrismException("No value provided for \"" + sOpt + "\" option of -exportmodel");
+				String optVal = opt.substring(sOpt.length() + 1);
+				if (optVal.equals("true"))
+					exportOptions.setShowRewards(true);
+				else if (optVal.equals("false"))
+					exportOptions.setShowRewards(false);
+				else
+					throw new PrismException("Unknown value \"" + optVal + "\" provided for \"" + sOpt + "\" option of -exportmodel");
+			}
 			else if (opt.startsWith(sOpt = "states")) {
 				if (!opt.startsWith(sOpt + "="))
 					throw new PrismException("No value provided for \"" + sOpt + "\" option of -exportmodel");
@@ -2229,7 +2251,7 @@ public class PrismCL implements PrismModelListener
 				else if (optVal.equals("false"))
 					exportOptions.setShowStates(false);
 				else
-					throw new PrismException("Unknown value \"" + optVal + "\" provided for \"reach\" option of -exportstrat");
+					throw new PrismException("Unknown value \"" + optVal + "\" provided for \"" + sOpt + "\" option of -exportmodel");
 			}
 			else if (opt.startsWith(sOpt = "obs")) {
 				if (!opt.startsWith(sOpt + "="))
@@ -2240,7 +2262,7 @@ public class PrismCL implements PrismModelListener
 				else if (optVal.equals("false"))
 					exportOptions.setShowObservations(false);
 				else
-					throw new PrismException("Unknown value \"" + optVal + "\" provided for \"reach\" option of -exportstrat");
+					throw new PrismException("Unknown value \"" + optVal + "\" provided for \"" + sOpt + "\" option of -exportmodel");
 			}
 			else if (opt.startsWith(sOpt = "actions")) {
 				if (!opt.startsWith(sOpt + "="))
