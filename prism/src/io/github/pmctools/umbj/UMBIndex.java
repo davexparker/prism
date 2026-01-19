@@ -295,7 +295,7 @@ public class UMBIndex
 		/** Type of values stored */
 		public UMBType type;
 		/** For string annotations, the number of strings */
-		@SerializedName("#states")
+		@SerializedName("#strings")
 		public Integer numStrings;
 
 		/**
@@ -404,6 +404,9 @@ public class UMBIndex
 	{
 		/** If true, valuations are unique within their entity */
 		public Boolean unique;
+		/** If there are any string variables, the number of strings */
+		@SerializedName("#strings")
+		public Integer numStrings;
 		/** Descriptions for each class of valuations for an entity */
 		public List<ValuationClassDescription> classes = new ArrayList<>();
 
