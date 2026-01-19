@@ -54,6 +54,11 @@ public class UMBReader
 	private UMBIndex umbIndex;
 
 	/**
+	 * Default buffer size (in bytes) for reading from UMB file.
+	 */
+	private static int BUFFER_SIZE = 64 * 1024;
+
+	/**
 	 * Construct a new {@link UMBReader} reading from the specified file.
 	 * @param fileIn The UMB file to read from.
 	 */
@@ -521,18 +526,31 @@ public class UMBReader
 				throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes)");
 			}
 			ByteBuffer bytes;
-			// Extract index of each 1 bit
+			int numBytes = Long.BYTES;
+			long leftToRead = ((size + 63) / 64);
+			int cacheSize = (int) Math.min((BUFFER_SIZE) / numBytes, leftToRead);
+			long[] cache = new long[cacheSize];
+			int toRead = (int) (Math.min(leftToRead, cacheSize));
 			long index = 0;
-			int blockSize = Long.BYTES * 8;
-			while ((bytes = umbIn.readBytesPadded(Long.BYTES)) != null) {
-				long l = bytes.getLong();
-				// Find local index i of each 1 bit within 64-bit block
-				for (int i = 0; i < blockSize; i++) {
-					if ((l & (1L << i)) != 0) {
-						longConsumer.accept(index + i);
-					}
+			while (toRead > 0 && (bytes = umbIn.readBytes(toRead * numBytes)) != null) {
+				// Cache data
+				for (int i = 0; i < toRead; i++) {
+					cache[i] = bytes.getLong();
 				}
-				index += Long.BYTES * 8;
+				// Pass data to consumer
+				for (int i = 0; i < toRead; i++) {
+					long l = cache[i];
+					// Find local index j of each 1 bit within 64-bit block
+					int blockSize = index + Long.BYTES * 8 <= size ? Long.BYTES * 8 : (int) (size - index);
+					for (int j = 0; j < blockSize; j++) {
+						if ((l & (1L << j)) != 0) {
+							longConsumer.accept(index + j);
+						}
+					}
+					index += Long.BYTES * 8;
+				}
+				leftToRead -= toRead;
+				toRead = (int) (Math.min(leftToRead, cacheSize));
 			}
 		} catch (RuntimeException e) {
 			// Errors may occur in consumers so catch runtime exceptions here
@@ -553,16 +571,29 @@ public class UMBReader
 				throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes)");
 			}
 			ByteBuffer bytes;
-			// Extract index of each 1 bit
+			int numBytes = Long.BYTES;
+			long leftToRead = ((size + 63) / 64);
+			int cacheSize = (int) Math.min((BUFFER_SIZE) / numBytes, leftToRead);
+			long[] cache = new long[cacheSize];
+			int toRead = (int) (Math.min(leftToRead, cacheSize));
 			long index = 0;
-			while ((bytes = umbIn.readBytesPadded(Long.BYTES)) != null) {
-				long l = bytes.getLong();
-				// Find local index i of each 1 bit within 64-bit block
-				int blockSize = index + Long.BYTES * 8 <= size ? Long.BYTES * 8 : (int) (size - index);
-				for (int i = 0; i < blockSize; i++) {
-					booleanConsumer.accept((l & (1L << i)) != 0);
+			while (toRead > 0 && (bytes = umbIn.readBytes(toRead * numBytes)) != null) {
+				// Cache data
+				for (int i = 0; i < toRead; i++) {
+					cache[i] = bytes.getLong();
 				}
-				index += Long.BYTES * 8;
+				// Pass data to consumer
+				for (int i = 0; i < toRead; i++) {
+					long l = cache[i];
+					// Find local index j of each 1 bit within 64-bit block
+					int blockSize = index + Long.BYTES * 8 <= size ? Long.BYTES * 8 : (int) (size - index);
+					for (int j = 0; j < blockSize; j++) {
+						booleanConsumer.accept((l & (1L << j)) != 0);
+					}
+					index += Long.BYTES * 8;
+				}
+				leftToRead -= toRead;
+				toRead = (int) (Math.min(leftToRead, cacheSize));
 			}
 		} catch (RuntimeException e) {
 			// Errors may occur in consumers so catch runtime exceptions here
@@ -581,8 +612,22 @@ public class UMBReader
 				throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes, not " + (size * Integer.BYTES) + ")");
 			}
 			ByteBuffer bytes;
-			while ((bytes = umbIn.readBytes(Integer.BYTES)) != null) {
-				intConsumer.accept(bytes.getInt());
+			int numBytes = Integer.BYTES;
+			long leftToRead = size;
+			int cacheSize = (int) Math.min((BUFFER_SIZE) / numBytes, leftToRead);
+			int[] cache = new int[cacheSize];
+			int toRead = (int) (Math.min(leftToRead, cacheSize));
+			while (toRead > 0 && (bytes = umbIn.readBytes(toRead * numBytes)) != null) {
+				// Cache data
+				for (int i = 0; i < toRead; i++) {
+					cache[i] = bytes.getInt();
+				}
+				// Pass data to consumer
+				for (int i = 0; i < toRead; i++) {
+					intConsumer.accept(cache[i]);
+				}
+				leftToRead -= toRead;
+				toRead = (int) (Math.min(leftToRead, cacheSize));
 			}
 		} catch (RuntimeException e) {
 			// Errors may occur in consumers so catch runtime exceptions here
@@ -601,8 +646,22 @@ public class UMBReader
 				throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes, not " + (size * Long.BYTES) + ")");
 			}
 			ByteBuffer bytes;
-			while ((bytes = umbIn.readBytes(Long.BYTES)) != null) {
-				longConsumer.accept(bytes.getLong());
+			int numBytes = Long.BYTES;
+			long leftToRead = size;
+			int cacheSize = (int) Math.min((BUFFER_SIZE) / numBytes, leftToRead);
+			long[] cache = new long[cacheSize];
+			int toRead = (int) (Math.min(leftToRead, cacheSize));
+			while (toRead > 0 && (bytes = umbIn.readBytes(toRead * numBytes)) != null) {
+				// Cache data
+				for (int i = 0; i < toRead; i++) {
+					cache[i] = bytes.getLong();
+				}
+				// Pass data to consumer
+				for (int i = 0; i < toRead; i++) {
+					longConsumer.accept(cache[i]);
+				}
+				leftToRead -= toRead;
+				toRead = (int) (Math.min(leftToRead, cacheSize));
 			}
 		} catch (RuntimeException e) {
 			// Errors may occur in consumers so catch runtime exceptions here
@@ -621,8 +680,22 @@ public class UMBReader
 				throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes, not " + (size * Double.BYTES) + ")");
 			}
 			ByteBuffer bytes;
-			while ((bytes = umbIn.readBytes(Double.BYTES)) != null) {
-				doubleConsumer.accept(bytes.getDouble());
+			int numBytes = Double.BYTES;
+			long leftToRead = size;
+			int cacheSize = (int) Math.min((BUFFER_SIZE) / numBytes, leftToRead);
+			double[] cache = new double[cacheSize];
+			int toRead = (int) (Math.min(leftToRead, cacheSize));
+			while (toRead > 0 && (bytes = umbIn.readBytes(toRead * numBytes)) != null) {
+				// Cache data
+				for (int i = 0; i < toRead; i++) {
+					cache[i] = bytes.getDouble();
+				}
+				// Pass data to consumer
+				for (int i = 0; i < toRead; i++) {
+					doubleConsumer.accept(cache[i]);
+				}
+				leftToRead -= toRead;
+				toRead = (int) (Math.min(leftToRead, cacheSize));
 			}
 		} catch (RuntimeException e) {
 			// Errors may occur in consumers so catch runtime exceptions here
@@ -656,10 +729,24 @@ public class UMBReader
 				throw new UMBException("File " + filename + " has unexpected size (" + entrySize + " bytes, not " + (size * numBytes) + ")");
 			}
 			ByteBuffer bytes;
-			UMBBitString bitstring = new UMBBitString(numBytes);
-			while ((bytes = umbIn.readBytes(numBytes)) != null) {
-				bytes.get(bitstring.bytes);
-				bitstringConsumer.accept(bitstring);
+			long leftToRead = size;
+			int cacheSize = (int) Math.min((BUFFER_SIZE) / numBytes, leftToRead);
+			UMBBitString[] cache = new UMBBitString[cacheSize];
+			for (int i = 0; i < cacheSize; i++) {
+				cache[i] = new UMBBitString(numBytes);
+			}
+			int toRead = (int) (Math.min(leftToRead, cacheSize));
+			while (toRead > 0 && (bytes = umbIn.readBytes(toRead * numBytes)) != null) {
+				// Cache data
+				for (int i = 0; i < toRead; i++) {
+					bytes.get(cache[i].bytes);
+				}
+				// Pass data to consumer
+				for (int i = 0; i < toRead; i++) {
+					bitstringConsumer.accept(cache[i]);
+				}
+				leftToRead -= toRead;
+				toRead = (int) (Math.min(leftToRead, cacheSize));
 			}
 		} catch (RuntimeException e) {
 			// Errors may occur in consumers so catch runtime exceptions here
@@ -707,9 +794,17 @@ public class UMBReader
 		}
 	}
 
+	UMBIn umbInCached = null;
+
 	private UMBIn open() throws UMBException
 	{
-		return new UMBIn(fileIn);
+		if (umbInCached != null) {
+			return umbInCached;
+		} else {
+//			umbInCached = new UMBIn(fileIn);;
+//			return umbInCached;
+			return new UMBIn(fileIn);
+		}
 	}
 
 	//
