@@ -1934,9 +1934,27 @@ public class PrismCL implements PrismModelListener
 		String exts[] = extList.split(",");
 		// Process file extensions
 		importModelWarning = null;
+		if (extList.contains("tar")) {
+			List<String> command = new ArrayList<>();
+			command.add("tar");
+			command.add("-xf");
+			command.add(basename + ".tar");
+			try {
+				int exitCode = new ProcessBuilder(command).start().waitFor();
+				if (exitCode != 0) {
+					throw new PrismException("Failed to extract from tar file for explicit model imports");
+				}
+			} catch (IOException | InterruptedException e) {
+				throw new PrismException("Failed to extract from tar file for explicit model imports");
+			}
+		}
 		for (String ext : exts) {
+			// Items to ignore
+			if (ext.equals("tar")) {
+				// Already processed
+			}
 			// Items to import
-			if (ext.equals("all")) {
+			else if (ext.equals("all")) {
 				modelFilename = basename + ".tra";
 				addModelImport(ModelExportTask.ModelExportEntity.MODEL,basename + ".tra", false);
 				addModelImport(ModelExportTask.ModelExportEntity.STATES,basename + ".sta", false);
@@ -2302,6 +2320,19 @@ public class PrismCL implements PrismModelListener
 					exportOptions.setModelPrecision(precision);
 				} catch (NumberFormatException e) {
 					throw new PrismException("Invalid value \"" + optVal + "\" provided for \"" + sOpt + "\" option of -exportmodel");
+				}
+			}
+			else if (opt.startsWith(sOpt = "tar")) {
+				if (!opt.startsWith(sOpt + "="))
+					throw new PrismException("No value provided for \"" + sOpt + "\" option of -exportmodel");
+				String optVal = opt.substring(sOpt.length() + 1);
+				if (optVal.equals("true")) {
+					exportOptions.setTarred(true);
+				} else if (optVal.equals("false")) {
+					exportOptions.setTarred(false);
+				}
+				else {
+					throw new PrismException("Unknown value \"" + optVal + "\" provided for \"" + sOpt + "\" option of -exportmodel");
 				}
 			}
 			else if (opt.startsWith(sOpt = "zip")) {

@@ -26,10 +26,7 @@
 
 package prism;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -2747,7 +2744,41 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 		long timer = System.currentTimeMillis();
 		for (ModelExportTask exportTask : modelExportTasks) {
 			exportBuiltModelTask(exportTask);
+			if (exportTask.getExportOptions().getFormat() == ModelExportFormat.UMB && !exportTask.getExportOptions().getBinaryAsText()) {
+				long fileSize = exportTask.getFile().length() / 1024;
+				mainLog.println("Model export size: " + fileSize + " Kb");
+			}
 		}
+
+		// If requested, put explicit files into a .tar
+		if (!modelExportTasks.isEmpty()
+				&& modelExportTasks.stream().allMatch(t -> t.getExportOptions().getFormat() == ModelExportFormat.EXPLICIT)
+				&& modelExportTasks.stream().allMatch(t -> t.getExportOptions().getTarred())) {
+			List<String> command = new ArrayList<>();
+			command.add("tar");
+			command.add("-cf");
+			String baseName = modelExportTasks.get(0).getFile().toString();
+			int dotIndex = baseName.lastIndexOf('.');
+			baseName = dotIndex == -1 ? baseName : baseName.substring(0, dotIndex);
+			command.add(baseName + ".tar");
+			for (ModelExportTask exportTask : modelExportTasks) {
+				command.add(exportTask.getFile().getPath());
+			}
+			try {
+				int exitCode = new ProcessBuilder(command).start().waitFor();
+				if (exitCode == 0) {
+					mainLog.println("Explicit model export files added to " + baseName + ".tar");
+					long fileSize = new File(baseName + ".tar").length() / 1024;
+					mainLog.println("Model export size: " + fileSize + " Kb");
+				} else {
+					mainLog.printWarning("Failed to create tar file for explicit model exports");
+				}
+			} catch (IOException | InterruptedException e) {
+				mainLog.printWarning("Failed to create tar file for explicit model exports");
+			}
+		}
+
+		// Report export time
 		timer = System.currentTimeMillis() - timer;
 		mainLog.println("Time for exporting: " + timer / 1000.0 + " seconds.");
 	}

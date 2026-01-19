@@ -120,6 +120,11 @@ public class ModelExportOptions implements Cloneable
 	private Optional<Boolean> binaryAsText = Optional.empty();
 
 	/**
+	 * For formats that support it, whether to tar
+	 */
+	private Optional<Boolean> tarred = Optional.empty();
+
+	/**
 	 * For formats that support it, whether to zip
 	 */
 	private Optional<Boolean> zipped = Optional.empty();
@@ -247,6 +252,15 @@ public class ModelExportOptions implements Cloneable
 	}
 
 	/**
+	 * Set whether to tar the output file (for formats that support it)
+	 */
+	public ModelExportOptions setTarred(boolean tarred)
+	{
+		this.tarred = Optional.of(tarred);
+		return this;
+	}
+
+	/**
 	 * Set whether to zip the output file (for formats that support it)
 	 */
 	public ModelExportOptions setZipped(boolean zipped)
@@ -298,6 +312,9 @@ public class ModelExportOptions implements Cloneable
 		}
 		if (other.binaryAsText.isPresent()) {
 			setBinaryAsText(other.getBinaryAsText());
+		}
+		if (other.tarred.isPresent()) {
+			setTarred(other.getTarred());
 		}
 		if (other.zipped.isPresent()) {
 			setZipped(other.getZipped());
@@ -407,6 +424,15 @@ public class ModelExportOptions implements Cloneable
 	public boolean getBinaryAsText()
 	{
 		return binaryAsText.orElse(false);
+	}
+
+	/**
+	 * Whether to tar the output file (for formats that support it)
+	 */
+	public boolean getTarred()
+	{
+		// Only UMB defaults to zipped
+		return tarred.orElse(getFormat() == ModelExportFormat.UMB);
 	}
 
 	/**
