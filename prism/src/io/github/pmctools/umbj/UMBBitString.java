@@ -47,9 +47,9 @@ public class UMBBitString
 		// Store bits into the byte array
 		for (int i = 0; i < n; i++) {
 			// Copy the i-th (least significant) bit of value to the appropriate bit in bytes
-			char valueBitShifted = (char) (((value >>> i) & 1) << ((offset + i) % 8));
-			char byteMask = (char) ('\u0001' << ((offset + i) % 8));
-			bytes[(offset + i) / 8] = (byte) ((bytes[(offset + i) / 8] & ~(byteMask)) | (valueBitShifted));
+			char valueBitShifted = (char) (((value >>> i) & 1) << ((offset + i) & 7));
+			char byteMask = (char) ('\u0001' << ((offset + i) & 7));
+			bytes[(offset + i) >> 3] = (byte) ((bytes[(offset + i) >> 3] & ~(byteMask)) | (valueBitShifted));
 		}
 	}
 
@@ -83,9 +83,9 @@ public class UMBBitString
 		long valueLong = Double.doubleToLongBits(value);
 		for (int i = 0; i < n; i++) {
 			// Copy the i-th (least significant) bit of valueLong to the appropriate bit in bytes
-			char valueBitShifted = (char) (((valueLong >>> i) & 1) << ((offset + i) % 8));
-			char byteMask = (char) ('\u0001' << ((offset + i) % 8));
-			bytes[(offset + i) / 8] = (byte) ((bytes[(offset + i) / 8] & ~(byteMask)) | (valueBitShifted));
+			char valueBitShifted = (char) (((valueLong >>> i) & 1) << ((offset + i) & 7));
+			char byteMask = (char) ('\u0001' << ((offset + i) & 7));
+			bytes[(offset + i) >> 3] = (byte) ((bytes[(offset + i) >> 3] & ~(byteMask)) | (valueBitShifted));
 		}
 	}
 
@@ -118,7 +118,7 @@ public class UMBBitString
 		// Extract bits into an int
 		int value = 0;
 		for (int i = offset + n - 1; i >= offset; i--) {
-			value = (value << 1) | ((bytes[i / 8] & (1L << (i % 8))) != 0 ? 1 : 0);
+			value = (value << 1) | ((bytes[i >> 3] & (1L << (i & 7))) != 0 ? 1 : 0);
 		}
 		// Sign extend if necessary
 		if ((value & (1 << (n - 1))) != 0) {
@@ -141,7 +141,7 @@ public class UMBBitString
 		// Extract bits into an int
 		int value = 0;
 		for (int i = offset + n - 1; i >= offset; i--) {
-			value = (value << 1) | ((bytes[i / 8] & (1L << (i % 8))) != 0 ? 1 : 0);
+			value = (value << 1) | ((bytes[i >> 3] & (1L << (i & 7))) != 0 ? 1 : 0);
 		}
 		return value;
 	}
@@ -159,7 +159,7 @@ public class UMBBitString
 		// Extract bits into a long
 		long value = 0;
 		for (int i = offset + n - 1; i >= offset; i--) {
-			value = (value << 1) | ((bytes[i / 8] & (1L << (i % 8))) != 0 ? 1 : 0);
+			value = (value << 1) | ((bytes[i >> 3] & (1L << (i & 7))) != 0 ? 1 : 0);
 		}
 		return Double.longBitsToDouble(value);
 	}
@@ -188,7 +188,7 @@ public class UMBBitString
 		StringBuilder sb = new StringBuilder();
 		int end = offset + size;
 		for (int i = end - 1; i >= offset; i--) {
-			sb.append((bytes[i / 8] & (1L << (i % 8))) != 0 ? "1" : "0");
+			sb.append((bytes[i >> 3] & (1L << (i & 7))) != 0 ? "1" : "0");
 		}
 		return sb.toString();
 	}
