@@ -282,9 +282,11 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 			umbIndex.setObservationsApplyTo(UMBIndex.UMBEntity.STATES);
 		}
 		boolean rational = model.getEvaluator().exact();
-		umbIndex.setBranchProbabilityType(UMBType.contNum(rational, modelType.intervals()));
-		if (modelType.isProbabilistic() && !modelType.choicesSumToOne()) {
-			umbIndex.setExitRateType(UMBType.contNum(rational, modelType.intervals()));
+		if (modelType.isProbabilistic()) {
+			umbIndex.setBranchProbabilityType(UMBType.contNum(rational, modelType.intervals()));
+			if (!modelType.choicesSumToOne()) {
+				umbIndex.setExitRateType(UMBType.contNum(rational, modelType.intervals()));
+			}
 		}
 	}
 
