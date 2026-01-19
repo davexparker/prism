@@ -317,8 +317,8 @@ public class UMBIndex
 				throw new UMBException("Annotation \"" + id + "\" in group \"" + group + "\" is empty");
 			}
 			checkFieldExists(type, "type");
+			checkFieldExistsIff(numStrings, "numStrings", type.type == Type.STRING);
 			if (type.type == Type.STRING) {
-				checkFieldExists(numStrings, "numStrings");
 				if (numStrings <= 0) {
 					throw new UMBException("Number of strings must be positive");
 				}
