@@ -297,6 +297,8 @@ public class UMBIndex
 		/** For string annotations, the number of strings */
 		@SerializedName("#strings")
 		public Integer numStrings;
+		/** For stochastic annotations, the type for probability values */
+		public UMBType probabilityType;
 
 		/**
 		 * Add an entity to which this annotation applies.
@@ -359,6 +361,14 @@ public class UMBIndex
 		}
 
 		/**
+		 * Get the type for probability values (for stochastic annotations)
+		 */
+		public UMBType getProbabilityType()
+		{
+			return probabilityType;
+		}
+
+		/**
 		 * Get the name of the folder to store this annotation, for the specified entity.
 		 * @param entity The entity
 		 */
@@ -374,6 +384,24 @@ public class UMBIndex
 		public String getFilename(UMBEntity entity)
 		{
 			return UMBFormat.annotationFile(group, id, entity);
+		}
+
+		/**
+		 * Get the filename for the distribution mapping if this is a stochastic annotation, for the specified entity.
+		 * @param entity The entity
+		 */
+		public String getDistributionFilename(UMBEntity entity)
+		{
+			return UMBFormat.annotationDistributionFile(group, id, entity);
+		}
+
+		/**
+		 * Get the filename for the probabilities if this is a stochastic annotation, for the specified entity.
+		 * @param entity The entity
+		 */
+		public String getProbabilitiesFilename(UMBEntity entity)
+		{
+			return UMBFormat.annotationProbabilitiesFile(group, id, entity);
 		}
 	}
 

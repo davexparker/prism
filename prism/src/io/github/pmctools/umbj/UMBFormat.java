@@ -57,6 +57,12 @@ public class UMBFormat
 	/** Filename for storing an annotation's values */
 	public static final String ANNOTATION_VALUES_FILE = "values" + BIN_FILE_EXT;
 
+	/** Filename for storing a stochastic annotation's distribution mapping */
+	public static final String ANNOTATION_DISTRIBUTION_FILE = "distribution-mapping" + BIN_FILE_EXT;
+
+	/** Filename for storing a stochastic annotation's distribution mapping */
+	public static final String ANNOTATION_PROBABILITIES_FILE = "probabilities" + BIN_FILE_EXT;
+
 	// Subfolders for built-in annotation groups
 
 	public static final String AP_ANNOTATIONS_GROUP = "aps";
@@ -139,6 +145,22 @@ public class UMBFormat
 	public static String annotationFile(String group, String id, UMBIndex.UMBEntity entity)
 	{
 		return annotationFolder(group, id, entity) + "/" + ANNOTATION_VALUES_FILE;
+	}
+
+	/**
+	 * Get the filename for a stochastic annotation's distribution mapping
+	 */
+	public static String annotationDistributionFile(String group, String id, UMBIndex.UMBEntity entity)
+	{
+		return annotationFolder(group, id, entity) + "/" + ANNOTATION_DISTRIBUTION_FILE;
+	}
+
+	/**
+	 * Get the filename for a stochastic annotation's probabilities
+	 */
+	public static String annotationProbabilitiesFile(String group, String id, UMBIndex.UMBEntity entity)
+	{
+		return annotationFolder(group, id, entity) + "/" + ANNOTATION_PROBABILITIES_FILE;
 	}
 
 	/**
