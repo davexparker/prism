@@ -75,7 +75,7 @@ public class UMBIndex
 	/** UMB file entities which can be annotated/indexed */
 	public enum UMBEntity implements UMBField
 	{
-		STATES, CHOICES, BRANCHES, OBSERVATIONS;
+		STATES, CHOICES, BRANCHES, OBSERVATIONS, PLAYERS;
 		@Override
 		public String toString()
 		{
@@ -84,6 +84,7 @@ public class UMBIndex
 				case CHOICES: return "choices";
 				case BRANCHES: return "branches";
 				case OBSERVATIONS: return "observations";
+				case PLAYERS: return "players";
 				default: return "?";
 			}
 		}
@@ -1008,6 +1009,8 @@ public class UMBIndex
 				return getNumBranches();
 			case OBSERVATIONS:
 				return getNumObservations();
+			case PLAYERS:
+				return getNumPlayers();
 			default:
 				throw new UMBException("Unsupported entity \"" + entity + "\"");
 		}
@@ -1157,24 +1160,6 @@ public class UMBIndex
 			throw new UMBException("No annotation with alias \"" + alias + "\" in group \"" + group + "\" exists");
 		}
 		return id;
-	}
-
-	/**
-	 * Get the size of the annotation data for the specified entity.
-	 * @param appliesTo The entity to which the annotation applies
-	 */
-	public long getAnnotationDataSize(UMBEntity appliesTo) throws UMBException
-	{
-		switch (appliesTo) {
-			case STATES:
-				return getNumStates();
-			case CHOICES:
-				return getNumChoices();
-			case BRANCHES:
-				return getNumBranches();
-			default:
-				throw new UMBException("Unsupported annotation application \"" + appliesTo + "\"");
-		}
 	}
 
 	// Methods to get info about AP annotations

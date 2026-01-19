@@ -375,7 +375,7 @@ public class UMBReader
 	public void extractBooleanAnnotationSparse(UMBIndex.Annotation annotation, UMBIndex.UMBEntity appliesTo, LongConsumer longConsumer) throws UMBException
 	{
 		String filename = annotation.getFilename(appliesTo);
-		extractBooleanArraySparse(filename, getUMBIndex().getAnnotationDataSize(appliesTo), longConsumer);
+		extractBooleanArraySparse(filename, getUMBIndex().getEntityCount(appliesTo), longConsumer);
 	}
 
 	public void extractIndexedBooleanAnnotation(String group, String id, UMBIndex.UMBEntity appliesTo, LongBooleanConsumer longBooleanConsumer) throws UMBException
@@ -386,7 +386,7 @@ public class UMBReader
 	public void extractIndexedBooleanAnnotation(UMBIndex.Annotation annotation, UMBIndex.UMBEntity appliesTo, LongBooleanConsumer longBooleanConsumer) throws UMBException
 	{
 		String filename = annotation.getFilename(appliesTo);
-		extractBooleanArray(filename, getUMBIndex().getAnnotationDataSize(appliesTo), new IndexedBooleanConsumer(longBooleanConsumer));
+		extractBooleanArray(filename, getUMBIndex().getEntityCount(appliesTo), new IndexedBooleanConsumer(longBooleanConsumer));
 	}
 
 	public void extractIntAnnotation(String group, String id, UMBIndex.UMBEntity appliesTo, IntConsumer intConsumer) throws UMBException
@@ -397,7 +397,7 @@ public class UMBReader
 	public void extractIntAnnotation(UMBIndex.Annotation annotation, UMBIndex.UMBEntity appliesTo, IntConsumer intConsumer) throws UMBException
 	{
 		String filename = annotation.getFilename(appliesTo);
-		extractIntArray(filename, getUMBIndex().getAnnotationDataSize(appliesTo), intConsumer);
+		extractIntArray(filename, getUMBIndex().getEntityCount(appliesTo), intConsumer);
 	}
 
 	public void extractIndexedIntAnnotation(String group, String id, UMBIndex.UMBEntity appliesTo, LongIntConsumer longIntConsumer) throws UMBException
@@ -408,7 +408,7 @@ public class UMBReader
 	public void extractIndexedIntAnnotation(UMBIndex.Annotation annotation, UMBIndex.UMBEntity appliesTo, LongIntConsumer longIntConsumer) throws UMBException
 	{
 		String filename = annotation.getFilename(appliesTo);
-		extractIntArray(filename, getUMBIndex().getAnnotationDataSize(appliesTo), new IndexedIntConsumer(longIntConsumer));
+		extractIntArray(filename, getUMBIndex().getEntityCount(appliesTo), new IndexedIntConsumer(longIntConsumer));
 	}
 
 	public void extractDoubleAnnotation(String group, String id, UMBIndex.UMBEntity appliesTo, DoubleConsumer doubleConsumer) throws UMBException
@@ -419,13 +419,13 @@ public class UMBReader
 	public void extractDoubleAnnotation(UMBIndex.Annotation annotation, UMBIndex.UMBEntity appliesTo, DoubleConsumer doubleConsumer) throws UMBException
 	{
 		String filename = annotation.getFilename(appliesTo);
-		extractDoubleArray(filename, getUMBIndex().getAnnotationDataSize(appliesTo), doubleConsumer);
+		extractDoubleArray(filename, getUMBIndex().getEntityCount(appliesTo), doubleConsumer);
 	}
 
 	public void extractContinuousNumericAnnotation(UMBIndex.Annotation annotation, UMBIndex.UMBEntity appliesTo, Consumer<?> consumer) throws UMBException
 	{
 		String filename = annotation.getFilename(appliesTo);
-		extractContinuousNumericArray(filename, annotation.getType(), getUMBIndex().getAnnotationDataSize(appliesTo), consumer);
+		extractContinuousNumericArray(filename, annotation.getType(), getUMBIndex().getEntityCount(appliesTo), consumer);
 	}
 
 	public void extractStringAnnotation(UMBIndex.Annotation annotation, UMBIndex.UMBEntity appliesTo, Consumer<String> stringConsumer) throws UMBException

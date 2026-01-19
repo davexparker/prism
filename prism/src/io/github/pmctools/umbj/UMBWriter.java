@@ -483,7 +483,7 @@ public class UMBWriter
 			throw new UMBException("Duplicate data for " + appliesTo + "s in annotation \"" + annotation.id + "\" in group \"" + annotation.group + "\"");
 		}
 		annotation.addAppliesTo(appliesTo);
-		long annotationSize = umbIndex.getAnnotationDataSize(appliesTo);
+		long annotationSize = umbIndex.getEntityCount(appliesTo);
 		addBooleanArray(annotation.getFilename(appliesTo), bitset, annotationSize);
 	}
 
@@ -499,7 +499,7 @@ public class UMBWriter
 			throw new UMBException("Duplicate data for " + appliesTo + "s in annotation \"" + annotation.id + "\" in group \"" + annotation.group + "\"");
 		}
 		annotation.addAppliesTo(appliesTo);
-		long annotationSize = umbIndex.getAnnotationDataSize(appliesTo);
+		long annotationSize = umbIndex.getEntityCount(appliesTo);
 		addIntArray(annotation.getFilename(appliesTo), intValues, annotationSize);
 	}
 
@@ -515,7 +515,7 @@ public class UMBWriter
 			throw new UMBException("Duplicate data for " + appliesTo + "s in annotation \"" + annotation.id + "\" in group \"" + annotation.group + "\"");
 		}
 		annotation.addAppliesTo(appliesTo);
-		long annotationSize = umbIndex.getAnnotationDataSize(appliesTo);
+		long annotationSize = umbIndex.getEntityCount(appliesTo);
 		addLongArray(annotation.getFilename(appliesTo), longValues, annotationSize);
 	}
 
@@ -531,7 +531,7 @@ public class UMBWriter
 			throw new UMBException("Duplicate data for " + appliesTo + "s in annotation \"" + annotation.id + "\" in group \"" + annotation.group + "\"");
 		}
 		annotation.addAppliesTo(appliesTo);
-		long annotationSize = umbIndex.getAnnotationDataSize(appliesTo);
+		long annotationSize = umbIndex.getEntityCount(appliesTo);
 		addDoubleArray(annotation.getFilename(appliesTo), doubleValues, annotationSize);
 	}
 
@@ -541,7 +541,7 @@ public class UMBWriter
 			throw new UMBException("Duplicate data for " + appliesTo + "s in annotation \"" + annotation.id + "\" in group \"" + annotation.group + "\"");
 		}
 		annotation.addAppliesTo(appliesTo);
-		long annotationSize = umbIndex.getAnnotationDataSize(appliesTo);
+		long annotationSize = umbIndex.getEntityCount(appliesTo);
 		addContinuousNumericArray(annotation.getFilename(appliesTo), values, valueType, annotationSize);
 	}
 
@@ -554,7 +554,7 @@ public class UMBWriter
 		String folderName = annotation.getFolderName(appliesTo);
 		addStringsFiles(strings, UMBFormat.stringOffsetsFile(folderName), UMBFormat.stringsFile(folderName));
 		if (indices != null) {
-			long annotationSize = umbIndex.getAnnotationDataSize(appliesTo);
+			long annotationSize = umbIndex.getEntityCount(appliesTo);
 			addIntArray(annotation.getFilename(appliesTo), indices, annotationSize);
 		}
 	}
