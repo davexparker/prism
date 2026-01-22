@@ -442,7 +442,7 @@ public class PrismCL implements PrismModelListener
 						if (modelBuildFail) {
 							results[j].setMultipleErrors(definedMFConstants, null, modelBuildException);
 							if (test) {
-								doResultTest(propertiesToCheck.get(j), new Result(modelBuildException), prism.getModelInfo().getConstantValues(), null);
+								doResultTest(propertiesToCheck.get(j), new Result(modelBuildException), prism.getModelInfo().getConstantValues(), propertiesFile.getConstantValues());
 							}
 							break;
 						}

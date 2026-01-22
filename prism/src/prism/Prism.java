@@ -2213,6 +2213,7 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 			case IMDP:
 			case LTS:
 			case POMDP:
+			case IPOMDP:
 				if (getCurrentEngine() == PrismEngine.SYMBOLIC) {
 					mainLog.println("\nSwitching to explicit engine, which supports " + getModelType() + "s...");
 					engineOld = getEngine();
