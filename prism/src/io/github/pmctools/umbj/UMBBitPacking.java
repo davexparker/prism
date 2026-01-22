@@ -332,6 +332,7 @@ public class UMBBitPacking
 	public String decodeBitString(UMBBitString bitString) throws UMBException
 	{
 		StringBuilder sb = new StringBuilder();
+		sb.append("(");
 		int numVars = getNumVariables();
 		for (int i = 0; i < numVars; i++) {
 			BitPackedVariable var = getVariable(i);
@@ -357,6 +358,7 @@ public class UMBBitPacking
 				sb.append(",");
 			}
 		}
+		sb.append(")");
 		return sb.toString();
 	}
 

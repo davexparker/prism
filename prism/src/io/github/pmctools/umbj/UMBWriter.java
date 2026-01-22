@@ -968,7 +968,7 @@ public class UMBWriter
 
 		public abstract long totalBytes();
 		public abstract Iterator<ByteBuffer> byteIterator();
-		public abstract String toText();
+		public abstract String toText() throws UMBException;
 	}
 
 	/**
@@ -1016,12 +1016,12 @@ public class UMBWriter
 			};
 		}
 
-		public String nextAsText()
+		public String nextAsText() throws UMBException
 		{
 			return iterator().next().toString();
 		}
 
-		public String toText()
+		public String toText() throws UMBException
 		{
 			StringJoiner sj = new StringJoiner(",", "[", "]");
 			while (hasNextBytes()) {
@@ -1325,10 +1325,11 @@ public class UMBWriter
 			return bitStrings.hasNext();
 		}
 
-		public String nextAsText()
+		public String nextAsText() throws UMBException
 		{
 			UMBBitString bitString = bitStrings.next();
-			return bitPacking == null ? bitString.toString() : bitPacking.formatBitString(bitString);
+			//return bitPacking == null ? bitString.toString() : bitPacking.formatBitString(bitString);
+			return bitPacking == null ? bitString.toString() : bitPacking.decodeBitString(bitString);
 		}
 
 		@Override
