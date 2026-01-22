@@ -106,7 +106,9 @@ public class UMBExporter<Value> extends ModelExporter<Value>
 		// Load all model info into a UMBWriter, then export
 		UMBWriter umbWriter = createUMBWriter(model);
 		try {
-			umbWriter.export(fileOut, modelExportOptions.getZipped());
+			ModelExportOptions.CompressionFormat compressionDefault = ModelExportOptions.CompressionFormat.fromUMB(UMBFormat.DEFAULT_COMPRESSION_FORMAT);
+			UMBFormat.CompressionFormat compressionFormat = modelExportOptions.getCompressionFormat(compressionDefault).toUMB();
+			umbWriter.export(fileOut, modelExportOptions.getZipped(), compressionFormat);
 		} catch (UMBException e) {
 			throw new PrismException(e.getMessage());
 		}

@@ -26,6 +26,8 @@
 
 package io;
 
+import io.github.pmctools.umbj.UMBFormat;
+
 import java.util.Optional;
 
 import static prism.PrismSettings.DEFAULT_EXPORT_MODEL_PRECISION;
@@ -35,6 +37,38 @@ import static prism.PrismSettings.DEFAULT_EXPORT_MODEL_PRECISION;
  */
 public class ModelExportOptions implements Cloneable
 {
+	/** File compression formats */
+	public enum CompressionFormat {
+		GZIP,
+		XZ;
+		public String extension()
+		{
+			switch (this) {
+				case GZIP: return "gz";
+				case XZ: return "xz";
+				default: throw new IllegalStateException("Unknown compression format: " + this);
+			}
+		}
+
+		public static CompressionFormat fromUMB(UMBFormat.CompressionFormat compressionFormat)
+		{
+			switch (compressionFormat) {
+				case GZIP: return GZIP;
+				case XZ: return XZ;
+				default: throw new IllegalStateException("Unknown compression format: " + compressionFormat);
+			}
+		}
+
+		public UMBFormat.CompressionFormat toUMB()
+		{
+			switch (this) {
+				case GZIP: return UMBFormat.CompressionFormat.GZIP;
+				case XZ: return UMBFormat.CompressionFormat.XZ;
+				default: throw new IllegalStateException("Unknown compression format: " + this);
+			}
+		}
+	}
+
 	/**
 	 * Model export format
 	 */
@@ -89,6 +123,11 @@ public class ModelExportOptions implements Cloneable
 	 * For formats that support it, whether to zip
 	 */
 	private Optional<Boolean> zipped = Optional.empty();
+
+	/**
+	 * Compression format to use (if zipping)
+	 */
+	private Optional<CompressionFormat> zipFormat = Optional.empty();
 
 	// Constructors
 
@@ -217,6 +256,15 @@ public class ModelExportOptions implements Cloneable
 	}
 
 	/**
+	 * Set compression format to use (if zipping)
+	 */
+	public ModelExportOptions setCompressionFormat(CompressionFormat compressionFormat)
+	{
+		this.zipFormat = Optional.of(compressionFormat);
+		return this;
+	}
+
+	/**
 	 * Apply any options that have been set in another {@link ModelExportOptions} to this one.
 	 */
 	public void apply(ModelExportOptions other)
@@ -253,6 +301,9 @@ public class ModelExportOptions implements Cloneable
 		}
 		if (other.zipped.isPresent()) {
 			setZipped(other.getZipped());
+		}
+		if (other.zipFormat.isPresent()) {
+			setCompressionFormat(other.getCompressionFormat());
 		}
 	}
 
@@ -365,6 +416,23 @@ public class ModelExportOptions implements Cloneable
 	{
 		// Only UMB defaults to zipped
 		return zipped.orElse(getFormat() == ModelExportFormat.UMB);
+	}
+
+	/**
+	 * Compression format to use (if zipping)
+	 */
+	public CompressionFormat getCompressionFormat()
+	{
+		return getCompressionFormat(CompressionFormat.GZIP);
+	}
+
+	/**
+	 * Compression format to use (if zipping)
+	 * @param orElse Default to use if has not been specified
+	 */
+	public CompressionFormat getCompressionFormat(CompressionFormat orElse)
+	{
+		return zipFormat.orElse(CompressionFormat.GZIP);
 	}
 
 	/**

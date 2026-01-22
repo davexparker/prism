@@ -2312,6 +2312,10 @@ public class PrismCL implements PrismModelListener
 					exportOptions.setZipped(true);
 				} else if (optVal.equals("false")) {
 					exportOptions.setZipped(false);
+				} else if (optVal.equals("gzip") || optVal.equals("gz")) {
+					exportOptions.setZipped(true).setCompressionFormat(ModelExportOptions.CompressionFormat.GZIP);
+				} else if (optVal.equals("xz")) {
+					exportOptions.setZipped(true).setCompressionFormat(ModelExportOptions.CompressionFormat.XZ);
 				}
 				else {
 					throw new PrismException("Unknown value \"" + optVal + "\" provided for \"" + sOpt + "\" option of -exportmodel");
