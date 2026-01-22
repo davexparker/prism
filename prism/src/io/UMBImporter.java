@@ -290,6 +290,8 @@ public class UMBImporter extends ExplicitModelImporter
 				return ModelType.IDTMC;
 			case IMDP:
 				return ModelType.IMDP;
+			case IPOMDP:
+				return ModelType.IPOMDP;
 			default:
 				throw new PrismException("Unsupported model type " + modelType + " in UMB file");
 		}
@@ -546,9 +548,9 @@ public class UMBImporter extends ExplicitModelImporter
 					jHi = choiceTransitionOffsets.getInt(i + 1);
 					for (int j = jLo; j < jHi; j++) {
 						Object action = hasActions ? getModelInfo().getActions().get(choiceActionIndices.getInt(i)) : firstAction;
-						if (getModelInfo().getModelType() == ModelType.IMDP) {
-							Interval<Double> dIntv = new Interval<>((Double) transitionProbabilities.get(2 * j), (Double) transitionProbabilities.get(2 * j + 1));
-							((IOUtils.MDPTransitionConsumer<Interval<Double>>) storeTransition).accept(s, iCount, transitionSuccessors.getInt(j), dIntv, action);
+						if (getModelInfo().getModelType().intervals()) {
+							Interval<Value> vIntv = new Interval<>(transitionProbabilities.get(2 * j), transitionProbabilities.get(2 * j + 1));
+							((IOUtils.MDPTransitionConsumer<Interval<Value>>) storeTransition).accept(s, iCount, transitionSuccessors.getInt(j), vIntv, action);
 						} else {
 							Value v = transitionProbabilities.get(j);
 							storeTransition.accept(s, iCount, transitionSuccessors.getInt(j), v, action);

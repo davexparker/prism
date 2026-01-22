@@ -28,17 +28,7 @@ package io;
 
 import common.Interval;
 import common.iterable.SingletonIterator;
-import explicit.CTMC;
-import explicit.DTMC;
-import explicit.IDTMC;
-import explicit.IMDP;
-import explicit.IntervalModel;
-import explicit.LTS;
-import explicit.MDP;
-import explicit.Model;
-import explicit.NondetModel;
-import explicit.PartiallyObservableModel;
-import explicit.Utils;
+import explicit.*;
 import explicit.rewards.Rewards;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.doubles.DoubleIterators;
@@ -324,6 +314,8 @@ public interface ModelAccess<Value>
 					return ((IMDP<Value>) model).getIntervalModel().getTransitionsMappedIterator(s, i, Interval::getLower);
 				} else if (model instanceof IDTMC) {
 					return ((IDTMC<Value>) model).getIntervalModel().getTransitionsMappedIterator(s, Interval::getLower);
+				} else if (model instanceof IPOMDP) {
+					return ((IPOMDP<Value>) model).getIntervalModel().getTransitionsMappedIterator(s, i, Interval::getLower);
 				} else {
 					return null;
 				}
