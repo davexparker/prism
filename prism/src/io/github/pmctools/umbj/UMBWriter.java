@@ -751,7 +751,18 @@ public class UMBWriter
 	 */
 	public void export(File fileOut, boolean zipped) throws UMBException
 	{
-		UMBOut umbOut = new UMBOut(fileOut, zipped);
+		export(fileOut, zipped, null);
+	}
+
+	/**
+	 * Export content to a UMB file.
+	 * @param fileOut The file to export to.
+	 * @param zipped Whether to zip the file
+	 * @param compressionFormat How to zip the file (null means use default)
+	 */
+	public void export(File fileOut, boolean zipped, UMBFormat.CompressionFormat compressionFormat) throws UMBException
+	{
+		UMBOut umbOut = new UMBOut(fileOut, zipped, compressionFormat);
 		exportIndex(umbOut);
 		for (UMBDataFile umbDataFile : umbDataFiles) {
 			exportUMBFile(umbDataFile, umbOut);
@@ -866,20 +877,24 @@ public class UMBWriter
 		 */
 		public UMBOut(File fileOut, boolean zipped) throws UMBException
 		{
-			this(fileOut, zipped ? UMBFormat.DEFAULT_COMPRESSION_FORMAT : null);
+			this(fileOut, zipped, null);
 		}
 
 		/**
 		 * Open a new UMB file for writing
 		 * @param fileOut The file to write to
-		 * @param compressionFormat How to zip the file (null means no zipping)
+		 * @param zipped Whether to zip the file
+		 * @param compressionFormat How to zip the file (null means use the default)
 		 */
-		public UMBOut(File fileOut, UMBFormat.CompressionFormat compressionFormat) throws UMBException
+		public UMBOut(File fileOut, boolean zipped, UMBFormat.CompressionFormat compressionFormat) throws UMBException
 		{
 			try {
 				// Open file/zip/tar
 				fsOut = new BufferedOutputStream(Files.newOutputStream(fileOut.toPath()));
-				if (compressionFormat != null) {
+				if (zipped) {
+					if (compressionFormat == null) {
+						compressionFormat = UMBFormat.DEFAULT_COMPRESSION_FORMAT;
+					}
 					zipOut = new CompressorStreamFactory().createCompressorOutputStream(compressionFormat.extension(), fsOut);
 					tarOut = new TarArchiveOutputStream(zipOut);
 				} else {

@@ -81,7 +81,8 @@ public class UMBFormat
 
 	// Allowable compression formats
 
-	public enum CompressionFormat {
+	public enum CompressionFormat
+	{
 		GZIP,
 		XZ;
 		public String extension() {
@@ -94,10 +95,10 @@ public class UMBFormat
 	}
 
 	/** Allowable compression formats (strict) */
-	public static final List<CompressionFormat> ALLOWED_COMPRESSION_FORMATS = List.of(CompressionFormat.XZ);
+	public static final List<CompressionFormat> ALLOWED_COMPRESSION_FORMATS = List.of(CompressionFormat.GZIP, CompressionFormat.XZ);
 
 	/** Default compression format */
-	public static final CompressionFormat DEFAULT_COMPRESSION_FORMAT = CompressionFormat.XZ;
+	public static final CompressionFormat DEFAULT_COMPRESSION_FORMAT = CompressionFormat.GZIP;
 
 	/**
 	 * Get the filename for the offsets mapping string indices to string data within some folder
