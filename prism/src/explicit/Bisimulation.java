@@ -32,6 +32,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import explicit.rewards.Rewards;
 import parser.State;
 import prism.PrismComponent;
 import prism.PrismException;
@@ -58,17 +59,16 @@ public class Bisimulation<Value> extends PrismComponent
 
 	/**
 	 * Perform bisimulation minimisation on a model.
+	 * Labels and rewards to be respected are attached.
 	 * @param model The model
-	 * @param propNames Names of the propositions in {@code propBSs}
-	 * @param propBSs Propositions (satisfying sets of states) to be preserved by bisimulation.
 	 */
-	public Model<Value> minimise(Model<Value> model, List<String> propNames, List<BitSet> propBSs) throws PrismException
+	public Model<Value> minimise(Model<Value> model) throws PrismException
 	{
 		switch (model.getModelType()) {
 		case DTMC:
-			return minimiseDTMC((DTMC<Value>) model, propNames, propBSs);
+			return minimiseDTMC((DTMC<Value>) model);
 		case CTMC:
-			return minimiseCTMC((CTMC<Value>) model, propNames, propBSs);
+			return minimiseCTMC((CTMC<Value>) model);
 		default:
 			throw new PrismNotSupportedException("Bisimulation minimisation not yet supported for " + model.getModelType() + "s");
 		}
@@ -76,13 +76,13 @@ public class Bisimulation<Value> extends PrismComponent
 
 	/**
 	 * Perform bisimulation minimisation on a DTMC.
+	 * Labels and rewards to be respected are attached.
 	 * @param dtmc The DTMC
-	 * @param propNames Names of the propositions in {@code propBSs}
-	 * @param propBSs Propositions (satisfying sets of states) to be preserved by bisimulation.
 	 */
-	private DTMC<Value> minimiseDTMC(DTMC<Value> dtmc, List<String> propNames, List<BitSet> propBSs)
+	private DTMC<Value> minimiseDTMC(DTMC<Value> dtmc)
 	{
 		// Create initial partition based on propositions
+        List<BitSet> propBSs = new ArrayList<>(dtmc.getLabelToStatesMap().values());
 		initialisePartitionInfo(dtmc, propBSs);
 		//printPartition(dtmc);
 
@@ -100,7 +100,7 @@ public class Bisimulation<Value> extends PrismComponent
 				dtmcNew.setProbability(i, e.getKey(), e.getValue());
 			}
 		}
-		attachStatesAndLabels(dtmc, dtmcNew, propNames, propBSs);
+		attachStatesAndLabels(dtmc, dtmcNew);
 
 		return dtmcNew;
 	}
@@ -108,12 +108,12 @@ public class Bisimulation<Value> extends PrismComponent
 	/**
 	 * Perform bisimulation minimisation on a CTMC.
 	 * @param ctmc The CTMC
-	 * @param propNames Names of the propositions in {@code propBSs}
-	 * @param propBSs Propositions (satisfying sets of states) to be preserved by bisimulation.
+	 * Labels and rewards to be respected are attached.
 	 */
-	private CTMC<Value> minimiseCTMC(CTMC<Value> ctmc, List<String> propNames, List<BitSet> propBSs)
+	private CTMC<Value> minimiseCTMC(CTMC<Value> ctmc)
 	{
 		// Create initial partition based on propositions
+		List<BitSet> propBSs = new ArrayList<>(ctmc.getLabelToStatesMap().values());
 		initialisePartitionInfo(ctmc, propBSs);
 		//printPartition(ctmc);
 
@@ -131,7 +131,7 @@ public class Bisimulation<Value> extends PrismComponent
 				ctmcNew.setProbability(i, e.getKey(), e.getValue());
 			}
 		}
-		attachStatesAndLabels(ctmc, ctmcNew, propNames, propBSs);
+		attachStatesAndLabels(ctmc, ctmcNew);
 
 		return ctmcNew;
 	}
@@ -255,10 +255,8 @@ public class Bisimulation<Value> extends PrismComponent
 	 * to the minimised model, in the form of labels (stored as BitSets).
 	 * @param model The original model
 	 * @param modelNew The minimised model
-	 * @param propNames The names of the propositions
-	 * @param propBSs Satisfying states (of the minimised model) for the propositions
 	 */
-	private void attachStatesAndLabels(Model<Value> model, ModelExplicit<Value> modelNew, List<String> propNames, List<BitSet> propBSs)
+	private void attachStatesAndLabels(Model<Value> model, ModelExplicit<Value> modelNew)
 	{
 		// Attach states
 		if (model.getStatesList() != null) {
@@ -275,6 +273,9 @@ public class Bisimulation<Value> extends PrismComponent
 		}
 
 		// Build/attach new labels
+		List<String> propNames = new ArrayList<>();
+		List<BitSet> propBSs = new ArrayList<>();
+		model.getLabelToStatesMap().forEach((name, bs) -> { propNames.add(name); propBSs.add(bs); });
 		int numProps = propBSs.size();
 		for (int i = 0; i < numProps; i++) {
 			String propName = propNames.get(i);

@@ -59,6 +59,7 @@ import parser.ast.*;
 import parser.ast.ExpressionFilter.FilterOperator;
 import parser.type.TypeBool;
 import parser.type.TypeDouble;
+import parser.visitor.ASTTraverse;
 import parser.visitor.ASTTraverseModify;
 import parser.visitor.ReplaceLabels;
 import prism.*;
@@ -527,16 +528,9 @@ public class StateModelChecker extends PrismComponent
 
 		// If required, do bisimulation minimisation
 		if (doBisim) {
-			mainLog.println("\nPerforming bisimulation minimisation...");
-			ArrayList<String> propNames = new ArrayList<String>();
-			ArrayList<BitSet> propBSs = new ArrayList<BitSet>();
-			Expression exprNew = checkMaximalPropositionalFormulas(model, expr.deepCopy(), propNames, propBSs);
-			Bisimulation<Value> bisim = new Bisimulation<>(this);
-			model = bisim.minimise(model, propNames, propBSs);
-			mainLog.println("Modified property: " + exprNew);
-			expr = exprNew;
-			//model.exportToPrismExplicitTra("bisim.tra");
-			//model.exportStates(modelInfo.createVarList(), new PrismFileLog("bisim.sta"), new ModelExportOptions());
+			Pair<Model<Value>, Expression> minimised = doBisimulationMinimisation(model, expr);
+			model = minimised.first;
+			expr = minimised.second;
 		}
 
 		// Do model checking and store result vector
@@ -558,6 +552,84 @@ public class StateModelChecker extends PrismComponent
 
 		// Return result
 		return result;
+	}
+
+	/**
+	 * Perform bisimulation minimisation prior to model checking {@code expr} on {@code model}:
+	 * evaluate the maximal propositional sub-formulas of {@code expr} and attach them to
+	 * {@code model} as labels, attach any reward structures needed by R operators in
+	 * {@code expr} (see {@link #attachRewardsForBisimulation(Model, Expression)}), minimise
+	 * the model, and return the minimised model together with the (relabelled) property to
+	 * check on it.
+	 */
+	protected <Value> Pair<Model<Value>, Expression> doBisimulationMinimisation(Model<Value> model, Expression expr) throws PrismException
+	{
+		mainLog.println("\nPerforming bisimulation minimisation...");
+		// Model must be writeable, currently
+		if (!(model instanceof ModelExplicit)) {
+			throw new PrismException("Cannot perform bisimulation minimisation on a non-writeable model");
+		}
+		// Find and evaluate maximal propositional formulas in the property, to use as propositions for bisimulation minimisation
+		ArrayList<String> propNames = new ArrayList<String>();
+		ArrayList<BitSet> propBSs = new ArrayList<BitSet>();
+		Expression exprNew = checkMaximalPropositionalFormulas(model, expr.deepCopy(), propNames, propBSs);
+		// Attach to the model as labels (first clearing any existing ones)
+		((ModelExplicit<Value>) model).clearLabels();
+		for (int i = 0; i < propNames.size(); i++) {
+			((ModelExplicit<Value>) model).addLabel(propNames.get(i), propBSs.get(i));
+		}
+		// Find any R operators, get/construct their rewards and attach them to the model
+		attachRewardsForBisimulation(model, exprNew);
+		// Do the bisimulation
+		Bisimulation<Value> bisim = new Bisimulation<>(this);
+		model = bisim.minimise(model);
+		//model.export(mainLog, ModelExportFormat.EXPLICIT);
+		mainLog.println("Modified property: " + exprNew);
+		return new Pair<>(model, exprNew);
+	}
+
+	/**
+	 * Find any R operators in {@code expr}, construct/attach their reward structures to
+	 * {@code model} (first clearing any existing attachments), choosing whether to convert
+	 * (Markov chain) transition rewards to "expected" state rewards depending on whether
+	 * each R operator uses instantaneous reward.
+	 * Throws a {@link PrismException} if the same reward structure is needed in both
+	 * "expected" and non-"expected" form within {@code expr} (e.g. via both instantaneous
+	 * and non-instantaneous R operators on the same reward structure), since this is not
+	 * currently supported.
+	 */
+	protected <Value> void attachRewardsForBisimulation(Model<Value> model, Expression expr) throws PrismException
+	{
+		((ModelExplicit<Value>) model).clearRewards();
+		Map<Integer, Boolean> rewardExpectedByIndex = new HashMap<>();
+		PrismException[] pEx = new  PrismException[1];
+		try {
+			expr.accept(new ASTTraverse()
+			{
+				public Object visit(ExpressionReward e) throws PrismLangException
+				{
+					try {
+						RewardGenerator<Value> rewardGen = getRewardGenerator(model);
+						int r = e.getRewardStructIndexByIndexObject(rewardGen, constantValues);
+						boolean expected = !Expression.usesInstantaneousReward(e.getExpression());
+						Boolean expectedSoFar = rewardExpectedByIndex.put(r, expected);
+						if (expectedSoFar != null && expectedSoFar != expected) {
+							throw new PrismLangException("Bisimulation minimisation does not yet support using reward structure \"" +
+									rewardGen.getRewardStructName(r) + "\" for both instantaneous and non-instantaneous rewards in the same property", e);
+						}
+						Rewards<Value> rewards = constructRewards(model, r, true, expected);
+						((ModelExplicit<Value>) model).addRewards(rewardGen.getRewardStructName(r), r, rewards);
+					} catch (PrismException ex) {
+						pEx[0] = ex;
+						throw new PrismLangException("Error processing property for bisimulation", e);
+					}
+					return null;
+				}
+			});
+		} catch (PrismLangException ex) {
+			// Preserve PrismNotSupportedException if it arises
+			throw (pEx[0] != null) ?  pEx[0] : ex;
+		}
 	}
 
 	/**
