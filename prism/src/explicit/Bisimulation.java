@@ -32,6 +32,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import explicit.rewards.Rewards;
 import parser.State;
 import prism.PrismComponent;
 import prism.PrismException;
@@ -62,7 +63,7 @@ public class Bisimulation<Value> extends PrismComponent
 	 * @param propNames Names of the propositions in {@code propBSs}
 	 * @param propBSs Propositions (satisfying sets of states) to be preserved by bisimulation.
 	 */
-	public Model<Value> minimise(Model<Value> model, List<String> propNames, List<BitSet> propBSs) throws PrismException
+	public Model<Value> minimise(Model<Value> model, List<String> propNames, List<BitSet> propBSs, String rewName, Rewards<Value> rewards) throws PrismException
 	{
 		switch (model.getModelType()) {
 		case DTMC:

@@ -54,27 +54,8 @@ import parser.EvaluateContext.EvalMode;
 import parser.State;
 import parser.Values;
 import parser.VarList;
-import parser.ast.Declaration;
-import parser.ast.DeclarationIntUnbounded;
-import parser.ast.Expression;
-import parser.ast.ExpressionBinaryOp;
-import parser.ast.ExpressionConstant;
-import parser.ast.ExpressionFilter;
+import parser.ast.*;
 import parser.ast.ExpressionFilter.FilterOperator;
-import parser.ast.ExpressionFormula;
-import parser.ast.ExpressionFunc;
-import parser.ast.ExpressionITE;
-import parser.ast.ExpressionIdent;
-import parser.ast.ExpressionLabel;
-import parser.ast.ExpressionLiteral;
-import parser.ast.ExpressionObs;
-import parser.ast.ExpressionProp;
-import parser.ast.ExpressionUnaryOp;
-import parser.ast.ExpressionVar;
-import parser.ast.LabelList;
-import parser.ast.ModulesFile;
-import parser.ast.PropertiesFile;
-import parser.ast.Property;
 import parser.type.TypeBool;
 import parser.type.TypeDouble;
 import parser.visitor.ASTTraverseModify;
@@ -582,11 +563,29 @@ public class StateModelChecker extends PrismComponent
 		// If required, do bisimulation minimisation
 		if (doBisim) {
 			mainLog.println("\nPerforming bisimulation minimisation...");
+			// Find and evaluate maximal propositional formulas in the property, to use as propositions for bisimulation minimisation
 			ArrayList<String> propNames = new ArrayList<String>();
 			ArrayList<BitSet> propBSs = new ArrayList<BitSet>();
 			Expression exprNew = checkMaximalPropositionalFormulas(model, expr.deepCopy(), propNames, propBSs);
+			// If there is an R operator, get its reward structure
+			ExpressionReward rewardExpr = null;
+			String rewName = null;
+			Rewards<Value> rewards = null;
+			if (exprNew instanceof ExpressionReward) {
+				rewardExpr = (ExpressionReward) exprNew;
+			} else if (exprNew instanceof ExpressionFilter) {
+				if (((ExpressionFilter) exprNew).getOperand() instanceof ExpressionReward) {
+					rewardExpr = (ExpressionReward) ((ExpressionFilter) exprNew).getOperand();
+				}
+			}
+			if (rewardExpr != null) {
+				int r = rewardExpr.getRewardStructIndexByIndexObject(rewardGen, constantValues);
+				rewName = rewardGen.getRewardStructName(r);
+				rewards = constructExpectedRewards(model, r);
+			}
+			// Do the bisimulation
 			Bisimulation<Value> bisim = new Bisimulation<>(this);
-			model = bisim.minimise(model, propNames, propBSs);
+			model = bisim.minimise(model, propNames, propBSs, rewName, rewards);
 			mainLog.println("Modified property: " + exprNew);
 			expr = exprNew;
 			//model.exportToPrismExplicitTra("bisim.tra");
