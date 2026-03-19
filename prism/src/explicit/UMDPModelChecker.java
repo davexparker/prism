@@ -223,7 +223,7 @@ public class UMDPModelChecker extends ProbModelChecker
 
 		// Check for any zero lower probability bounds (not supported
 		// since this approach assumes the graph structure remains static)
-		umdp.checkLowerBoundsArePositive();
+//		umdp.checkLowerBoundsArePositive();
 		
 		// Store num states
 		int n = umdp.getNumStates();
@@ -285,7 +285,7 @@ public class UMDPModelChecker extends ProbModelChecker
 
 		// Check for any zero lower probability bounds (not supported
 		// since this approach assumes the graph structure remains static)
-		umdp.checkLowerBoundsArePositive();
+//		umdp.checkLowerBoundsArePositive();
 		
 		// Store num states
 		n = umdp.getNumStates();
@@ -406,7 +406,7 @@ public class UMDPModelChecker extends ProbModelChecker
 
 		// Check for any zero lower probability bounds (not supported
 		// since this approach assumes the graph structure remains static)
-		umdp.checkLowerBoundsArePositive();
+//		umdp.checkLowerBoundsArePositive();
 		
 		// Check for deadlocks in non-target state (because breaks e.g. prob1)
 		umdp.checkForDeadlocks(target);
