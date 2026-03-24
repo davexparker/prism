@@ -119,9 +119,11 @@ public class PrismSTPGAbstractRefine extends QuantAbstractRefine
 		// Get initial/target (concrete) states
 		labels = StateModelChecker.loadLabelsFile(labFile);
 		initialConcrete = labels.get("init");
-		targetConcrete = labels.get(targetLabel);
-		if (targetConcrete == null)
-			throw new PrismException("Unknown label \"" + targetLabel + "\"");
+		if (targetConcrete == null) {
+			targetConcrete = labels.get(targetLabel);
+			if (targetConcrete == null)
+				throw new PrismException("Unknown label \"" + targetLabel + "\"");
+		}
 
 		// set the initial states from the set initialConcrete
 		for (int state : new IterableStateSet(initialConcrete, modelConcrete.getNumStates())) {
@@ -325,6 +327,12 @@ public class PrismSTPGAbstractRefine extends QuantAbstractRefine
 		}
 	}
 
+	/**
+	 * Rebuild abstract state {@code i} of {@code abstraction}
+	 * based on the current mapping between concrete and abstract states,
+	 * stored in {@code abstractToConcrete} and {@code concreteToAbstract},
+	 * and the concrete model {@code modelConcrete}.
+	 */
 	protected void rebuildAbstractionState(int i) throws PrismException
 	{
 		List<Set<Integer>> list, listNew;
