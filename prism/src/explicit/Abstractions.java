@@ -163,6 +163,9 @@ public class Abstractions
             throw new PrismException("Concrete model should have a single initial state");
         }
         int initConcrete = modelConcrete.getFirstInitialState();
+        if (!modelConcrete.areAllChoiceActionsUnique()) {
+            throw new PrismException("Concrete model should have distinct choice actions in all states");
+        }
 
         // Create empty abstraction
         IMDPSimple<Double> abstraction = new IMDPSimple<>(nAbstract);

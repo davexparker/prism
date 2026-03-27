@@ -99,15 +99,15 @@ public class STPGAbstrSimple<Value> extends ModelExplicit<Value> implements STPG
 	 */
 	public STPGAbstrSimple(MDPSimple<Value> m)
 	{
-		DistributionSet<Value> set;
-		int i;
-		// TODO: actions?
 		initialise(m.getNumStates());
 		copyFrom(m);
-		for (i = 0; i < numStates; i++) {
-			set = newDistributionSet(null);
-			set.addAll(m.getChoices(i));
-			addDistributionSet(i, set);
+		for (int s = 0; s < numStates; s++) {
+			DistributionSet<Value> set = newDistributionSet(null);
+			int numChoices = m.getNumChoices(s);
+			for (int i = 0; i < numChoices; i++) {
+				set.add(new ActionDistribution<>(m.getChoice(s, i), m.getAction(s, i)));
+			}
+			addDistributionSet(s, set);
 		}
 	}
 
@@ -119,7 +119,7 @@ public class STPGAbstrSimple<Value> extends ModelExplicit<Value> implements STPG
 		super.initialise(numStates);
 		numDistrSets = numDistrs = numTransitions = 0;
 		maxNumDistrSets = maxNumDistrs = 0;
-		trans = new ArrayList<ArrayList<DistributionSet<Value>>>(numStates);
+		trans = new ArrayList<>(numStates);
 		for (int i = 0; i < numStates; i++) {
 			trans.add(new ArrayList<>());
 		}
@@ -447,7 +447,7 @@ public class STPGAbstrSimple<Value> extends ModelExplicit<Value> implements STPG
 	public SuccessorsIterator getSuccessors(final int s, final int i)
 	{
 		return SuccessorsIterator.chain(new Iterator<SuccessorsIterator>() {
-			private Iterator<Distribution<Value>> iterator = trans.get(s).get(i).iterator();
+			private Iterator<ActionDistribution<Value>> iterator = trans.get(s).get(i).iterator();
 
 			@Override
 			public boolean hasNext()
@@ -828,7 +828,7 @@ public class STPGAbstrSimple<Value> extends ModelExplicit<Value> implements STPG
 	public int getNumNestedTransitions(int s, int i, int j)
 	{
 		DistributionSet<Value> ds = trans.get(s).get(i);
-		Iterator<Distribution<Value>> iter = ds.iterator();
+		Iterator<ActionDistribution<Value>> iter = ds.iterator();
 		Distribution<Value> distr = null;
 		int k = 0;
 		while (iter.hasNext() && k <= j) {
@@ -847,7 +847,7 @@ public class STPGAbstrSimple<Value> extends ModelExplicit<Value> implements STPG
 	public Iterator<Entry<Integer, Value>> getNestedTransitionsIterator(int s, int i, int j)
 	{
 		DistributionSet<Value> ds = trans.get(s).get(i);
-		Iterator<Distribution<Value>> iter = ds.iterator();
+		Iterator<ActionDistribution<Value>> iter = ds.iterator();
 		Distribution<Value> distr = null;
 		int k = 0;
 		while (iter.hasNext() && k <= j) {

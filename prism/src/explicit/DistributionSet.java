@@ -30,11 +30,11 @@ package explicit;
 import java.util.*;
 
 /**
- * Represents a set of distributions.
+ * Represents a set of action-labelled distributions.
  * The order in which distributions are inserted is preserved
  * (but does not affect equality of distributions sets).
  */
-public class DistributionSet<Value> extends LinkedHashSet<Distribution<Value>>
+public class DistributionSet<Value> extends LinkedHashSet<ActionDistribution<Value>>
 {
 	private static final long serialVersionUID = 1L;
 
@@ -56,8 +56,13 @@ public class DistributionSet<Value> extends LinkedHashSet<Distribution<Value>>
 		this.action = action;
 	}
 
+	public void add(Distribution<Value> distr)
+	{
+		add(new ActionDistribution<>(distr));
+	}
+
 	/**
-	 * Returns true if all indices in the supports of all distributions are in the set. 
+	 * Returns true if all indices in the supports of all distributions are in the set.
 	 */
 	public boolean isSubsetOf(BitSet set)
 	{
@@ -70,7 +75,7 @@ public class DistributionSet<Value> extends LinkedHashSet<Distribution<Value>>
 	}
 
 	/**
-	 * Returns true if at least one index in the support of some distribution is in the set. 
+	 * Returns true if at least one index in the support of some distribution is in the set.
 	 */
 	public boolean containsOneOf(BitSet set)
 	{
@@ -81,7 +86,7 @@ public class DistributionSet<Value> extends LinkedHashSet<Distribution<Value>>
 		}
 		return false;
 	}
-	
+
 	public String toString()
 	{
 		return (action == null ? "" : "\"" + action + "\":") + super.toString();
@@ -97,12 +102,12 @@ public class DistributionSet<Value> extends LinkedHashSet<Distribution<Value>>
 	 * @param d the distribution to look up
 	 * @return the index of {@code d} or -1 if not found
 	 */
-	public int indexOf(Distribution<Value> d)
+	public int indexOf(Object a, Distribution<Value> d)
 	{
 		int i = -1;
-		for (Distribution<Value> itDist : this) {
+		for (ActionDistribution<Value> itActDist : this) {
 			i++;
-			if (itDist.equals(d)) {
+			if (itActDist.equals(d)) {
 				return i;
 			}
 		}

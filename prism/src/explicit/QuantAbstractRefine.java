@@ -1250,17 +1250,17 @@ public abstract class QuantAbstractRefine extends PrismComponent
 	/**
 	 * Export abstract model to a dot file with additional annotated info 
 	 */
-	private static void exportToDotFile(String filename, Model abstraction, BitSet known, double lbSoln[],
+	private static <Value> void exportToDotFile(String filename, Model<Value> abstraction, BitSet known, double lbSoln[],
 			double ubSoln[]) throws PrismException
 	{
-		STPGAbstrSimple<?> stpg;
+		STPGAbstrSimple<Value> stpg;
 		int i, j, k;
 		String nij, nijk;
 		
 		if (abstraction instanceof STPG) {
-			stpg = (STPGAbstrSimple) abstraction;
+			stpg = (STPGAbstrSimple<Value>) abstraction;
 		} else if (abstraction instanceof MDPSimple) {
-			stpg = new STPGAbstrSimple((MDPSimple) abstraction);
+			stpg = new STPGAbstrSimple<>((MDPSimple<Value>) abstraction);
 		} else {
 			throw new PrismNotSupportedException("Cannot export this model type to a dot file");
 		}
@@ -1275,13 +1275,13 @@ public abstract class QuantAbstractRefine extends PrismComponent
 					out.write(i + " [label=\"" + i + " [" + (ubSoln[i] - lbSoln[i]) + "]" + "\"");
 				out.write("]\n");
 				j = -1;
-				for (DistributionSet<?> distrs : stpg.getChoices(i)) {
+				for (DistributionSet<Value> distrs : stpg.getChoices(i)) {
 					j++;
 					nij = "n" + i + "_" + j;
 					out.write(i + " -> " + nij + " [ arrowhead=none,label=\"" + j + "\" ];\n");
 					out.write(nij + " [ shape=circle,width=0.1,height=0.1,label=\"\" ];\n");
 					k = -1;
-					for (Distribution<?> distr : distrs) {
+					for (Distribution<Value> distr : distrs) {
 						k++;
 						nijk = "n" + i + "_" + j + "_" + k;
 						out.write(nij + " -> " + nijk + " [ arrowhead=none,label=\"" + k + "\" ];\n");
