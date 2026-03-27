@@ -247,6 +247,30 @@ public class Abstractions
         }
         System.out.println("IMDP-based abstraction: " + abstraction.infoString());
 
+        // Print abstraction
+       /* for (int a = 0; a < nAbstract; a++) {
+            System.out.print(a);
+            int numChoices = abstraction.getNumChoices(a);
+            for (int i = 0; i < numChoices; i++) {
+                System.out.print(" " + abstraction.getAction(a, i) + ":");
+                System.out.print(((IMDPSimple<Double>) abstraction).mdp.trans.get(a).get(i));
+            }
+            System.out.println();
+            for (int c = 0; c < numConcreteStates; c++) {
+                if (concreteToAbstract[c] == a) {
+                    System.out.print("  " + c);
+                    for (int i = 0; i < numChoices; i++) {
+                        System.out.print(" " + modelConcrete.getAction(c, i) + ":{");
+                        modelConcrete.getTransitionsIterator(c, i).forEachRemaining(e -> {
+                           System.out.print(" " + e.getKey() + "=" + e.getValue());
+                        });
+                        System.out.print(" }");
+                    }
+                    System.out.println();
+                }
+            }
+        }*/
+
         // Solve abstraction to get bounds
         IMDPModelChecker mc =  new IMDPModelChecker(prism);
         MinMax minMax = new MinMax();
