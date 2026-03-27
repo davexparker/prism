@@ -179,7 +179,21 @@ public class Abstractions
         // Process each concrete state
         for (int c = 0; c < numConcreteStates; c++) {
             int a = concreteToAbstract[c];
-
+            // Check that available actions match
+            if (!abstractionData.get(a).isEmpty()) {
+                int numChoices = abstractionData.get(a).size();
+                if (numChoices != modelConcrete.getNumChoices(c)) {
+                    throw new PrismException("Concrete state " + c + " does not match number of choices");
+                }
+                HashSet<Object> actionsAbstract = new HashSet<>(abstractionData.get(a).keySet());
+                HashSet<Object> actionsConcrete = new HashSet<>();
+                for (int i = 0; i < numChoices; i++) {
+                    actionsConcrete.add(modelConcrete.getAction(c, i));
+                }
+                if (!actionsAbstract.equals(actionsConcrete)) {
+                    throw new PrismException("Concrete state " + c + " does not match actions");
+                }
+            }
             // Lift distributions to abstract states, add to abstraction
             int numChoices = modelConcrete.getNumChoices(c);
             for (int i = 0; i < numChoices; i++) {
