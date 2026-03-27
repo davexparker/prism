@@ -183,14 +183,35 @@ public class Abstractions
             // Lift distributions to abstract states, add to abstraction
             int numChoices = modelConcrete.getNumChoices(c);
             for (int i = 0; i < numChoices; i++) {
-                Object action = modelConcrete.getAction(a, i);
+                Object action = modelConcrete.getAction(c, i);
                 // Get storage for IMDP transitions for this state-action (create if missing)
-                Distribution<Interval<Double>> idistrAbstract = abstractionData.get(a).computeIfAbsent(action, k -> new Distribution<>(Evaluator.forDoubleInterval()));
-                modelConcrete.forEachTransition(c, i, (s, t, d) -> {
-                    int aSucc = concreteToAbstract[t];
-                    Interval<Double> ival = idistrAbstract.get(aSucc);
-                    idistrAbstract.set(aSucc, new Interval<>(Double.min(ival.getLower(), d),  Double.max(ival.getUpper(), d)));
-                });
+                Distribution<Interval<Double>> idistrAbstract = abstractionData.get(a).get(action);
+                if (idistrAbstract == null) {
+                    // Lift distribution to abstract states, make new point interval distribution
+                    Distribution<Interval<Double>> idistrAbstractNew = new Distribution<>(Evaluator.forDoubleInterval());
+                    modelConcrete.forEachTransition(c, i, (s, t, d) -> {
+                        int aSucc = concreteToAbstract[t];
+                        idistrAbstractNew.add(aSucc, new Interval<>(d, d));
+                    });
+                    abstractionData.get(a).put(action, idistrAbstractNew);
+                } else {
+                    // Lift distribution to abstract states
+                    Distribution<Double> distrAbstractNew = Distribution.ofDouble();
+                    modelConcrete.forEachTransition(c, i, (s, t, d) -> {
+                        int aSucc = concreteToAbstract[t];
+                        distrAbstractNew.add(aSucc, d);
+                    });
+                    // Merge distributions (take min/max of probabilities for each abstract successor)
+                    Set<Integer> combinedSupport = new HashSet<>(idistrAbstract.getSupport());
+                    combinedSupport.addAll(distrAbstractNew.getSupport());
+                    Distribution<Interval<Double>> idistrAbstractNew = new Distribution<>(Evaluator.forDoubleInterval());
+                    for (int aSucc : combinedSupport) {
+                        Interval<Double> ival = idistrAbstract.get(aSucc);
+                        double pNew = distrAbstractNew.get(aSucc);
+                        idistrAbstractNew.set(aSucc, new Interval<>(Double.min(ival.getLower(), pNew), Double.max(ival.getUpper(), pNew)));
+                    }
+                    abstractionData.get(a).put(action, idistrAbstractNew);
+                }
             }
 
             // Update initial/target abstract states
