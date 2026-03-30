@@ -6,6 +6,8 @@ import com.google.gson.reflect.TypeToken;
 import common.Interval;
 import parser.ast.PropertiesFile;
 import prism.*;
+import strat.MDStrategyArray;
+import strat.StrategyExportOptions;
 
 import java.io.File;
 import java.io.FileReader;
@@ -42,7 +44,7 @@ public class Abstractions
             Result result = prism.modelCheck("P" + (min?"min":"max") + "=? [ F " + targetExpression + " ];");
             MDP<Double> model = (MDP<Double>) prism.getBuiltModelExplicit();
             System.out.println("Concrete model: " + model.infoString());
-            System.out.println("Concrete model value: " + result.getResult());
+            System.out.println("Concrete model " + (min?"min":"max") + " value: " + result.getResult());
 
             // Get set of target states
             StateModelChecker mc = new StateModelChecker(prism);
@@ -272,14 +274,40 @@ public class Abstractions
         }*/
 
         // Solve abstraction to get bounds
-        IMDPModelChecker mc =  new IMDPModelChecker(prism);
-        MinMax minMax = new MinMax();
-        minMax.setMin(min);
-        minMax.setMinUnc(true);
-        double lb = mc.computeReachProbs(abstraction, targetAbstract, minMax).soln[initConcrete];
-        minMax.setMinUnc(false);
-        double ub = mc.computeReachProbs(abstraction, targetAbstract, minMax).soln[initConcrete];
+        IMDPModelChecker mcImdp =  new IMDPModelChecker(prism);
+        mcImdp.setGenStrat(true);
+        mcImdp.setProb1(false);
+        ModelCheckerResult res = mcImdp.computeReachProbs(abstraction, targetAbstract, new MinMax().setMin(min).setMinUnc(true));
+        double lb = res.soln[initConcrete];
+        MDStrategyArray<Double> lbStrat = (MDStrategyArray<Double>) res.strat;
+        res = mcImdp.computeReachProbs(abstraction, targetAbstract, new MinMax().setMin(min).setMinUnc(false));
+        double ub = res.soln[initConcrete];
+        MDStrategyArray<Double> ubStrat = (MDStrategyArray<Double>) res.strat;
         System.out.println("Bounds from IMDP-based abstraction: [" + lb + ", " + ub + "]");
+
+        // Analyse accuracy of policy in induced IDTMC
+        IDTMC<Double> idtmcInduced = (IDTMC<Double>) lbStrat.constructInducedModel(new StrategyExportOptions().setReachOnly(false));
+        IDTMCModelChecker mcIdtmc =  new IDTMCModelChecker(prism);
+        mcIdtmc.setProb1(false);
+        res = mcIdtmc.computeReachProbs(idtmcInduced, targetAbstract, MinMax.blank().setMinUnc(true));
+        double strat1lb = res.soln[initConcrete];
+        res = mcIdtmc.computeReachProbs(idtmcInduced, targetAbstract, MinMax.blank().setMinUnc(false));
+        double strat1ub = res.soln[initConcrete];
+        System.out.println("Bounds from induced IDTMC abstraction: [" + strat1lb + ", " + strat1ub + "]");
+
+        // Concretise strategy and solve induced DTMC to get performance of strategy on concrete model
+        int[] stratArrayConcrete = new int[numConcreteStates];
+        for (int c = 0; c < numConcreteStates; c++) {
+            stratArrayConcrete[c] = modelConcrete.getChoiceByAction(c, lbStrat.getChoiceAction(concreteToAbstract[c]));
+        }
+        MDStrategyArray<Double> stratConcrete = new MDStrategyArray<>(modelConcrete, stratArrayConcrete);
+        //DTMC<Double> dtmcInduced = (DTMC<Double>) modelConcrete.constructInducedModel(stratConcrete);
+        DTMC<Double> dtmcInduced = (DTMC<Double>) stratConcrete.constructInducedModel(new StrategyExportOptions().setReachOnly(false));
+        DTMCModelChecker mcDtmc =  new DTMCModelChecker(prism);
+        res = mcDtmc.computeReachProbs(dtmcInduced, targetConcrete);
+        double strat1perf = res.soln[initConcrete];
+        System.out.println("Performance of strategy on concrete model: " + strat1perf);
+
     }
 
     /**
