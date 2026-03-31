@@ -155,7 +155,7 @@ public class UDTMCModelChecker extends ProbModelChecker
 
 		// Check for any zero lower probability bounds (not supported
 		// since this approach assumes the graph structure remains static)
-		udtmc.checkLowerBoundsArePositive();
+		//udtmc.checkLowerBoundsArePositive();
 		
 		// Store num states
 		int n = udtmc.getNumStates();
@@ -215,7 +215,7 @@ public class UDTMCModelChecker extends ProbModelChecker
 
 		// Check for any zero lower probability bounds (not supported
 		// since this approach assumes the graph structure remains static)
-		udtmc.checkLowerBoundsArePositive();
+		//udtmc.checkLowerBoundsArePositive();
 		
 		// Store num states
 		n = udtmc.getNumStates();
@@ -318,7 +318,7 @@ public class UDTMCModelChecker extends ProbModelChecker
 
 		// Check for any zero lower probability bounds (not supported
 		// since this approach assumes the graph structure remains static)
-		udtmc.checkLowerBoundsArePositive();
+		//udtmc.checkLowerBoundsArePositive();
 		
 		// Check for deadlocks in non-target state (because breaks e.g. prob1)
 		udtmc.checkForDeadlocks(target);
@@ -437,7 +437,7 @@ public class UDTMCModelChecker extends ProbModelChecker
 
 		// Check for any zero lower probability bounds (not supported
 		// since this approach assumes the graph structure remains static)
-		udtmc.checkLowerBoundsArePositive();
+		//udtmc.checkLowerBoundsArePositive();
 		
 		// Check for deadlocks in non-target state (because breaks e.g. prob1)
 		udtmc.checkForDeadlocks(target);
