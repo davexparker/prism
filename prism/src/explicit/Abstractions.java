@@ -4,6 +4,9 @@ import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
 
 import common.Interval;
+import parser.ast.Expression;
+import parser.ast.ExpressionProb;
+import parser.ast.ExpressionTemporal;
 import parser.ast.PropertiesFile;
 import prism.*;
 import strat.MDStrategyArray;
@@ -18,6 +21,26 @@ import java.util.*;
 public class Abstractions
 {
     Prism prism = new Prism(new PrismDevNullLog());
+
+    public static class Property
+    {
+        public String op; // "P" or "R"
+        public MinMax minMax; // min or max?
+        public BitSet target; // target states for reachability
+        public BitSet remain; // constrain states for until (null if not needed)
+        @Override
+        public String toString()
+        {
+            String s = op + (minMax.isMin() ? "min" : "max");
+            if (target != null) {
+                s += ", " + target.cardinality() + " target states";
+            }
+            if (remain != null) {
+                s += ", " + remain.cardinality() + " remain states";
+            }
+            return s;
+        }
+    }
 
     /**
      * @param args: [0] filename of UMB file for concrete model, [1] expression for target of reachability, [2] abstract states filename
@@ -35,23 +58,25 @@ public class Abstractions
 
             // Concrete model details
             String modelFilename = args[0];
-            String targetExpression = args[1];
-            boolean min = false; // Pmin
+            String propString = args[1];
+            System.out.println("Model file: " + modelFilename);
+            System.out.println("Property string: " + propString);
 
-            // Build, model check concrete model
+            // Build concrete MDP, parse/extract property, model check
             prism.loadModelFromUMBFile(new File(modelFilename));
             prism.buildModel();
-            Result result = prism.modelCheck("P" + (min?"min":"max") + "=? [ F " + targetExpression + " ];");
-            MDP<Double> model = (MDP<Double>) prism.getBuiltModelExplicit();
-            System.out.println("Concrete model: " + model.infoString());
-            System.out.println("Concrete model " + (min?"min":"max") + " value: " + result.getResult());
-
-            // Get set of target states
-            StateModelChecker mc = new StateModelChecker(prism);
-            PropertiesFile pf = prism.parsePropertiesString(targetExpression);
-            mc.setModelCheckingInfo(prism.getModelInfo(), null, null);
-            StateValues sv = mc.checkExpression(model, pf.getProperty(0), null);
-            BitSet target = sv.getBitSet();
+            if (prism.getModelType() != ModelType.MDP) {
+                throw new RuntimeException("Concrete model is not an MDP");
+            }
+            MDP<Double> modelConcrete = (MDP<Double>) prism.getBuiltModelExplicit();
+            PropertiesFile propPF = prism.parsePropertiesString(propString);
+            Expression propExpr = propPF.getProperty(0);
+            Property propConcrete = extractProperty(propExpr, modelConcrete, prism.getModelInfo());
+            Result result = prism.modelCheck(propPF, propExpr);
+            double valConcrete = (Double) result.getResult();
+            System.out.println("\nConcrete MDP: " + modelConcrete.infoString());
+            System.out.println("Concrete property: " + propConcrete);
+            System.out.println("Concrete result: " + valConcrete);
 
             // Load abstraction info
             String c2aJsonFilename = args[2];
@@ -65,12 +90,12 @@ public class Abstractions
             int[] concrete2abstract = new int[c2aJsonMap.size()];
             c2aJsonMap.forEach((key, value) -> concrete2abstract[Integer.parseInt(key)] = value);
             int nAbstract = c2aJsonMap.values().stream().max(Integer::compareTo).orElseThrow(() -> new PrismException("Empty map")) + 1;
-            System.out.println(nAbstract + " abstract states");
+            //System.out.println(nAbstract + " abstract states");
 
             // Build/solve abstractions
-            buildGameAbstraction(model, target, false, concrete2abstract, nAbstract);
-            buildIMDPAbstraction(model, target, false, concrete2abstract, nAbstract);
-            buildGameAbstractionViaRefinement(model, target, false, concrete2abstract, nAbstract);
+            buildGameAbstraction(modelConcrete, propConcrete, concrete2abstract, nAbstract);
+            buildIMDPAbstraction(modelConcrete, propConcrete, concrete2abstract, nAbstract);
+            buildGameAbstractionViaRefinement(modelConcrete, propConcrete.target, propConcrete.minMax.isMin(), concrete2abstract, nAbstract);
 
         } catch (PrismException e) {
             System.err.println(e.getMessage());
@@ -80,14 +105,38 @@ public class Abstractions
     }
 
     /**
+     * Extract info from a property, including check which states satisfy target etc.
+     */
+    private Property extractProperty(Expression propExpr, MDP<Double> model, ModelInfo modelInfo) throws PrismException
+    {
+        Property prop = new Property();
+        StateModelChecker mc = new StateModelChecker(prism);
+        if (propExpr instanceof ExpressionProb) {
+            prop.op = "P";
+            prop.minMax = ((ExpressionProb) propExpr).getRelopBoundInfo(null).getMinMax(model.getModelType());
+            Expression pathExpr = ((ExpressionProb) propExpr).getExpression();
+            if (pathExpr instanceof ExpressionTemporal && ((ExpressionTemporal) pathExpr).getOperator() == ExpressionTemporal.P_F) {
+                Expression targetExpr = ((ExpressionTemporal) ((ExpressionProb) propExpr).getExpression()).getOperand2();
+                mc.setModelCheckingInfo(modelInfo, null, null);
+                StateValues sv = mc.checkExpression(model, targetExpr, null);
+                prop.target = sv.getBitSet();
+            } else {
+                throw new PrismException("Unknown property type: " + pathExpr);
+            }
+        } else {
+            throw new PrismException("Unknown property type: " + propExpr);
+        }
+        return prop;
+    }
+
+    /**
      * Build/solve a game-based abstraction
      * @param modelConcrete The concrete model
-     * @param targetConcrete target states in concrete model (for probabilistic reachability)
-     * @param min Min/max for probabilistic reachability?
+     * @param propConcrete The property for the concrete model
      * @param concreteToAbstract Mapping from concrete to abstract states
      * @param nAbstract Number of abstract states
      */
-    public void buildGameAbstraction(MDP<Double> modelConcrete, BitSet targetConcrete, boolean min, int[] concreteToAbstract, int nAbstract) throws PrismException
+    public void buildGameAbstraction(MDP<Double> modelConcrete, Property propConcrete, int[] concreteToAbstract, int nAbstract) throws PrismException
     {
         int numConcreteStates = modelConcrete.getNumStates();
         if (numConcreteStates != concreteToAbstract.length) {
@@ -104,7 +153,15 @@ public class Abstractions
         for (int a = 0; a < nAbstract; a++) {
             abstractToConcrete.add(new ArrayList<Set<Integer>>());
         }
-        BitSet targetAbstract = new BitSet();
+        // Create property to check on abstraction
+        Property propAbstract = new Property();
+        propAbstract.op = propConcrete.op;
+        propAbstract.minMax = new MinMax(propConcrete.minMax);
+        propAbstract.target = new BitSet();
+        propAbstract.remain = null;
+        if (propConcrete.remain != null) {
+            propAbstract.remain = new BitSet();
+        }
 
         // Process each concrete state
         for (int c = 0; c < numConcreteStates; c++) {
@@ -134,28 +191,28 @@ public class Abstractions
             if (modelConcrete.isInitialState(c)) {
                 abstraction.addInitialState(a);
             }
-            if (targetConcrete.get(c)) {
-                targetAbstract.set(a);
+            if (propConcrete.target.get(c)) {
+                propAbstract.target.set(a);
             }
         }
-        System.out.println("Game-based abstraction: " + abstraction.infoString());
+        System.out.println("\nGame-based abstraction: " + abstraction.infoString());
+        System.out.println("Game-based abstraction property: " + propAbstract);
 
         // Solve abstraction to get bounds
         STPGModelChecker mc =  new STPGModelChecker(prism);
-        double lb = mc.computeReachProbs(abstraction, targetAbstract, true, min).soln[initConcrete];
-        double ub = mc.computeReachProbs(abstraction, targetAbstract, false, min).soln[initConcrete];
+        double lb = mc.computeUntilProbs(abstraction, propAbstract.remain, propAbstract.target, true, propAbstract.minMax.isMin()).soln[initConcrete];
+        double ub = mc.computeUntilProbs(abstraction, propAbstract.remain, propAbstract.target, false, propAbstract.minMax.isMin()).soln[initConcrete];
         System.out.println("Bounds from game-based abstraction: [" + lb + ", " + ub + "]");
     }
 
     /**
      * Build/solve an IMDP-based abstraction
      * @param modelConcrete The concrete model
-     * @param targetConcrete target states in concrete model (for probabilistic reachability)
-     * @param min Min/max for probabilistic reachability?
+     * @param propConcrete The property for the concrete model
      * @param concreteToAbstract Mapping from concrete to abstract states
      * @param nAbstract Number of abstract states
      */
-    public void buildIMDPAbstraction(MDP<Double> modelConcrete, BitSet targetConcrete, boolean min, int[] concreteToAbstract, int nAbstract) throws PrismException
+    public void buildIMDPAbstraction(MDP<Double> modelConcrete, Property propConcrete, int[] concreteToAbstract, int nAbstract) throws PrismException
     {
         int numConcreteStates = modelConcrete.getNumStates();
         if (numConcreteStates != concreteToAbstract.length) {
@@ -171,11 +228,19 @@ public class Abstractions
 
         // Create empty abstraction
         IMDPSimple<Double> abstraction = new IMDPSimple<>(nAbstract);
-        BitSet targetAbstract = new BitSet();
         // Temporary storage for IMDP transitions
         List<Map<Object, Distribution<Interval<Double>>>> abstractionData = new ArrayList<>(nAbstract);
         for (int a = 0; a < nAbstract; a++) {
             abstractionData.add(new HashMap<>());
+        }
+        // Create property to check on abstraction
+        Property propAbstract = new Property();
+        propAbstract.op = propConcrete.op;
+        propAbstract.minMax = new MinMax(propConcrete.minMax);
+        propAbstract.target = new BitSet();
+        propAbstract.remain = null;
+        if (propConcrete.remain != null) {
+            propAbstract.remain = new BitSet();
         }
 
         // Process each concrete state
@@ -234,8 +299,8 @@ public class Abstractions
             if (modelConcrete.isInitialState(c)) {
                 abstraction.addInitialState(a);
             }
-            if (targetConcrete.get(c)) {
-                targetAbstract.set(a);
+            if (propConcrete.target.get(c)) {
+                propAbstract.target.set(a);
             }
         }
         // Add transitions to IMDP
@@ -247,7 +312,7 @@ public class Abstractions
                 abstraction.addActionLabelledChoice(finalA, idistr, action);
             });
         }
-        System.out.println("IMDP-based abstraction: " + abstraction.infoString());
+        System.out.println("\nIMDP-based abstraction: " + abstraction.infoString());
 
         // Print abstraction
        /* for (int a = 0; a < nAbstract; a++) {
@@ -277,10 +342,10 @@ public class Abstractions
         IMDPModelChecker mcImdp =  new IMDPModelChecker(prism);
         mcImdp.setGenStrat(true);
         mcImdp.setProb1(false);
-        ModelCheckerResult res = mcImdp.computeReachProbs(abstraction, targetAbstract, new MinMax().setMin(min).setMinUnc(true));
+        ModelCheckerResult res = mcImdp.computeReachProbs(abstraction, propAbstract.target, new MinMax(propAbstract.minMax).setMinUnc(true));
         double lb = res.soln[initConcrete];
         MDStrategyArray<Double> lbStrat = (MDStrategyArray<Double>) res.strat;
-        res = mcImdp.computeReachProbs(abstraction, targetAbstract, new MinMax().setMin(min).setMinUnc(false));
+        res = mcImdp.computeReachProbs(abstraction, propAbstract.target, new MinMax(propAbstract.minMax).setMinUnc(false));
         double ub = res.soln[initConcrete];
         MDStrategyArray<Double> ubStrat = (MDStrategyArray<Double>) res.strat;
         System.out.println("Bounds from IMDP-based abstraction: [" + lb + ", " + ub + "]");
@@ -289,9 +354,9 @@ public class Abstractions
         IDTMC<Double> idtmcInduced = (IDTMC<Double>) lbStrat.constructInducedModel(new StrategyExportOptions().setReachOnly(false));
         IDTMCModelChecker mcIdtmc =  new IDTMCModelChecker(prism);
         mcIdtmc.setProb1(false);
-        res = mcIdtmc.computeReachProbs(idtmcInduced, targetAbstract, MinMax.blank().setMinUnc(true));
+        res = mcIdtmc.computeReachProbs(idtmcInduced, propAbstract.target, new MinMax().setMinUnc(true));
         double strat1lb = res.soln[initConcrete];
-        res = mcIdtmc.computeReachProbs(idtmcInduced, targetAbstract, MinMax.blank().setMinUnc(false));
+        res = mcIdtmc.computeReachProbs(idtmcInduced, propAbstract.target, new MinMax().setMinUnc(false));
         double strat1ub = res.soln[initConcrete];
         System.out.println("Bounds from induced IDTMC abstraction: [" + strat1lb + ", " + strat1ub + "]");
 
@@ -304,7 +369,7 @@ public class Abstractions
         //DTMC<Double> dtmcInduced = (DTMC<Double>) modelConcrete.constructInducedModel(stratConcrete);
         DTMC<Double> dtmcInduced = (DTMC<Double>) stratConcrete.constructInducedModel(new StrategyExportOptions().setReachOnly(false));
         DTMCModelChecker mcDtmc =  new DTMCModelChecker(prism);
-        res = mcDtmc.computeReachProbs(dtmcInduced, targetConcrete);
+        res = mcDtmc.computeReachProbs(dtmcInduced, propConcrete.target);
         double strat1perf = res.soln[initConcrete];
         System.out.println("Performance of strategy on concrete model: " + strat1perf);
 
