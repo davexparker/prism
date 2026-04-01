@@ -9,7 +9,9 @@ import parser.ast.ExpressionProb;
 import parser.ast.ExpressionTemporal;
 import parser.ast.PropertiesFile;
 import prism.*;
+import strat.MDStrategy;
 import strat.MDStrategyArray;
+import strat.Strategy;
 import strat.StrategyExportOptions;
 
 import java.io.File;
@@ -199,10 +201,23 @@ public class Abstractions
         System.out.println("Game-based abstraction property: " + propAbstract);
 
         // Solve abstraction to get bounds
-        STPGModelChecker mc =  new STPGModelChecker(prism);
-        double lb = mc.computeUntilProbs(abstraction, propAbstract.remain, propAbstract.target, true, propAbstract.minMax.isMin()).soln[initConcrete];
-        double ub = mc.computeUntilProbs(abstraction, propAbstract.remain, propAbstract.target, false, propAbstract.minMax.isMin()).soln[initConcrete];
+        STPGModelChecker mcStpg =  new STPGModelChecker(prism);
+        mcStpg.setGenStrat(true);
+        ModelCheckerResult res = mcStpg.computeUntilProbs(abstraction, propAbstract.remain, propAbstract.target, true, propAbstract.minMax.isMin());
+        double lb = res.soln[initConcrete];
+        MDStrategyArray<Double> lbStrat = (MDStrategyArray<Double>) res.strat;
+        res = mcStpg.computeUntilProbs(abstraction, propAbstract.remain, propAbstract.target, false, propAbstract.minMax.isMin());
+        double ub = res.soln[initConcrete];
+        MDStrategyArray<Double> ubStrat = (MDStrategyArray<Double>) res.strat;
         System.out.println("Bounds from game-based abstraction: [" + lb + ", " + ub + "]");
+
+        // Concretise strategy and solve induced DTMC to get performance of strategy on concrete model
+        MDStrategyArray<Double> stratConcrete = concretiseStrategy(lbStrat, concreteToAbstract, numConcreteStates, modelConcrete);
+        DTMC<Double> dtmcInduced = (DTMC<Double>) stratConcrete.constructInducedModel(new StrategyExportOptions().setReachOnly(false));
+        DTMCModelChecker mcDtmc =  new DTMCModelChecker(prism);
+        res = mcDtmc.computeReachProbs(dtmcInduced, propConcrete.target);
+        double strat1perf = res.soln[initConcrete];
+        System.out.println("Performance of strategy on concrete model: " + strat1perf);
     }
 
     /**
@@ -361,18 +376,22 @@ public class Abstractions
         System.out.println("Bounds from induced IDTMC abstraction: [" + strat1lb + ", " + strat1ub + "]");
 
         // Concretise strategy and solve induced DTMC to get performance of strategy on concrete model
-        int[] stratArrayConcrete = new int[numConcreteStates];
-        for (int c = 0; c < numConcreteStates; c++) {
-            stratArrayConcrete[c] = modelConcrete.getChoiceByAction(c, lbStrat.getChoiceAction(concreteToAbstract[c]));
-        }
-        MDStrategyArray<Double> stratConcrete = new MDStrategyArray<>(modelConcrete, stratArrayConcrete);
-        //DTMC<Double> dtmcInduced = (DTMC<Double>) modelConcrete.constructInducedModel(stratConcrete);
+        MDStrategyArray<Double> stratConcrete = concretiseStrategy(lbStrat, concreteToAbstract, numConcreteStates, modelConcrete);
         DTMC<Double> dtmcInduced = (DTMC<Double>) stratConcrete.constructInducedModel(new StrategyExportOptions().setReachOnly(false));
         DTMCModelChecker mcDtmc =  new DTMCModelChecker(prism);
         res = mcDtmc.computeReachProbs(dtmcInduced, propConcrete.target);
         double strat1perf = res.soln[initConcrete];
         System.out.println("Performance of strategy on concrete model: " + strat1perf);
+    }
 
+    public MDStrategyArray<Double> concretiseStrategy(MDStrategy<Double> stratAbstract, int[] concreteToAbstract, int numConcreteStates, NondetModel<Double> modelConcrete)
+    {
+        // Concretise strategy and solve induced DTMC to get performance of strategy on concrete model
+        int[] stratArrayConcrete = new int[numConcreteStates];
+        for (int c = 0; c < numConcreteStates; c++) {
+            stratArrayConcrete[c] = modelConcrete.getChoiceByAction(c, stratAbstract.getChoiceAction(concreteToAbstract[c]));
+        }
+        return new MDStrategyArray<>(modelConcrete, stratArrayConcrete);
     }
 
     /**
