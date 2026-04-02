@@ -203,6 +203,7 @@ public class Abstractions
                 abstraction.addInitialState(a);
             }
         }
+        int initAbstract = abstraction.getFirstInitialState();
         propAbstract.target = overapproximateSet(propConcrete.target::get, concreteToAbstract, nAbstract);
         if (propAbstract.remain != null) {
             propAbstract.remain = underapproximateSet(propConcrete.remain::get, concreteToAbstract, nAbstract);
@@ -214,10 +215,10 @@ public class Abstractions
         STPGModelChecker mcStpg =  new STPGModelChecker(prism);
         mcStpg.setGenStrat(true);
         ModelCheckerResult res = mcStpg.computeUntilProbs(abstraction, propAbstract.remain, propAbstract.target, true, propAbstract.minMax.isMin());
-        double lb = res.soln[initConcrete];
+        double lb = res.soln[initAbstract];
         MDStrategyArray<Double> lbStrat = (MDStrategyArray<Double>) res.strat;
         res = mcStpg.computeUntilProbs(abstraction, propAbstract.remain, propAbstract.target, false, propAbstract.minMax.isMin());
-        double ub = res.soln[initConcrete];
+        double ub = res.soln[initAbstract];
         MDStrategyArray<Double> ubStrat = (MDStrategyArray<Double>) res.strat;
         System.out.println("Bounds from game-based abstraction: [" + lb + ", " + ub + "]");
 
@@ -325,6 +326,7 @@ public class Abstractions
                 abstraction.addInitialState(a);
             }
         }
+        int initAbstract = abstraction.getFirstInitialState();
         propAbstract.target = overapproximateSet(propConcrete.target::get, concreteToAbstract, nAbstract);
         if (propAbstract.remain != null) {
             propAbstract.remain = underapproximateSet(propConcrete.remain::get, concreteToAbstract, nAbstract);
@@ -370,10 +372,10 @@ public class Abstractions
         mcImdp.setGenStrat(true);
         mcImdp.setProb1(false);
         ModelCheckerResult res = mcImdp.computeUntilProbs(abstraction, propAbstract.remain, propAbstract.target, new MinMax(propAbstract.minMax).setMinUnc(true));
-        double lb = res.soln[initConcrete];
+        double lb = res.soln[initAbstract];
         MDStrategyArray<Double> lbStrat = (MDStrategyArray<Double>) res.strat;
         res = mcImdp.computeUntilProbs(abstraction, propAbstract.remain, propAbstract.target, new MinMax(propAbstract.minMax).setMinUnc(false));
-        double ub = res.soln[initConcrete];
+        double ub = res.soln[initAbstract];
         MDStrategyArray<Double> ubStrat = (MDStrategyArray<Double>) res.strat;
         System.out.println("Bounds from IMDP-based abstraction: [" + lb + ", " + ub + "]");
 
