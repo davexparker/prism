@@ -19,6 +19,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.*;
+import java.util.function.Predicate;
 
 public class Abstractions
 {
@@ -122,6 +123,14 @@ public class Abstractions
                 mc.setModelCheckingInfo(modelInfo, null, null);
                 StateValues sv = mc.checkExpression(model, targetExpr, null);
                 prop.target = sv.getBitSet();
+            } else if (pathExpr instanceof ExpressionTemporal && ((ExpressionTemporal) pathExpr).getOperator() == ExpressionTemporal.P_U) {
+                Expression remainExpr = ((ExpressionTemporal) ((ExpressionProb) propExpr).getExpression()).getOperand1();
+                Expression targetExpr = ((ExpressionTemporal) ((ExpressionProb) propExpr).getExpression()).getOperand2();
+                mc.setModelCheckingInfo(modelInfo, null, null);
+                StateValues sv = mc.checkExpression(model, remainExpr, null);
+                prop.remain = sv.getBitSet();
+                sv = mc.checkExpression(model, targetExpr, null);
+                prop.target = sv.getBitSet();
             } else {
                 throw new PrismException("Unknown property type: " + pathExpr);
             }
@@ -193,9 +202,10 @@ public class Abstractions
             if (modelConcrete.isInitialState(c)) {
                 abstraction.addInitialState(a);
             }
-            if (propConcrete.target.get(c)) {
-                propAbstract.target.set(a);
-            }
+        }
+        propAbstract.target = overapproximateSet(propConcrete.target::get, concreteToAbstract, nAbstract);
+        if (propAbstract.remain != null) {
+            propAbstract.remain = underapproximateSet(propConcrete.remain::get, concreteToAbstract, nAbstract);
         }
         System.out.println("\nGame-based abstraction: " + abstraction.infoString());
         System.out.println("Game-based abstraction property: " + propAbstract);
@@ -215,7 +225,7 @@ public class Abstractions
         MDStrategyArray<Double> stratConcrete = concretiseStrategy(lbStrat, concreteToAbstract, numConcreteStates, modelConcrete);
         DTMC<Double> dtmcInduced = (DTMC<Double>) stratConcrete.constructInducedModel(new StrategyExportOptions().setReachOnly(false));
         DTMCModelChecker mcDtmc =  new DTMCModelChecker(prism);
-        res = mcDtmc.computeReachProbs(dtmcInduced, propConcrete.target);
+        res = mcDtmc.computeUntilProbs(dtmcInduced, propConcrete.remain, propConcrete.target);
         double strat1perf = res.soln[initConcrete];
         System.out.println("Performance of strategy on concrete model: " + strat1perf);
     }
@@ -314,9 +324,10 @@ public class Abstractions
             if (modelConcrete.isInitialState(c)) {
                 abstraction.addInitialState(a);
             }
-            if (propConcrete.target.get(c)) {
-                propAbstract.target.set(a);
-            }
+        }
+        propAbstract.target = overapproximateSet(propConcrete.target::get, concreteToAbstract, nAbstract);
+        if (propAbstract.remain != null) {
+            propAbstract.remain = underapproximateSet(propConcrete.remain::get, concreteToAbstract, nAbstract);
         }
         // Add transitions to IMDP
         for (int a = 0; a < nAbstract; a++) {
@@ -328,6 +339,7 @@ public class Abstractions
             });
         }
         System.out.println("\nIMDP-based abstraction: " + abstraction.infoString());
+        System.out.println("IMDP-based abstraction property: " + propAbstract);
 
         // Print abstraction
        /* for (int a = 0; a < nAbstract; a++) {
@@ -357,10 +369,10 @@ public class Abstractions
         IMDPModelChecker mcImdp =  new IMDPModelChecker(prism);
         mcImdp.setGenStrat(true);
         mcImdp.setProb1(false);
-        ModelCheckerResult res = mcImdp.computeReachProbs(abstraction, propAbstract.target, new MinMax(propAbstract.minMax).setMinUnc(true));
+        ModelCheckerResult res = mcImdp.computeUntilProbs(abstraction, propAbstract.remain, propAbstract.target, new MinMax(propAbstract.minMax).setMinUnc(true));
         double lb = res.soln[initConcrete];
         MDStrategyArray<Double> lbStrat = (MDStrategyArray<Double>) res.strat;
-        res = mcImdp.computeReachProbs(abstraction, propAbstract.target, new MinMax(propAbstract.minMax).setMinUnc(false));
+        res = mcImdp.computeUntilProbs(abstraction, propAbstract.remain, propAbstract.target, new MinMax(propAbstract.minMax).setMinUnc(false));
         double ub = res.soln[initConcrete];
         MDStrategyArray<Double> ubStrat = (MDStrategyArray<Double>) res.strat;
         System.out.println("Bounds from IMDP-based abstraction: [" + lb + ", " + ub + "]");
@@ -369,9 +381,9 @@ public class Abstractions
         IDTMC<Double> idtmcInduced = (IDTMC<Double>) lbStrat.constructInducedModel(new StrategyExportOptions().setReachOnly(false));
         IDTMCModelChecker mcIdtmc =  new IDTMCModelChecker(prism);
         mcIdtmc.setProb1(false);
-        res = mcIdtmc.computeReachProbs(idtmcInduced, propAbstract.target, new MinMax().setMinUnc(true));
+        res = mcIdtmc.computeUntilProbs(idtmcInduced, propAbstract.remain, propAbstract.target, new MinMax().setMinUnc(true));
         double strat1lb = res.soln[initConcrete];
-        res = mcIdtmc.computeReachProbs(idtmcInduced, propAbstract.target, new MinMax().setMinUnc(false));
+        res = mcIdtmc.computeReachProbs(idtmcInduced, propAbstract.remain, propAbstract.target, new MinMax().setMinUnc(false));
         double strat1ub = res.soln[initConcrete];
         System.out.println("Bounds from induced IDTMC abstraction: [" + strat1lb + ", " + strat1ub + "]");
 
@@ -379,9 +391,34 @@ public class Abstractions
         MDStrategyArray<Double> stratConcrete = concretiseStrategy(lbStrat, concreteToAbstract, numConcreteStates, modelConcrete);
         DTMC<Double> dtmcInduced = (DTMC<Double>) stratConcrete.constructInducedModel(new StrategyExportOptions().setReachOnly(false));
         DTMCModelChecker mcDtmc =  new DTMCModelChecker(prism);
-        res = mcDtmc.computeReachProbs(dtmcInduced, propConcrete.target);
+        res = mcDtmc.computeUntilProbs(dtmcInduced, propConcrete.remain, propConcrete.target);
         double strat1perf = res.soln[initConcrete];
         System.out.println("Performance of strategy on concrete model: " + strat1perf);
+    }
+
+    public BitSet overapproximateSet(Predicate<Integer> setConcrete, int[] concreteToAbstract, int nAbstract)
+    {
+        BitSet setAbstract = new BitSet(nAbstract);
+        for (int c = 0; c < concreteToAbstract.length; c++) {
+            if (setConcrete.test(c)) {
+                setAbstract.set(concreteToAbstract[c]);
+            }
+        }
+        return setAbstract;
+    }
+
+    public BitSet underapproximateSet(Predicate<Integer> setConcrete, int[] concreteToAbstract, int nAbstract)
+    {
+        BitSet setAbstract = new BitSet(nAbstract);
+        for (int a = 0; a < nAbstract; a++) {
+            setAbstract.set(a);
+        }
+        for (int c = 0; c < concreteToAbstract.length; c++) {
+            if (!setConcrete.test(c)) {
+                setAbstract.set(concreteToAbstract[c], false);
+            }
+        }
+        return setAbstract;
     }
 
     public MDStrategyArray<Double> concretiseStrategy(MDStrategy<Double> stratAbstract, int[] concreteToAbstract, int numConcreteStates, NondetModel<Double> modelConcrete)
