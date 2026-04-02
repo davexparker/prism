@@ -170,15 +170,6 @@ public class Abstractions
         for (int a = 0; a < nAbstract; a++) {
             abstractToConcrete.add(new ArrayList<Set<Integer>>());
         }
-        // Create property to check on abstraction
-        Property propAbstract = new Property();
-        propAbstract.op = propConcrete.op;
-        propAbstract.minMax = new MinMax(propConcrete.minMax);
-        propAbstract.target = new BitSet();
-        propAbstract.remain = null;
-        if (propConcrete.remain != null) {
-            propAbstract.remain = new BitSet();
-        }
 
         // Process each concrete state
         for (int c = 0; c < numConcreteStates; c++) {
@@ -210,30 +201,31 @@ public class Abstractions
             }
         }
         int initAbstract = abstraction.getFirstInitialState();
-        propAbstract.target = overapproximateSet(propConcrete.target::get, concreteToAbstract, nAbstract);
-        if (propAbstract.remain != null) {
-            propAbstract.remain = underapproximateSet(propConcrete.remain::get, concreteToAbstract, nAbstract);
-        }
         System.out.println("\nGame-based abstraction: " + abstraction.infoString());
-        System.out.println("Game-based abstraction property: " + propAbstract);
 
         // Solve abstraction to get bounds
         STPGModelChecker mcStpg =  new STPGModelChecker(prism);
         mcStpg.setGenStrat(true);
-        ModelCheckerResult res = mcStpg.computeUntilProbs(abstraction, propAbstract.remain, propAbstract.target, true, propAbstract.minMax.isMin());
-        double lb = res.soln[initAbstract];
-        MDStrategyArray<Double> lbStrat = (MDStrategyArray<Double>) res.strat;
-        res = mcStpg.computeUntilProbs(abstraction, propAbstract.remain, propAbstract.target, false, propAbstract.minMax.isMin());
-        double ub = res.soln[initAbstract];
-        MDStrategyArray<Double> ubStrat = (MDStrategyArray<Double>) res.strat;
+        Property propOver = overapproximateProperty(propConcrete, concreteToAbstract, nAbstract);
+        Property propUnder = underapproximateProperty(propConcrete, concreteToAbstract, nAbstract);
+        System.out.println("Game-based abstraction overapproximation property: " + propOver);
+        System.out.println("Game-based abstraction underpproximation property: " + propUnder);
+        ModelCheckerResult resOver = mcStpg.computeUntilProbs(abstraction, propOver.remain, propOver.target, propOver.minMax.isMin(), propOver.minMax.isMin());
+        double valOver = resOver.soln[initAbstract];
+        MDStrategyArray<Double> stratOver = (MDStrategyArray<Double>) resOver.strat;
+        ModelCheckerResult resUnder = mcStpg.computeUntilProbs(abstraction, propUnder.remain, propUnder.target, !propUnder.minMax.isMin(), propUnder.minMax.isMin());
+        double valUnder = resUnder.soln[initAbstract];
+        MDStrategyArray<Double> stratUnder = (MDStrategyArray<Double>) resUnder.strat;
+        double lb = propConcrete.minMax.isMin() ? valOver : valUnder;
+        double ub = propConcrete.minMax.isMin() ? valUnder : valOver;
         System.out.println("Bounds from game-based abstraction: [" + lb + ", " + ub + "]");
 
         // Concretise strategy and solve induced DTMC to get performance of strategy on concrete model
-        MDStrategyArray<Double> stratConcrete = concretiseStrategy(lbStrat, concreteToAbstract, numConcreteStates, modelConcrete);
+        MDStrategyArray<Double> stratConcrete = concretiseStrategy(stratUnder, concreteToAbstract, numConcreteStates, modelConcrete);
         DTMC<Double> dtmcInduced = (DTMC<Double>) stratConcrete.constructInducedModel(new StrategyExportOptions().setReachOnly(false));
         DTMCModelChecker mcDtmc =  new DTMCModelChecker(prism);
-        res = mcDtmc.computeUntilProbs(dtmcInduced, propConcrete.remain, propConcrete.target);
-        double strat1perf = res.soln[initConcrete];
+        ModelCheckerResult resPerf = mcDtmc.computeUntilProbs(dtmcInduced, propConcrete.remain, propConcrete.target);
+        double strat1perf = resPerf.soln[initConcrete];
         System.out.println("Performance of strategy on concrete model: " + strat1perf);
     }
 
@@ -264,15 +256,6 @@ public class Abstractions
         List<Map<Object, Distribution<Interval<Double>>>> abstractionData = new ArrayList<>(nAbstract);
         for (int a = 0; a < nAbstract; a++) {
             abstractionData.add(new HashMap<>());
-        }
-        // Create property to check on abstraction
-        Property propAbstract = new Property();
-        propAbstract.op = propConcrete.op;
-        propAbstract.minMax = new MinMax(propConcrete.minMax);
-        propAbstract.target = new BitSet();
-        propAbstract.remain = null;
-        if (propConcrete.remain != null) {
-            propAbstract.remain = new BitSet();
         }
 
         // Process each concrete state
@@ -333,10 +316,6 @@ public class Abstractions
             }
         }
         int initAbstract = abstraction.getFirstInitialState();
-        propAbstract.target = overapproximateSet(propConcrete.target::get, concreteToAbstract, nAbstract);
-        if (propAbstract.remain != null) {
-            propAbstract.remain = underapproximateSet(propConcrete.remain::get, concreteToAbstract, nAbstract);
-        }
         // Add transitions to IMDP
         for (int a = 0; a < nAbstract; a++) {
             int finalA = a;
@@ -347,7 +326,6 @@ public class Abstractions
             });
         }
         System.out.println("\nIMDP-based abstraction: " + abstraction.infoString());
-        System.out.println("IMDP-based abstraction property: " + propAbstract);
 
         // Print abstraction
        /* for (int a = 0; a < nAbstract; a++) {
@@ -377,26 +355,32 @@ public class Abstractions
         IMDPModelChecker mcImdp =  new IMDPModelChecker(prism);
         mcImdp.setGenStrat(true);
         mcImdp.setProb1(false);
-        ModelCheckerResult res = mcImdp.computeUntilProbs(abstraction, propAbstract.remain, propAbstract.target, new MinMax(propAbstract.minMax).setMinUnc(true));
-        double lb = res.soln[initAbstract];
-        MDStrategyArray<Double> lbStrat = (MDStrategyArray<Double>) res.strat;
-        res = mcImdp.computeUntilProbs(abstraction, propAbstract.remain, propAbstract.target, new MinMax(propAbstract.minMax).setMinUnc(false));
-        double ub = res.soln[initAbstract];
-        MDStrategyArray<Double> ubStrat = (MDStrategyArray<Double>) res.strat;
+        Property propOver = overapproximateProperty(propConcrete, concreteToAbstract, nAbstract);
+        Property propUnder = underapproximateProperty(propConcrete, concreteToAbstract, nAbstract);
+        System.out.println("IMDP-based abstraction overapproximation property: " + propOver);
+        System.out.println("IMDP-based abstraction underpproximation property: " + propUnder);
+        ModelCheckerResult resOver = mcImdp.computeUntilProbs(abstraction, propOver.remain, propOver.target, propOver.minMax.setMinUnc(propOver.minMax.isMin()));
+        double valOver = resOver.soln[initAbstract];
+        MDStrategyArray<Double> stratOver = (MDStrategyArray<Double>) resOver.strat;
+        ModelCheckerResult resUnder = mcImdp.computeUntilProbs(abstraction, propOver.remain, propOver.target, propOver.minMax.setMinUnc(!propOver.minMax.isMin()));
+        double valUnder = resUnder.soln[initAbstract];
+        MDStrategyArray<Double> stratUnder = (MDStrategyArray<Double>) resUnder.strat;
+        double lb = propConcrete.minMax.isMin() ? valOver : valUnder;
+        double ub = propConcrete.minMax.isMin() ? valUnder : valOver;
         System.out.println("Bounds from IMDP-based abstraction: [" + lb + ", " + ub + "]");
 
         // Analyse accuracy of policy in induced IDTMC
-        IDTMC<Double> idtmcInduced = (IDTMC<Double>) lbStrat.constructInducedModel(new StrategyExportOptions().setReachOnly(false));
+        IDTMC<Double> idtmcInduced = (IDTMC<Double>) stratOver.constructInducedModel(new StrategyExportOptions().setReachOnly(false));
         IDTMCModelChecker mcIdtmc =  new IDTMCModelChecker(prism);
         mcIdtmc.setProb1(false);
-        res = mcIdtmc.computeUntilProbs(idtmcInduced, propAbstract.remain, propAbstract.target, new MinMax().setMinUnc(true));
+        ModelCheckerResult res = mcIdtmc.computeUntilProbs(idtmcInduced, propOver.remain, propOver.target, new MinMax().setMinUnc(true));
         double strat1lb = res.soln[initConcrete];
-        res = mcIdtmc.computeReachProbs(idtmcInduced, propAbstract.remain, propAbstract.target, new MinMax().setMinUnc(false));
+        res = mcIdtmc.computeReachProbs(idtmcInduced, propOver.remain, propOver.target, new MinMax().setMinUnc(false));
         double strat1ub = res.soln[initConcrete];
         System.out.println("Bounds from induced IDTMC abstraction: [" + strat1lb + ", " + strat1ub + "]");
 
         // Concretise strategy and solve induced DTMC to get performance of strategy on concrete model
-        MDStrategyArray<Double> stratConcrete = concretiseStrategy(lbStrat, concreteToAbstract, numConcreteStates, modelConcrete);
+        MDStrategyArray<Double> stratConcrete = concretiseStrategy(stratUnder, concreteToAbstract, numConcreteStates, modelConcrete);
         DTMC<Double> dtmcInduced = (DTMC<Double>) stratConcrete.constructInducedModel(new StrategyExportOptions().setReachOnly(false));
         DTMCModelChecker mcDtmc =  new DTMCModelChecker(prism);
         res = mcDtmc.computeUntilProbs(dtmcInduced, propConcrete.remain, propConcrete.target);
@@ -427,6 +411,30 @@ public class Abstractions
             }
         }
         return setAbstract;
+    }
+
+    public Property overapproximateProperty(Property propConcrete, int[] concreteToAbstract, int nAbstract)
+    {
+        Property probAbstract = new Property();
+        probAbstract.op = propConcrete.op;
+        probAbstract.minMax = new MinMax(propConcrete.minMax);
+        probAbstract.target = overapproximateSet(propConcrete.target::get, concreteToAbstract, nAbstract);
+        if (propConcrete.remain != null) {
+            probAbstract.remain = overapproximateSet(propConcrete.remain::get, concreteToAbstract, nAbstract);
+        }
+        return probAbstract;
+    }
+
+    public Property underapproximateProperty(Property propConcrete, int[] concreteToAbstract, int nAbstract)
+    {
+        Property probAbstract = new Property();
+        probAbstract.op = propConcrete.op;
+        probAbstract.minMax = new MinMax(propConcrete.minMax);
+        probAbstract.target = underapproximateSet(propConcrete.target::get, concreteToAbstract, nAbstract);
+        if (propConcrete.remain != null) {
+            probAbstract.remain = underapproximateSet(propConcrete.remain::get, concreteToAbstract, nAbstract);
+        }
+        return probAbstract;
     }
 
     public MDStrategyArray<Double> concretiseStrategy(MDStrategy<Double> stratAbstract, int[] concreteToAbstract, int numConcreteStates, NondetModel<Double> modelConcrete)
