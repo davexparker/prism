@@ -182,7 +182,7 @@ public class Abstractions
             DistributionSet<Double> distrsAbstract = abstraction.newDistributionSet(null);
             int numChoices = modelConcrete.getNumChoices(c);
             for (int i = 0; i < numChoices; i++) {
-                Distribution<Double> distrAbstract = Distribution.ofDouble();
+                ActionDistribution<Double> distrAbstract = ActionDistribution.ofDouble(modelConcrete.getAction(c, i));
                 modelConcrete.forEachTransition(c, i, (s, t, d) -> {
                     distrAbstract.add(concreteToAbstract[t], d);
                 });

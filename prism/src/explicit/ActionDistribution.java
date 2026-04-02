@@ -17,6 +17,12 @@ public class ActionDistribution<Value> extends Distribution<Value>
         this.action = null;
     }
 
+    public ActionDistribution(Evaluator<Value> eval, Object action)
+    {
+        super(eval);
+        this.action = action;
+    }
+
     public ActionDistribution(Distribution<Value> distr)
     {
         super(distr);
@@ -27,6 +33,15 @@ public class ActionDistribution<Value> extends Distribution<Value>
     {
         super(distr);
         this.action = action;
+    }
+
+    /**
+     * Construct an action-distribution pair with an empty distribution
+     * assuming an Evaluator of type Double.
+     */
+    public static ActionDistribution<Double> ofDouble(Object action)
+    {
+        return new ActionDistribution<>(Evaluator.forDouble(), action);
     }
 
     @Override
