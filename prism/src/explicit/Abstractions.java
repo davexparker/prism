@@ -15,6 +15,7 @@ import strat.Strategy;
 import strat.StrategyExportOptions;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -63,7 +64,6 @@ public class Abstractions
             String modelFilename = args[0];
             String propString = args[1];
             System.out.println("Model file: " + modelFilename);
-            System.out.println("Property string: " + propString);
 
             // Build concrete MDP, parse/extract property, model check
             prism.loadModelFromUMBFile(new File(modelFilename));
@@ -72,8 +72,14 @@ public class Abstractions
                 throw new RuntimeException("Concrete model is not an MDP");
             }
             MDP<Double> modelConcrete = (MDP<Double>) prism.getBuiltModelExplicit();
-            PropertiesFile propPF = prism.parsePropertiesString(propString);
+            PropertiesFile propPF;
+            if (propString.endsWith(".props")) {
+                propPF = prism.parsePropertiesFile(new File(propString));
+            } else {
+                propPF = prism.parsePropertiesString(propString);
+            }
             Expression propExpr = propPF.getProperty(0);
+            System.out.println("Property: " + propExpr);
             Property propConcrete = extractProperty(propExpr, modelConcrete, prism.getModelInfo());
             Result result = prism.modelCheck(propPF, propExpr);
             double valConcrete = (Double) result.getResult();
@@ -100,7 +106,7 @@ public class Abstractions
             buildIMDPAbstraction(modelConcrete, propConcrete, concrete2abstract, nAbstract);
             buildGameAbstractionViaRefinement(modelConcrete, propConcrete.target, propConcrete.minMax.isMin(), concrete2abstract, nAbstract);
 
-        } catch (PrismException e) {
+        } catch (PrismException | FileNotFoundException e) {
             System.err.println(e.getMessage());
             System.exit(1);
         }
