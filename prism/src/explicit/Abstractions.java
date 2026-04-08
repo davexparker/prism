@@ -213,20 +213,36 @@ public class Abstractions
         ModelCheckerResult resOver = mcStpg.computeUntilProbs(abstraction, propOver.remain, propOver.target, propOver.minMax.isMin(), propOver.minMax.isMin());
         double valOver = resOver.soln[initAbstract];
         MDStrategyArray<Double> stratOver = (MDStrategyArray<Double>) resOver.strat;
+        abstraction.initialisePlayer2Strategy();
         ModelCheckerResult resUnder = mcStpg.computeUntilProbs(abstraction, propUnder.remain, propUnder.target, !propUnder.minMax.isMin(), propUnder.minMax.isMin());
         double valUnder = resUnder.soln[initAbstract];
-        MDStrategyArray<Double> stratUnder = (MDStrategyArray<Double>) resUnder.strat;
+        //MDStrategyArray<Double> stratUnder = (MDStrategyArray<Double>) resUnder.strat;
+        MDStrategy<Double> stratUnder = extractPlayer2Strategy(abstraction.getPlayer2Strategy(), abstractToConcrete, nAbstract, numConcreteStates, modelConcrete);
         double lb = propConcrete.minMax.isMin() ? valOver : valUnder;
         double ub = propConcrete.minMax.isMin() ? valUnder : valOver;
         System.out.println("Bounds from game-based abstraction: [" + lb + ", " + ub + "]");
 
         // Concretise strategy and solve induced DTMC to get performance of strategy on concrete model
-        MDStrategyArray<Double> stratConcrete = concretiseStrategy(stratUnder, concreteToAbstract, numConcreteStates, modelConcrete);
-        DTMC<Double> dtmcInduced = (DTMC<Double>) stratConcrete.constructInducedModel(new StrategyExportOptions().setReachOnly(false));
+        DTMC<Double> dtmcInduced = (DTMC<Double>) stratUnder.constructInducedModel(new StrategyExportOptions().setReachOnly(false));
         DTMCModelChecker mcDtmc =  new DTMCModelChecker(prism);
         ModelCheckerResult resPerf = mcDtmc.computeUntilProbs(dtmcInduced, propConcrete.remain, propConcrete.target);
         double strat1perf = resPerf.soln[initConcrete];
-        System.out.println("Performance of strategy on concrete model: " + strat1perf);
+        System.out.println("Performance of (underapproximation) strategy on concrete model: " + strat1perf);
+    }
+
+    public MDStrategy<Double> extractPlayer2Strategy(List<ArrayList<Object>> p2Strat, List<List<Set<Integer>>> abstractToConcrete, int nAbstract, int numConcreteStates, NondetModel<Double> modelConcrete)
+    {
+        int[] stratConcreteArray = new int[numConcreteStates];
+        for (int a = 0; a < nAbstract; a++) {
+            int numChoices  = abstractToConcrete.get(a).size();
+            for (int i = 0; i < numChoices; i++) {
+                for (int c : abstractToConcrete.get(a).get(i)) {
+                    int j = modelConcrete.getChoiceByAction(c, p2Strat.get(a).get(i));
+                    stratConcreteArray[c] = j;
+                }
+            }
+        }
+        return new MDStrategyArray<>(modelConcrete, stratConcreteArray);
     }
 
     /**

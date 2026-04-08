@@ -66,6 +66,8 @@ public class STPGAbstrSimple<Value> extends ModelExplicit<Value> implements STPG
 {
 	// Transition function (Steps)
 	protected List<ArrayList<DistributionSet<Value>>> trans;
+	// Player 2 strat, if requested
+	protected List<ArrayList<Object>> p2Strat;
 
 	// Flag: allow dupes in distribution sets?
 	public boolean allowDupes = false;
@@ -285,6 +287,18 @@ public class STPGAbstrSimple<Value> extends ModelExplicit<Value> implements STPG
 			numTransitions += distr.size();
 		actionList.markNeedsRecomputing();
 		return set.size() - 1;
+	}
+
+	public void initialisePlayer2Strategy()
+	{
+		p2Strat = new ArrayList<>(numStates);
+		for (int s = 0; s < numStates; s++) {
+			int numChoices = getNumChoices(s);
+			p2Strat.add(new ArrayList<>(numChoices));
+			for (int j = 0; j < numChoices; j++) {
+				p2Strat.get(s).add(null);
+			}
+		}
 	}
 
 	// Accessors (for ModelSimple)
@@ -570,12 +584,14 @@ public class STPGAbstrSimple<Value> extends ModelExplicit<Value> implements STPG
 		ArrayList<DistributionSet<Value>> step;
 
 		minmax1 = 0;
+		int i = 0;
 		first1 = true;
 		step = trans.get(s);
 		for (DistributionSet<Value> distrs : step) {
 			minmax2 = 0;
 			first2 = true;
-			for (Distribution<Value> distr : distrs) {
+			int j = 0;
+			for (ActionDistribution<Value> distr : distrs) {
 				// Compute sum for this distribution
 				d = 0.0;
 				for (Map.Entry<Integer, Value> e : distr) {
@@ -584,14 +600,20 @@ public class STPGAbstrSimple<Value> extends ModelExplicit<Value> implements STPG
 					d += prob * vect[k];
 				}
 				// Check whether we have exceeded min/max so far
-				if (first2 || (min2 && d < minmax2) || (!min2 && d > minmax2))
+				if (first2 || (min2 && d < minmax2) || (!min2 && d > minmax2)) {
 					minmax2 = d;
+					if (p2Strat != null) {
+						p2Strat.get(s).set(i, distr.getAction());
+					}
+				}
 				first2 = false;
+				j++;
 			}
 			// Check whether we have exceeded min/max so far
 			if (first1 || (min1 && minmax2 < minmax1) || (!min1 && minmax2 > minmax1))
 				minmax1 = minmax2;
 			first1 = false;
+			i++;
 		}
 
 		return minmax1;
@@ -796,6 +818,11 @@ public class STPGAbstrSimple<Value> extends ModelExplicit<Value> implements STPG
 	}
 	
 	// Additional accessor that extended STPG with a "nested view"
+
+	public List<ArrayList<Object>> getPlayer2Strategy()
+	{
+		return p2Strat;
+	}
 
 	/**
 	 * Is choice {@code i} of state {@code s} in nested form? (See {@link explicit.STPG} for details)

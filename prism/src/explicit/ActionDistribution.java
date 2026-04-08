@@ -44,6 +44,11 @@ public class ActionDistribution<Value> extends Distribution<Value>
         return new ActionDistribution<>(Evaluator.forDouble(), action);
     }
 
+    public Object getAction()
+    {
+        return action;
+    }
+
     @Override
     public boolean equals(Object o)
     {
