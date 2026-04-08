@@ -591,6 +591,7 @@ public class STPGAbstrSimple<Value> extends ModelExplicit<Value> implements STPG
 			minmax2 = 0;
 			first2 = true;
 			int j = 0;
+			Object stratCh = null;
 			for (ActionDistribution<Value> distr : distrs) {
 				// Compute sum for this distribution
 				d = 0.0;
@@ -603,11 +604,19 @@ public class STPGAbstrSimple<Value> extends ModelExplicit<Value> implements STPG
 				if (first2 || (min2 && d < minmax2) || (!min2 && d > minmax2)) {
 					minmax2 = d;
 					if (p2Strat != null) {
-						p2Strat.get(s).set(i, distr.getAction());
+						stratCh = distr.getAction();
 					}
 				}
 				first2 = false;
 				j++;
+			}
+			if (p2Strat != null && !first2) {
+				// For max, only remember strictly better choices
+				if (min2) {
+					p2Strat.get(s).set(i, stratCh);
+				} else if (p2Strat.get(s).get(i) == null || minmax2 > vect[s]) {
+					p2Strat.get(s).set(i, stratCh);
+				}
 			}
 			// Check whether we have exceeded min/max so far
 			if (first1 || (min1 && minmax2 < minmax1) || (!min1 && minmax2 > minmax1))
