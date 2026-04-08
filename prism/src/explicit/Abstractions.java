@@ -229,6 +229,30 @@ public class Abstractions
         ModelCheckerResult resPerf = mcDtmc.computeUntilProbs(dtmcInduced, propConcrete.remain, propConcrete.target);
         double strat1perf = resPerf.soln[initConcrete];
         System.out.println("Performance of (underapproximation) strategy on concrete model: " + strat1perf);
+
+        // Debugging
+        /*System.out.println("Target abs " + propOver.target + " / " + propUnder.target);
+        System.out.println("Concrete abs " + propConcrete.target);
+        dtmcInduced.exportToPrismExplicitTra("dtmc.tra");
+        modelConcrete.exportToPrismExplicitTra("mdp.tra");
+        try {
+            java.nio.file.Files.write(java.nio.file.Paths.get("abstr.txt"), abstraction.toString().getBytes());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        for (int a  = 0; a < nAbstract; a++) {
+            System.out.println(a + "=" + resOver.soln[a] + "-" + resUnder.soln[a]);
+            int numChoices = abstractToConcrete.get(a).size();
+            for (int i = 0; i < numChoices; i++) {
+                System.out.println(a + "." + i + ":" + abstractToConcrete.get(a).get(i) + "-" + abstraction.getPlayer2Strategy().get(a).get(i));
+                for (int c : abstractToConcrete.get(a).get(i)) {
+                    if (resPerf.soln[c] < resOver.soln[a]-1e-6 || resPerf.soln[c] > resUnder.soln[a]+1e-6) {
+                        System.out.println("****");
+                    }
+                    System.out.println(a + "." + i + ":" + abstractToConcrete.get(a).get(i) + "=" + resPerf.soln[c]);
+                }
+            }
+        }*/
     }
 
     public MDStrategy<Double> extractPlayer2Strategy(List<ArrayList<Object>> p2Strat, List<List<Set<Integer>>> abstractToConcrete, int nAbstract, int numConcreteStates, NondetModel<Double> modelConcrete)
