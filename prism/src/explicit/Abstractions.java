@@ -167,6 +167,13 @@ public class Abstractions
             throw new PrismException("Concrete model should have distinct choice actions in all states");
         }
 
+        // Re-check concrete model to get values
+        /*MDPModelChecker mcMDP = new MDPModelChecker(prism);
+        mcMDP.setGenStrat(true);
+        mcMDP.setProb1(false);
+        ModelCheckerResult resConcrete = mcMDP.computeUntilProbs(modelConcrete, propConcrete.remain, propConcrete.target, propConcrete.minMax.isMin());
+        System.out.println("Re-checking concrete result: " + resConcrete.soln[initConcrete]);*/
+
         // Create empty abstraction
         STPGAbstrSimple<Double> abstraction = new STPGAbstrSimple<>(nAbstract);
         List<List<Set<Integer>>> abstractToConcrete = new ArrayList<>();
@@ -234,6 +241,45 @@ public class Abstractions
         System.out.println("Performance of (underapproximation) strategy on concrete model: " + strat1perf);
 
         // Debugging
+
+        /*for (int c = 0; c < numConcreteStates; c++) {
+            int a = concreteToAbstract[c];
+            double val = resPerf.soln[c];
+            double valLo = resUnder.soln[a];
+            double valHi = resOver.soln[a];
+            System.out.println("State " + c + ": " + resPerf.soln[c] + " (concrete) vs " + resUnder.soln[a] + "-" + resOver.soln[a]);
+            if (val > valHi + 1e-6 || val < valLo - 1e-6) {
+
+                System.out.println("a=" + a + "=" + resOver.soln[a] + "-" + resUnder.soln[a] + "..." + abstractToConcrete.get(a));
+                int numChoices = abstractToConcrete.get(a).size();
+                for (int i = 0; i < numChoices; i++) {
+                    System.out.println("a.i=" + a + "." + i + ":" + abstractToConcrete.get(a).get(i) + "-" + abstraction.getPlayer2Strategy().get(a).get(i));
+                    for (int c2 : abstractToConcrete.get(a).get(i)) {
+                        System.out.println(a + "." + i + ":" + abstractToConcrete.get(a).get(i) + "=" + resPerf.soln[c2]);
+                    }
+                    System.out.println("Abstraction a.i=" +  a + "." + i + ":");
+                    System.out.println(abstraction.getChoice(a, i));
+                    System.out.println("Abstraction w/ vals a.i=" +  a + "." + i + ":");
+                    abstraction.getChoice(a, i).forEach(ad -> {;
+                        System.out.println(ad.getAction());
+                        ad.forEach(e -> {
+                            System.out.println("  " + e.getKey() + "=" + e.getValue() + "*" + resUnder.soln[e.getKey()] + "*" + resOver.soln[e.getKey()] + "*");
+                        });
+                    });
+                }
+
+                System.out.println("Concrete c=" + c + ":");
+                numChoices = modelConcrete.getNumChoices(c);
+                for (int i = 0; i < numChoices; i++) {
+                    System.out.print("  " + modelConcrete.getAction(c, i) + ":{");
+                    modelConcrete.getTransitionsIterator(c, i).forEachRemaining(e -> {
+                        System.out.print(" " + e.getKey() + "=" + e.getValue() + "*" + resPerf.soln[e.getKey()] + "*");
+                    });
+                    System.out.println(" }");
+                }
+            }
+        }/*
+
         /*System.out.println("Target abs " + propOver.target + " / " + propUnder.target);
         System.out.println("Concrete abs " + propConcrete.target);
         dtmcInduced.exportToPrismExplicitTra("dtmc.tra");
