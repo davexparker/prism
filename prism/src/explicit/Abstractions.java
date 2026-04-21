@@ -209,7 +209,7 @@ public class Abstractions
         // Solve abstraction to get bounds
         STPGModelChecker mcStpg =  new STPGModelChecker(prism);
         mcStpg.setGenStrat(true);
-        mcStpg.setPrecomp(false);
+        mcStpg.setProb1(false);
         Property propOver = overapproximateProperty(propConcrete, concreteToAbstract, nAbstract);
         Property propUnder = underapproximateProperty(propConcrete, concreteToAbstract, nAbstract);
         System.out.println("Game-based abstraction overapproximation property: " + propOver);
