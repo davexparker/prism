@@ -1588,6 +1588,10 @@ public class PrismCL implements PrismModelListener
 		registry.addSwitch("frontier", new FlagSwitch(() -> prism.setReachMethod(Prism.REACH_FRONTIER)));
 		registry.addSwitch("bfs",      new FlagSwitch(() -> prism.setReachMethod(Prism.REACH_BFS)));
 		registry.addSwitch("bisim",    new FlagSwitch(() -> prism.setDoBisim(true)));
+		registry.addSwitch("bisimmethod", (sw, a) -> {
+			prism.setDoBisim(true);
+			prism.setBisimMethod(a.next(sw));
+		});
 	}
 
 	/**

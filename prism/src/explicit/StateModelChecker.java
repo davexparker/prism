@@ -38,6 +38,7 @@ import java.util.TreeSet;
 import java.util.Vector;
 
 import common.Interval;
+import explicit.bisim.BisimulationTools;
 import explicit.rewards.ConstructRewards;
 import explicit.rewards.Rewards;
 import io.DotExporter;
@@ -104,6 +105,8 @@ public class StateModelChecker extends PrismComponent
 
 	// Do bisimulation minimisation before model checking?
 	protected boolean doBisim = false;
+	// Which bisimulation minimisation method to use?
+	protected String bisimMethod = null;
 
 	// Do topological value iteration?
 	protected boolean doTopologicalValueIteration = false;
@@ -230,6 +233,7 @@ public class StateModelChecker extends PrismComponent
 		setGenStrat(other.getGenStrat());
 		setRestrictStratToReach(other.getRestrictStratToReach());
 		setDoBisim(other.getDoBisim());
+		setBisimMethod(other.getBisimMethod());
 		setDoIntervalIteration(other.getDoIntervalIteration());
 		setDoPmaxQuotient(other.getDoPmaxQuotient());
 	}
@@ -322,6 +326,14 @@ public class StateModelChecker extends PrismComponent
 	public void setDoBisim(boolean doBisim)
 	{
 		this.doBisim = doBisim;
+	}
+
+	/**
+	 * Specify which bisimulation minimisation method to use.
+	 */
+	public void setBisimMethod(String bisimMethod)
+	{
+		this.bisimMethod = bisimMethod;
 	}
 
 	/**
@@ -425,6 +437,14 @@ public class StateModelChecker extends PrismComponent
 	public boolean getDoBisim()
 	{
 		return doBisim;
+	}
+
+	/**
+	 * Which bisimulation minimisation method to use.
+	 */
+	public String getBisimMethod()
+	{
+		return bisimMethod;
 	}
 
 	/**
@@ -581,8 +601,8 @@ public class StateModelChecker extends PrismComponent
 		// Find any R operators, get/construct their rewards and attach them to the model
 		attachRewardsForBisimulation(model, exprNew);
 		// Do the bisimulation
-		Bisimulation<Value> bisim = new Bisimulation<>(this);
-		model = bisim.minimise(model);
+		BisimulationTools<Value> bisim = new BisimulationTools<Value>();
+		model = bisim.minimise(this, bisimMethod, model);
 		//model.export(mainLog, ModelExportFormat.EXPLICIT);
 		mainLog.println("Modified property: " + exprNew);
 		return new Pair<>(model, exprNew);

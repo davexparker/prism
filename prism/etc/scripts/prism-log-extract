@@ -31,9 +31,11 @@ all_fields_details = [\
     {'name': 'time_constr', 'descr': 'Time to construct the model', 'regexp': 'Time for model construction: *(.+) sec'}, \
     {'name': 'prop_file', 'descr': 'Name of PRISM property file', 'type': 'file', 'regexp': 'Parsing properties file "(.+)"...'}, \
     {'name': 'prop_consts', 'descr': 'Constants defined for property', 'type': 'string', 'regexp': 'Property constants: (.+)'}, \
-    {'name': 'iters_check', 'descr': 'Iterations for (numerica) model checking', 'regexp': 'took ([^ \n]+) iterations', 'match': 'last'}, \
+    {'name': 'iters_check', 'descr': 'Iterations for (numerical) model checking', 'regexp': 'took ([^ \n]+) iterations', 'match': 'last'}, \
     {'name': 'time_check', 'descr': 'Time to perform mode checking', 'regexp': 'Time for model checking: *(.+) sec'}, \
     {'name': 'result', 'descr': 'Result of mode checking', 'regexp': '^Result.*: ([^( \n]+)'}, \
+    {'name': 'time_bisim', 'descr': 'Time to perform bisimulation minimization', 'regexp': 'Time for bisimulation computation: *(.+) sec'}, \
+    {'name': 'min_states', 'descr': 'Number of states in the minimized model', 'regexp': ' to *(.+) States'}, \
 ]
 
 # Names of all fields
