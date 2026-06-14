@@ -45,6 +45,7 @@ import explicit.MDPSimple;
 import explicit.Model;
 import explicit.ModelExplicit;
 import explicit.rewards.Rewards;
+import explicit.rewards.StateRewardsSimple;
 import parser.State;
 import prism.Evaluator;
 import prism.PrismComponent;
@@ -92,7 +93,7 @@ public abstract class Bisimulation<Value> extends PrismComponent
 			case MDP:
 				return computeMinimisedMDP((MDP<Value>) model);
 			default:
-				throw new PrismNotSupportedException("Bisimulation minimisation not yet supported for " +
+				throw new PrismNotSupportedException("Bisimulation minimisation is not yet supported for " +
 					model.getModelType() + "s");
 		}
 	}
@@ -295,13 +296,20 @@ public abstract class Bisimulation<Value> extends PrismComponent
 				rewardBSs.computeIfAbsent(rewards.getStateReward(s), r -> new BitSet()).set(s);
 			}
 			all.addAll(rewardBSs.values());
-		} else {
+		} else if (!propBSs.isEmpty()) {
 			bs1 = (BitSet) propBSs.get(0).clone();
 			bs0 = (BitSet) bs1.clone();
 			bs0.flip(0, numStates);
 			all.add(bs1);
 			all.add(bs0);
 			propStart = 1;
+		} else {
+			// no labels
+			for (int s = 0; s < numStates; s++) {
+				partition[s] = 0;
+			}
+			numBlocks = 1;
+			return;
 		}
 
 		// Compute all non-empty combinations of propositions

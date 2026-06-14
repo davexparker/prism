@@ -589,6 +589,12 @@ public class StateModelChecker extends PrismComponent
 		if (!(model instanceof ModelExplicit)) {
 			throw new PrismException("Cannot perform bisimulation minimisation on a non-writeable model");
 		}
+		// Check for unsupported filter operators
+		FilterOperator op = ((ExpressionFilter) expr).getOperatorType();
+		if (op == FilterOperator.SUM || op == FilterOperator.COUNT || op == FilterOperator.AVG) {
+			throw new PrismNotSupportedException("Bisimulation minimisation is not yet supported for " +
+					"filter(" + op.keyword + ", ...) properties");
+		}
 		// Find and evaluate maximal propositional formulas in the property, to use as propositions for bisimulation minimisation
 		ArrayList<String> propNames = new ArrayList<String>();
 		ArrayList<BitSet> propBSs = new ArrayList<BitSet>();
