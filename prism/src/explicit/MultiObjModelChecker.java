@@ -37,7 +37,7 @@ import parser.ast.ExpressionQuant;
 import prism.ModelType;
 import prism.MultiObjModelCheckerUtils;
 import prism.Operator;
-import prism.OpsAndBoundsList;
+import prism.MultiObjQuery;
 import prism.PrismComponent;
 import prism.PrismException;
 import prism.PrismNotSupportedException;
