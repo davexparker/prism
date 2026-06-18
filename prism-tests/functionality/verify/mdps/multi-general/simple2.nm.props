@@ -4,3 +4,15 @@ multi(R{"R1"}max=? [ C ],P>=0.4 [ F s=1&p=2 ])
 
 // RESULT: 1.8
 multi(Rmax=? [ C ],P>=0.52 [ F s=1&p=1 ],P>=0.4 [ F s=1&p=2 ])
+
+// Pure R[C] multi-objective queries exploiting the R1/R3 trade-off
+// ([a]: R1=1,R3=3; [b]: R1=2,R3=2; [c]: R1=3,R3=1; R2=1 for all actions)
+
+// RESULT: 2.0
+multi(R{"R1"}max=? [ C ], R{"R3"}>=2 [ C ])
+
+// RESULT: 3.0
+multi(R{"R1"}max=? [ C ], R{"R3"}>=1 [ C ])
+
+// RESULT: true
+multi(R{"R1"}>=2 [ C ], R{"R3"}>=2 [ C ])

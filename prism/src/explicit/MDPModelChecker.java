@@ -53,11 +53,14 @@ import explicit.rewards.Rewards;
 import io.ModelExportFormat;
 import parser.ast.Expression;
 import parser.ast.ExpressionFunc;
+import parser.type.TypeBool;
 import solver.LPSolver;
 import parser.type.TypeDouble;
+import parser.type.TypeVoid;
 import prism.Accuracy;
 import prism.Accuracy.AccuracyLevel;
 import prism.AccuracyFactory;
+import prism.TileList;
 import prism.OptionsIntervalIteration;
 import prism.PrismComponent;
 import prism.PrismDevNullLog;
@@ -93,8 +96,16 @@ public class MDPModelChecker extends ProbModelChecker
 	{
 		if (expr.getNameCode() == ExpressionFunc.MULTI) {
 			explicit.MultiObjModelChecker mcMo = new explicit.MultiObjModelChecker(this, this);
-			// Currently throws PrismNotSupportedException; return handling will be added when implemented
-			mcMo.checkMultiObjective((MDP<?>) model, expr, statesOfInterest);
+			Object value = mcMo.checkMultiObjective((MDP<?>) model, expr, statesOfInterest);
+			if (value instanceof TileList) {
+				return StateValues.createFromSingleValue(TypeVoid.getInstance(), value, model);
+			}
+			if (value instanceof Boolean) {
+				return StateValues.createFromSingleValue(TypeBool.getInstance(), (Boolean) value, model);
+			}
+			if (value instanceof Double) {
+				return StateValues.createFromSingleValue(TypeDouble.getInstance(), (Double) value, model);
+			}
 			throw new PrismException("Internal error: unexpected return from checkMultiObjective");
 		}
 		return super.checkExpressionFunc(model, expr, statesOfInterest);

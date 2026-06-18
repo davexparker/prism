@@ -15,3 +15,19 @@ multi(R{"R2"}max=?[C<=1],R{"R1"}>=2.95[C<=2])
 
 // RESULT: 0.4
 multi(R{"R4"}max=?[C<=2],R{"R1"}>=0.5[C<=1],R{"R3"}>=0.3[C<=2])
+
+// Unbounded R[C] queries (paths: [a]+[d]=R1:2,R2:2,R3:0,R4:0;
+//                                [b]+[e]=R1:3,R2:1,R3:1,R4:0;
+//                                [c]+[f]=R1:2.9,R2:2,R3:0,R4:1)
+
+// RESULT: 2.9
+multi(R{"R1"}max=? [ C ], R{"R2"}>=2 [ C ])
+
+// RESULT: 3.0
+multi(R{"R1"}max=? [ C ], R{"R3"}>=0.5 [ C ])
+
+// RESULT: true
+multi(R{"R1"}>=2 [ C ], R{"R3"}>=0.5 [ C ])
+
+// RESULT: 0.5
+multi(R{"R4"}max=? [ C ], R{"R1"}>=2.5 [ C ], R{"R3"}>=0.5 [ C ])

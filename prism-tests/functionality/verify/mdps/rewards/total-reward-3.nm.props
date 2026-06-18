@@ -27,3 +27,16 @@ R{"s1"}max=?[ C ]
 
 // RESULT: 0
 filter(state, R{"s1"}max=?[ C ], s=2)
+
+// Multi-objective R[C] queries combining the two finite transition reward structures.
+// Mixing probability q of action [a] gives: R{"s0_a"}=6q/(3-q), R{"s0_b"}=3(1-q)*1e-5/(3-q).
+// Increasing q raises R{"s0_a"} but lowers R{"s0_b"}; the constraint R{"s0_b"}>=5e-6 forces q<=0.6.
+
+// RESULT: 1.5
+multi(R{"s0_a"}max=? [ C ], R{"s0_b"}>=5.0E-6 [ C ])
+
+// RESULT: true
+multi(R{"s0_a"}>=1 [ C ], R{"s0_b"}>=5.0E-6 [ C ])
+
+// RESULT: false
+multi(R{"s0_a"}>=2 [ C ], R{"s0_b"}>=5.0E-6 [ C ])
