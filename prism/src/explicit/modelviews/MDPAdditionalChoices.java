@@ -39,6 +39,7 @@ import java.util.function.IntPredicate;
 
 import common.iterable.SingletonIterator;
 import explicit.MDP;
+import explicit.rewards.Rewards;
 import parser.State;
 import parser.Values;
 import parser.VarList;
@@ -143,6 +144,30 @@ public class MDPAdditionalChoices<Value> extends MDPView<Value>
 	public BitSet getLabelStates(final String name)
 	{
 		return model.getLabelStates(name);
+	}
+
+	@Override
+	public Rewards<Value> getRewardsByIndex(int r)
+	{
+		return model.getRewardsByIndex(r);
+	}
+
+	@Override
+	public Rewards<Value> getRewardsByName(String name)
+	{
+		return model.getRewardsByName(name);
+	}
+
+	@Override
+	public List<String> getRewardNames()
+	{
+		return model.getRewardNames();
+	}
+
+	@Override
+	public List<Rewards<Value>> getRewards()
+	{
+		return model.getRewards();
 	}
 
 	@Override

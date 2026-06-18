@@ -36,6 +36,7 @@ import java.util.Set;
 import explicit.DTMC;
 import explicit.DTMCSimple;
 import explicit.MDP;
+import explicit.rewards.Rewards;
 import parser.State;
 import parser.Values;
 import parser.VarList;
@@ -128,6 +129,30 @@ public class MDPFromDTMC<Value> extends MDPView<Value>
 	public BitSet getLabelStates(final String name)
 	{
 		return model.getLabelStates(name);
+	}
+
+	@Override
+	public Rewards<Value> getRewardsByIndex(int r)
+	{
+		return model.getRewardsByIndex(r);
+	}
+
+	@Override
+	public Rewards<Value> getRewardsByName(String name)
+	{
+		return model.getRewardsByName(name);
+	}
+
+	@Override
+	public List<String> getRewardNames()
+	{
+		return model.getRewardNames();
+	}
+
+	@Override
+	public List<Rewards<Value>> getRewards()
+	{
+		return model.getRewards();
 	}
 
 	@Override

@@ -34,7 +34,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.function.Function;
 
+import explicit.rewards.Rewards;
 import io.ExplicitModelImporter;
 import io.PrismExplicitImporter;
 import parser.State;
@@ -99,6 +101,19 @@ public abstract class ModelExplicit<Value> implements Model<Value>, ActionListOw
 	protected Map<String, BitSet> labels = new TreeMap<String, BitSet>();
 
 	/**
+	 * (Optionally) names for some attached reward structures.
+	 * name is null if no reward of that index is attached; "" if it is attached but unnamed.
+	 */
+	protected List<String> rewardNames = new ArrayList<>();
+
+	/**
+	 * (Optionally) some attached reward structures.
+	 * Rewards have a (zero-indexed) index dictating their position in this list.
+	 * Null is stored when a reward of that index is not attached.
+	 */
+	protected List<Rewards<Value>> rewards = new ArrayList<>();
+
+	/**
 	 * (Optionally) the stored predecessor relation. Becomes inaccurate after the model is changed!
 	 */
 	protected PredecessorRelation predecessorRelation = null;
@@ -117,6 +132,7 @@ public abstract class ModelExplicit<Value> implements Model<Value>, ActionListOw
 	 * Copy data from another Model (used by superclass copy constructors).
 	 * Assumes that this has already been initialise()ed.
 	 */
+	@SuppressWarnings("unchecked")
 	public void copyFrom(Model<?> model)
 	{
 		setEvaluator((Evaluator<Value>) model.getEvaluator());
@@ -134,6 +150,8 @@ public abstract class ModelExplicit<Value> implements Model<Value>, ActionListOw
 		statesList = model.getStatesList();
 		constantValues = model.getConstantValues();
 		labels = model.getLabelToStatesMap();
+		rewardNames = model.getRewardNames();
+		rewards = (List<Rewards<Value>>) (List<?>) model.getRewards();
 		varList = model.getVarList();
 	}
 
@@ -162,6 +180,8 @@ public abstract class ModelExplicit<Value> implements Model<Value>, ActionListOw
 		statesList = null;
 		constantValues = model.getConstantValues();
 		labels.clear();
+		rewardNames.clear();
+		rewards.clear();
 		varList = model.getVarList();
 	}
 
@@ -177,6 +197,8 @@ public abstract class ModelExplicit<Value> implements Model<Value>, ActionListOw
 		constantValues = null;
 		varList = null;
 		labels = new TreeMap<String, BitSet>();
+		rewardNames = new ArrayList<>();
+		rewards = new ArrayList<>();
 	}
 
 	/**
@@ -311,6 +333,64 @@ public abstract class ModelExplicit<Value> implements Model<Value>, ActionListOw
 
 		addLabel(label, labelStates);
 		return label;
+	}
+
+	/**
+	 * Attach a reward structure with index {@code r} and (optional) name {@code name}.
+	 * @param r Index of reward structure (zero-indexed)
+	 * @param name Name of reward structure ("" for unnamed; null also accepted)
+	 * @param rews The rewards
+	 * @return  The index of the attached reward
+	 */
+	public int addReward(int r, String name, Rewards<Value> rews)
+	{
+		if (r < rewards.size()) {
+			rewardNames.set(r, name == null ? "" : name);
+			rewards.set(r, rews);
+			return r;
+		}
+		while (r > rewards.size()) {
+			rewardNames.add(null);
+			rewards.add(null);
+		}
+		rewardNames.add(name == null ? "" : name);
+		rewards.add(rews);
+		return r;
+	}
+
+	/**
+	 * Attach a reward structure with (optional) name {@code name}.
+	 * If name is non-empty and a reward structure already exists with that name, the existing reward structure is overwritten.
+	 * @param name Name of reward structure ("" for unnamed; null also accepted)
+	 * @param rews The rewards
+	 * @return The index of the attached reward
+	 */
+	public int addReward(String name, Rewards<Value> rews)
+	{
+		int r = (name != null && !name.isEmpty() && rewardNames.contains(name)) ? rewardNames.indexOf(name) : rewards.size();
+		return addReward(r, name, rews);
+	}
+
+	/**
+	 * Copy the rewards from an existing model.
+	 */
+	public void copyRewards(Model<Value> model)
+	{
+		copyRewardsMapped(model, rews -> rews);
+	}
+
+	/**
+	 * Copy the rewards from an existing model after first applying a function to them.
+	 */
+	public void copyRewardsMapped(Model<Value> model, Function<Rewards<Value>, Rewards<Value>> map)
+	{
+		int r = 0;
+		for (Rewards<Value> rews : model.getRewards()) {
+			if (rews != null) {
+				addReward(r, model.getRewardName(r), map.apply(rews));
+			}
+			r++;
+		}
 	}
 
 	// Accessors (for Model interface)
@@ -448,6 +528,31 @@ public abstract class ModelExplicit<Value> implements Model<Value>, ActionListOw
 	public Map<String, BitSet> getLabelToStatesMap()
 	{
 		return labels;
+	}
+
+	@Override
+	public Rewards<Value> getRewardsByIndex(int r)
+	{
+		return r < rewards.size() ? rewards.get(r) : null;
+	}
+
+	@Override
+	public Rewards<Value> getRewardsByName(String name)
+	{
+		int r = (name != null && !name.isEmpty() && rewardNames.contains(name)) ? rewardNames.indexOf(name) : -1;
+		return r == -1 ? null : getRewardsByIndex(r);
+	}
+
+	@Override
+	public List<String> getRewardNames()
+	{
+		return rewardNames;
+	}
+
+	@Override
+	public List<Rewards<Value>> getRewards()
+	{
+		return rewards;
 	}
 
 	@Override

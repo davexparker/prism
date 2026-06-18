@@ -954,16 +954,20 @@ public class ProbModelChecker extends NonProbModelChecker
 	/**
 	 * Model check an R operator expression and return the values for all states.
 	 */
-	protected StateValues checkExpressionReward(Model<?> model, ExpressionReward expr, boolean forAll, Coalition coalition, BitSet statesOfInterest) throws PrismException
-	{
+	protected StateValues checkExpressionReward(Model<?> model, ExpressionReward expr, boolean forAll, Coalition coalition, BitSet statesOfInterest) throws PrismException {
 		// Get info from R operator
 		OpRelOpBound opInfo = expr.getRelopBoundInfo(constantValues);
 		MinMax minMax = opInfo.getMinMax(model.getModelType(), forAll);
 
-		// Build rewards
-		int r = expr.getRewardStructIndexByIndexObject(rewardGen, constantValues);
-		mainLog.println("Building reward structure...");
-		Rewards<?> rewards = Expression.usesInstantaneousReward(expr.getExpression()) ? constructRewards(model, r) : constructExpectedRewards(model, r);
+		// First look at rewards attached directly to model
+		int r = expr.getRewardStructIndexByIndexObject(model.getRewardNames(), constantValues, false);
+		Rewards<?> rewards = r == -1 ? null : model.getRewardsByIndex(r);
+		// Failing that, build rewards via reward generator
+		if (rewards == null) {
+			r = expr.getRewardStructIndexByIndexObject(rewardGen, constantValues);
+			mainLog.println("Building reward structure...");
+			rewards = Expression.usesInstantaneousReward(expr.getExpression()) ? constructRewards(model, r) : constructExpectedRewards(model, r);
+		}
 
 		// Compute rewards
 		StateValues rews = checkRewardFormula(model, rewards, expr.getExpression(), minMax, statesOfInterest);

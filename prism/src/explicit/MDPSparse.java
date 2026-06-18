@@ -98,14 +98,7 @@ public class MDPSparse extends MDPExplicit<Double>
 	public MDPSparse(final MDP<Double> mdp, boolean sort)
 	{
 		initialise(mdp.getNumStates());
-		if (mdp instanceof ActionListOwner) {
-			actionList.copyFrom(((ActionListOwner) mdp).getActionList());
-		}
-		setStatesList(mdp.getStatesList());
-		setConstantValues(mdp.getConstantValues());
-		for (String label : mdp.getLabels()) {
-			addLabel(label, mdp.getLabelStates(label));
-		}
+		copyFrom(mdp);
 
 		// Copy stats
 		numDistrs = mdp.getNumChoices();
