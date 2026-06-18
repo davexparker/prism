@@ -1,2 +1,4 @@
 -sparse
 -sparse -gs
+-ex
+-ex -gs
