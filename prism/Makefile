@@ -372,6 +372,27 @@ JFLAGS += --release 11 # Enforce Java language level
 export CFLAGS CXXFLAGS LDFLAGS JFLAGS LIBPREFIX LIBSUFFIX
 
 ##########################################
+# Optional plugins                       #
+##########################################
+
+GUROBI_PLUGIN_SRC := plugins/gurobi/src/solver/GurobiSolver.java
+GUROBI_PLUGIN_JAR := $(PRISM_LIB_DIR)/gurobi-plugin.jar
+GUROBI_JAR        := $(wildcard $(PRISM_LIB_DIR)/gurobi.jar)
+GUROBI_PLUGIN_TMP := .plugin_build_tmp
+
+ifneq ($(GUROBI_JAR),)
+prism_java: $(GUROBI_PLUGIN_JAR)
+
+$(GUROBI_PLUGIN_JAR): $(GUROBI_PLUGIN_SRC) $(GUROBI_JAR) $(JAVA_COMPILED_STAMP)
+	@mkdir -p $(GUROBI_PLUGIN_TMP)
+	$(JAVAC) $(JFLAGS) \
+	    -classpath "$(PRISM_LIB_DIR)/*:$(JAVA_CLASSES_DIR)" \
+	    -d $(GUROBI_PLUGIN_TMP) $(GUROBI_PLUGIN_SRC)
+	jar cf $(GUROBI_PLUGIN_JAR) -C $(GUROBI_PLUGIN_TMP) .
+	@rm -rf $(GUROBI_PLUGIN_TMP)
+endif
+
+##########################################
 # Main part of Makefile: Compiling PRISM #
 ##########################################
 
@@ -732,6 +753,8 @@ clean: checks
 	rm -f $(JAVA_SRC_FILES_LIST) $(JAVA_COMPILED_STAMP)
 	rm -f $(JAVA_TESTS_SRC_FILES_LIST) $(JAVA_TESTS_COMPILED_STAMP)
 	rm -rf $(PRISM_OBJ_DIR)
+	rm -f $(GUROBI_PLUGIN_JAR)
+	rm -rf $(GUROBI_PLUGIN_TMP)
 	rm -f $(PRISM_LIB_DIR)/$(LIBPREFIX)prism$(LIBSUFFIX)
 	rm -f $(OLD_SHARED_LIB_FILES)
 	rm -f $(PRISM_INCLUDE_DIR)/jni/*.h

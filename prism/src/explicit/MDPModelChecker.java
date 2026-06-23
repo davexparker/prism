@@ -1311,8 +1311,8 @@ public class MDPModelChecker extends ProbModelChecker
 						.getDeclaredConstructor(int.class)
 						.newInstance(numVars);
 			} catch (ClassNotFoundException | NoClassDefFoundError e) {
-				throw new PrismException("Gurobi LP solver not available "
-						+ "(compile with gurobi.jar in lib/ to enable)");
+				throw new PrismException("Gurobi LP solver not available:"
+						+ " place gurobi.jar and native libs in lib/ and run make");
 			} catch (ReflectiveOperationException e) {
 				throw new PrismException("Failed to load Gurobi solver: " + e.getMessage());
 			}
