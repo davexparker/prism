@@ -77,6 +77,8 @@ public class ProbModelChecker extends NonProbModelChecker
 	protected MDPSolnMethod mdpSolnMethod = MDPSolnMethod.GAUSS_SEIDEL;
 	// Method used to solve IMDPs (and IDTMCs)
 	protected IMDPSolnMethod imdpSolnMethod = IMDPSolnMethod.GAUSS_SEIDEL;
+	// LP solver backend to use when the MDP solution method is linear programming
+	protected String lpSolver = "lpsolve";
 	// Iterative numerical method termination criteria
 	protected TermCrit termCrit = TermCrit.RELATIVE;
 	// Parameter for iterative numerical method termination criteria
@@ -238,6 +240,8 @@ public class ProbModelChecker extends NonProbModelChecker
 			} else {
 				throw new PrismNotSupportedException("Explicit engine does not support IMDP solution method \"" + s + "\"");
 			}
+			// PRISM_LP_SOLVER
+			lpSolver = settings.getString(PrismSettings.PRISM_LP_SOLVER);
 			// PRISM_TERM_CRIT
 			s = settings.getString(PrismSettings.PRISM_TERM_CRIT);
 			if (s.equals("Absolute")) {
@@ -281,6 +285,7 @@ public class ProbModelChecker extends NonProbModelChecker
 		setLinEqMethod(other.getLinEqMethod());
 		setMDPSolnMethod(other.getMDPSolnMethod());
 		setIMDPSolnMethod(other.getIMDPSolnMethod());
+		setLPSolver(other.getLPSolver());
 		setTermCrit(other.getTermCrit());
 		setTermCritParam(other.getTermCritParam());
 		setMaxIters(other.getMaxIters());
@@ -358,6 +363,14 @@ public class ProbModelChecker extends NonProbModelChecker
 	public void setIMDPSolnMethod(IMDPSolnMethod imdpSolnMethod)
 	{
 		this.imdpSolnMethod = imdpSolnMethod;
+	}
+
+	/**
+	 * Set the LP solver backend (by id, e.g. "lpsolve" or "gurobi").
+	 */
+	public void setLPSolver(String lpSolver)
+	{
+		this.lpSolver = lpSolver;
 	}
 
 	/**
@@ -463,6 +476,11 @@ public class ProbModelChecker extends NonProbModelChecker
 	public MDPSolnMethod getMDPSolnMethod()
 	{
 		return mdpSolnMethod;
+	}
+
+	public String getLPSolver()
+	{
+		return lpSolver;
 	}
 
 	public IMDPSolnMethod getIMDPSolnMethod()
