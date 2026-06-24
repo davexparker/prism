@@ -371,26 +371,9 @@ JFLAGS += --release 11 # Enforce Java language level
 
 export CFLAGS CXXFLAGS LDFLAGS JFLAGS LIBPREFIX LIBSUFFIX
 
-##########################################
-# Optional plugins                       #
-##########################################
-
-GUROBI_PLUGIN_SRC := plugins/gurobi/src/solver/GurobiSolver.java
-GUROBI_PLUGIN_JAR := $(PRISM_LIB_DIR)/gurobi-plugin.jar
-GUROBI_JAR        := $(wildcard $(PRISM_LIB_DIR)/gurobi.jar)
-GUROBI_PLUGIN_TMP := .plugin_build_tmp
-
-ifneq ($(GUROBI_JAR),)
-prism_java: $(GUROBI_PLUGIN_JAR)
-
-$(GUROBI_PLUGIN_JAR): $(GUROBI_PLUGIN_SRC) $(GUROBI_JAR) $(JAVA_COMPILED_STAMP)
-	@mkdir -p $(GUROBI_PLUGIN_TMP)
-	$(JAVAC) $(JFLAGS) \
-	    -classpath "$(PRISM_LIB_DIR)/*:$(JAVA_CLASSES_DIR)" \
-	    -d $(GUROBI_PLUGIN_TMP) $(GUROBI_PLUGIN_SRC)
-	jar cf $(GUROBI_PLUGIN_JAR) -C $(GUROBI_PLUGIN_TMP) .
-	@rm -rf $(GUROBI_PLUGIN_TMP)
-endif
+# Variables for optional plugin compilation (targets defined later, after default goal)
+PLUGIN_TMP      := .plugin_build_tmp
+PLUGIN_SRC_DIRS := $(wildcard plugins/*/src)
 
 ##########################################
 # Main part of Makefile: Compiling PRISM #
@@ -439,6 +422,34 @@ prism: checks prism_java prism_lib prism_ng bin_scripts
 
 # Compile all Java code, build JNI headers
 prism_java: $(JAVA_COMPILED_STAMP)
+
+# Optional plugins: any plugins/xxx/ with Java source in src/ is compiled into
+# lib/prism-xxx.jar using lib/* as classpath. If optional SDK jars are absent,
+# compilation is skipped with a warning rather than failing the build.
+ifneq ($(PLUGIN_SRC_DIRS),)
+prism_java: compile-plugins
+endif
+
+.PHONY: compile-plugins
+compile-plugins: $(JAVA_COMPILED_STAMP)
+	@for src_dir in $(PLUGIN_SRC_DIRS); do \
+	    plugin=$$(basename $$(dirname $$src_dir)); \
+	    jar_out=$(PRISM_LIB_DIR)/prism-$$plugin.jar; \
+	    java_files=$$(find $$src_dir -name "*.java" 2>/dev/null | tr '\n' ' '); \
+	    [ -z "$$java_files" ] && continue; \
+	    echo "Compiling plugin: $$plugin"; \
+	    rm -rf $(PLUGIN_TMP) && mkdir -p $(PLUGIN_TMP); \
+	    if javac_out=$$($(JAVAC) $(JFLAGS) \
+	            -classpath "$(PRISM_LIB_DIR)/*:$(JAVA_CLASSES_DIR)" \
+	            -d $(PLUGIN_TMP) $$java_files 2>&1); then \
+	        [ -n "$$javac_out" ] && echo "$$javac_out"; \
+	        jar cf $$jar_out -C $(PLUGIN_TMP) .; \
+	        echo "  -> $$jar_out"; \
+	    else \
+	        echo "  Skipping plugin '$$plugin': compilation failed (optional dependencies may be missing from lib/)"; \
+	    fi; \
+	    rm -rf $(PLUGIN_TMP); \
+	done
 
 $(JAVA_COMPILED_STAMP): $(JAVA_SRC_FILES)
 	@mkdir -p $(JAVA_CLASSES_DIR) $(PRISM_INCLUDE_DIR)/jni
@@ -753,8 +764,12 @@ clean: checks
 	rm -f $(JAVA_SRC_FILES_LIST) $(JAVA_COMPILED_STAMP)
 	rm -f $(JAVA_TESTS_SRC_FILES_LIST) $(JAVA_TESTS_COMPILED_STAMP)
 	rm -rf $(PRISM_OBJ_DIR)
-	rm -f $(GUROBI_PLUGIN_JAR)
-	rm -rf $(GUROBI_PLUGIN_TMP)
+	@for src_dir in $(PLUGIN_SRC_DIRS); do \
+	    plugin=$$(basename $$(dirname $$src_dir)); \
+	    rm -f $(PRISM_LIB_DIR)/prism-$$plugin.jar; \
+	done
+	rm -f $(PRISM_LIB_DIR)/gurobi-plugin.jar
+	rm -rf $(PLUGIN_TMP)
 	rm -f $(PRISM_LIB_DIR)/$(LIBPREFIX)prism$(LIBSUFFIX)
 	rm -f $(OLD_SHARED_LIB_FILES)
 	rm -f $(PRISM_INCLUDE_DIR)/jni/*.h
