@@ -53,7 +53,7 @@ import explicit.rewards.Rewards;
 import io.ModelExportFormat;
 import parser.ast.Expression;
 import solver.LPSolver;
-import solver.LpSolveSolver;
+import solver.LPSolverRegistry;
 import parser.type.TypeDouble;
 import prism.Accuracy;
 import prism.Accuracy.AccuracyLevel;
@@ -78,10 +78,6 @@ import strat.Strategy;
  */
 public class MDPModelChecker extends ProbModelChecker
 {
-	public enum LPSolverType { LPSOLVE, GUROBI }
-
-	protected LPSolverType lpSolver = LPSolverType.GUROBI;
-
 	/**
 	 * Create a new MDPModelChecker, inherit basic state from parent (unless null).
 	 */
@@ -1297,28 +1293,11 @@ public class MDPModelChecker extends ProbModelChecker
 
 	/**
 	 * Create an LP solver backend of the type selected by {@link #lpSolver}.
-	 * The Gurobi backend is loaded via reflection so that MDPModelChecker compiles
-	 * without gurobi.jar; a helpful error is raised if the class is not available.
+	 * Backends are discovered at runtime via Java SPI (see {@link LPSolverRegistry}).
 	 */
 	private LPSolver createLPSolver(int numVars) throws PrismException
 	{
-		switch (lpSolver) {
-		case LPSOLVE:
-			return new LpSolveSolver(numVars);
-		case GUROBI:
-			try {
-				return (LPSolver) Class.forName("solver.GurobiSolver")
-						.getDeclaredConstructor(int.class)
-						.newInstance(numVars);
-			} catch (ClassNotFoundException | NoClassDefFoundError e) {
-				throw new PrismException("Gurobi LP solver not available:"
-						+ " place gurobi.jar and native libs in lib/ and run make");
-			} catch (ReflectiveOperationException e) {
-				throw new PrismException("Failed to load Gurobi solver: " + e.getMessage());
-			}
-		default:
-			throw new PrismException("Unknown LP solver: " + lpSolver);
-		}
+		return LPSolverRegistry.create(lpSolver, numVars);
 	}
 
 	/**

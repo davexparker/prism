@@ -443,6 +443,7 @@ compile-plugins: $(JAVA_COMPILED_STAMP)
 	            -classpath "$(PRISM_LIB_DIR)/*:$(JAVA_CLASSES_DIR)" \
 	            -d $(PLUGIN_TMP) $$java_files 2>&1); then \
 	        [ -n "$$javac_out" ] && echo "$$javac_out"; \
+	        [ -d $$src_dir/META-INF ] && cp -r $$src_dir/META-INF $(PLUGIN_TMP)/; \
 	        jar cf $$jar_out -C $(PLUGIN_TMP) .; \
 	        echo "  -> $$jar_out"; \
 	    else \
@@ -456,6 +457,7 @@ $(JAVA_COMPILED_STAMP): $(JAVA_SRC_FILES)
 	@find $(JAVA_SRC_DIR) -name "*.java" > $(JAVA_SRC_FILES_LIST)
 	@echo "Compiling Java files..."
 	$(JAVAC) $(JFLAGS) -classpath "$(PRISM_LIB_DIR)/*" -d $(JAVA_CLASSES_DIR) -h $(PRISM_INCLUDE_DIR)/jni @$(JAVA_SRC_FILES_LIST)
+	@if [ -d $(JAVA_SRC_DIR)/META-INF ]; then cp -r $(JAVA_SRC_DIR)/META-INF $(JAVA_CLASSES_DIR)/; fi
 	@touch $@
 
 # Rebuild PRISM (JavaCC) compiler if needed
