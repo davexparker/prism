@@ -11,7 +11,7 @@ It is compiled conditionally — only when `lib/gurobi.jar` is present.
    - `libgurobi130.dylib` (macOS) / `libgurobi130.so` (Linux) — Gurobi native lib
    - `libGurobiJni130.dylib` (macOS) / `libGurobiJni130.so` (Linux) — JNI bridge
 3. Run `make prism_java` from the `prism/` directory.
-   This produces `lib/gurobi-plugin.jar` automatically.
+   This produces `lib/prism-gurobi.jar` automatically.
 
 The plugin is then active at runtime. To select it:
 
@@ -21,12 +21,12 @@ The plugin is then active at runtime. To select it:
 
 ## Pre-built artifact
 
-If you have a pre-built `gurobi-plugin.jar` (e.g., from CI), drop it into `lib/`.
+If you have a pre-built `prism-gurobi.jar` (e.g., from CI), drop it into `lib/`.
 No `make` invocation needed — `lib/*` is on the runtime classpath.
 
 ## Removing the plugin
 
-Delete `lib/gurobi-plugin.jar`. PRISM will revert to lpsolve for LP solving.
+Delete `lib/prism-gurobi.jar`. PRISM will revert to lpsolve for LP solving.
 
 ## IDE development (IntelliJ)
 
@@ -36,5 +36,5 @@ To edit `GurobiSolver.java` with full IDE support:
    library via the existing `lib/` library entry).
 2. In IntelliJ: **File → Project Structure → Modules → prism → Sources**,
    click **+** and add `plugins/gurobi/src` as a source folder.
-3. Run `make prism_java` once to produce `lib/gurobi-plugin.jar`; subsequent
+3. Run `make prism_java` once to produce `lib/prism-gurobi.jar`; subsequent
    changes to `GurobiSolver.java` can be compiled within IntelliJ directly.
