@@ -95,6 +95,7 @@ public class PrismSettings implements Observer
 	public static final	String PRISM_MDP_SOLN_METHOD				= "prism.mdpSolnMethod";
 	public static final	String PRISM_MDP_MULTI_SOLN_METHOD			= "prism.mdpMultiSolnMethod";
 	public static final	String PRISM_IMDP_SOLN_METHOD				= "prism.imdpSolnMethod";
+	public static final	String PRISM_LP_SOLVER						= "prism.lpSolver";
 	public static final	String PRISM_TERM_CRIT						= "prism.termCrit";//"prism.termination";
 	public static final	String PRISM_TERM_CRIT_PARAM				= "prism.termCritParam";//"prism.terminationEpsilon";
 	public static final	String PRISM_MAX_ITERS						= "prism.maxIters";//"prism.maxIterations";
@@ -269,6 +270,8 @@ public class PrismSettings implements Observer
 																			"Which method to use when solving multi-objective queries on Markov decision processes." },
 			{ CHOICE_TYPE,		PRISM_IMDP_SOLN_METHOD,					"IMDP/DTMC solution method",				"4.7",			"Gauss-Seidel",																"Value iteration,Gauss-Seidel",
 																			"Which method to use when solving interval Markov decision processes and Markov chains." },
+			{ STRING_TYPE,		PRISM_LP_SOLVER,						"LP solver",							"4.10.2",			"lpsolve",																	"",
+																			"LP solver backend to use e.g. when the MDP solution method is linear programming (e.g. lpsolve, gurobi)." },
 			{ CHOICE_TYPE,		PRISM_TERM_CRIT,						"Termination criteria",					"2.1",			"Relative",																	"Absolute,Relative",																		
 																			"Criteria to use for checking termination of iterative numerical methods." },
 			{ DOUBLE_TYPE,		PRISM_TERM_CRIT_PARAM,					"Termination epsilon",					"2.1",			Double.valueOf(1.0E-6),															"0.0,",																						
@@ -1203,6 +1206,8 @@ public class PrismSettings implements Observer
 		}, "<x>", "Threshold for Pareto curve approximation");
 		reg.addSwitch("exportpareto", new StringSwitch(s -> set(PRISM_EXPORT_PARETO_FILENAME, s)),
 			"<file>", "When computing Pareto curves, export points to a file");
+		reg.addSwitch("lpsolver", new StringSwitch(s -> set(PRISM_LP_SOLVER, s)),
+			"<x>", "Specify LP solver to use for linear-programming-based methods");
 
 		// ── OUTPUT OPTIONS ────────────────────────────────────────────────────
 		reg.beginGroup("OUTPUT OPTIONS");
