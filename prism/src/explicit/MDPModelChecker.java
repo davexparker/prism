@@ -78,6 +78,10 @@ import strat.Strategy;
  */
 public class MDPModelChecker extends ProbModelChecker
 {
+	public enum LPSolverType { LPSOLVE, GUROBI }
+
+	protected LPSolverType lpSolver = LPSolverType.GUROBI;
+
 	/**
 	 * Create a new MDPModelChecker, inherit basic state from parent (unless null).
 	 */
@@ -1226,7 +1230,7 @@ public class MDPModelChecker extends ProbModelChecker
 		unknown.andNot(yes);
 		unknown.andNot(no);
 
-		LPSolver lp = new LpSolveSolver(n);
+		LPSolver lp = createLPSolver(n);
 		double[] coeffs = new double[n + 1];
 		int[] vars = new int[n + 1];
 		try {
@@ -1289,6 +1293,32 @@ public class MDPModelChecker extends ProbModelChecker
 		res.accuracy = new Accuracy(AccuracyLevel.EXACT_FLOATING_POINT);
 		res.timeTaken = timer / 1000.0;
 		return res;
+	}
+
+	/**
+	 * Create an LP solver backend of the type selected by {@link #lpSolver}.
+	 * The Gurobi backend is loaded via reflection so that MDPModelChecker compiles
+	 * without gurobi.jar; a helpful error is raised if the class is not available.
+	 */
+	private LPSolver createLPSolver(int numVars) throws PrismException
+	{
+		switch (lpSolver) {
+		case LPSOLVE:
+			return new LpSolveSolver(numVars);
+		case GUROBI:
+			try {
+				return (LPSolver) Class.forName("solver.GurobiSolver")
+						.getDeclaredConstructor(int.class)
+						.newInstance(numVars);
+			} catch (ClassNotFoundException | NoClassDefFoundError e) {
+				throw new PrismException("Gurobi LP solver not available "
+						+ "(compile with gurobi.jar in lib/ to enable)");
+			} catch (ReflectiveOperationException e) {
+				throw new PrismException("Failed to load Gurobi solver: " + e.getMessage());
+			}
+		default:
+			throw new PrismException("Unknown LP solver: " + lpSolver);
+		}
 	}
 
 	/**
@@ -2986,7 +3016,7 @@ public class MDPModelChecker extends ProbModelChecker
 		unknown.andNot(target);
 		unknown.andNot(inf);
 
-		LPSolver lp = new LpSolveSolver(n);
+		LPSolver lp = createLPSolver(n);
 		double[] coeffs = new double[n + 1];
 		int[] vars = new int[n + 1];
 		try {
