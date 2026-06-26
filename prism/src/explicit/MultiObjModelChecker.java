@@ -34,6 +34,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import strat.MRStrategy;
+
 import acceptance.AcceptanceRabin;
 import automata.DA;
 import common.IterableStateSet;
@@ -411,6 +413,43 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 					return false;
 				}
 				throw e;
+			}
+
+			// Extract and store randomised strategy from LP solution if requested.
+			// For each state s with LP variables, the randomised choice probability for
+			// action ch is y(s,ch) / sum_ch' y(s,ch') (occupancy measure normalised by
+			// total flow through s). For zero-reward MEC states the extra "stay" variable
+			// contributes to the total; its residual probability is assigned to the first
+			// MEC action (matching the _ec self-loop convention of the C++ LP exporter).
+			if (mc.getGenStrat()) {
+				MRStrategy<Double> strat = new MRStrategy<>(mdp);
+				for (int s = 0; s < n; s++) {
+					if (actionVar[s] == null) continue;
+					double total = 0.0;
+					for (int ch = 0; ch < mdp.getNumChoices(s); ch++) {
+						int vi = actionVar[s][ch];
+						if (vi >= 0) total += soln[vi];
+					}
+					if (extraVar[s] >= 0) total += soln[extraVar[s]];
+					if (total <= 0.0) continue; // unreachable: strategy undefined
+					for (int ch = 0; ch < mdp.getNumChoices(s); ch++) {
+						int vi = actionVar[s][ch];
+						if (vi >= 0 && soln[vi] > 0.0) {
+							strat.setChoiceProbability(s, ch, soln[vi] / total);
+						}
+					}
+					if (extraVar[s] >= 0 && soln[extraVar[s]] > 0.0) {
+						double stayProb = soln[extraVar[s]] / total;
+						BitSet myMec = mecForState[s];
+						for (int ch = 0; ch < mdp.getNumChoices(s); ch++) {
+							if (mdp.allSuccessorsInSet(s, ch, myMec)) {
+								strat.setChoiceProbability(s, ch, stayProb);
+								break;
+							}
+						}
+					}
+				}
+				mc.result.setStrategy(strat);
 			}
 
 			if (numNumerical == 0) {
