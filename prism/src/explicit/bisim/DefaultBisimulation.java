@@ -41,6 +41,7 @@ import java.util.Set;
 import explicit.CTMC;
 import explicit.DTMC;
 import explicit.MDP;
+import explicit.rewards.Rewards;
 import prism.Evaluator;
 import prism.PrismComponent;
 
@@ -156,15 +157,18 @@ public class DefaultBisimulation<Value> extends Bisimulation<Value>
 
 	/**
 	 * Computes probabilistic bisimilarity for the specified MDP.
+	 * Any transition rewards attached to the model are also respected.
 	 *
 	 * @param model The MDP.
 	 * @param eval  The evaluator to manipulate values.
 	 */
 	protected void mdpBisimilarity(MDP<Value> model, Evaluator<Value> eval)
 	{
+		Rewards<Value> rewards = model.getNumRewards() > 0 ? model.getRewards(0) : null;
 		/* the existing states are action states, and we create a probabilistic state for each distribution */
 		List<Map<Object, Set<Integer>>> actionStates = new ArrayList<Map<Object, Set<Integer>>>(numStates);
 		List<Map<Integer, Value>> probabilisticStates = new ArrayList<Map<Integer, Value>>(numStates);
+		List<Value> transitionRewards = new ArrayList<Value>(numStates);
 		int numProbabilisticStates = 0;
 		for (int source = 0; source < numStates; source++) {
 			Map<Object, Set<Integer>> actionState = new HashMap<Object, Set<Integer>>();
@@ -174,6 +178,9 @@ public class DefaultBisimulation<Value> extends Bisimulation<Value>
 					actionState.put(action, new HashSet<Integer>());
 				}
 				actionState.get(action).add(numProbabilisticStates);
+
+				Value reward = (rewards != null) ? rewards.getTransitionReward(source, actionId) : eval.zero();
+				transitionRewards.add(reward);
 
 				Map<Integer, Value> probabilisticState = new HashMap<Integer, Value>();
 				Iterator<Entry<Integer, Value>> iter = model.getTransitionsIterator(source, actionId);
@@ -196,7 +203,23 @@ public class DefaultBisimulation<Value> extends Bisimulation<Value>
 
 		/* set up the probabilistic blocks */
 		int[] probabilisticPartition = new int[numProbabilisticStates];
-		int numProbabilisticBlocks = 1;
+		int numProbabilisticBlocks = 0;
+		// initialise probabilistic partition using transition rewards
+		if (rewards != null && rewards.hasTransitionRewards()) {
+			Map<Value, Integer> rewardToBlock = new HashMap<>();
+			for (int source = 0; source < numProbabilisticStates; source++) {
+				Value reward = transitionRewards.get(source);
+				if (rewardToBlock.containsKey(reward)) {
+					probabilisticPartition[source] = rewardToBlock.get(reward);
+				} else {
+					rewardToBlock.put(reward, numProbabilisticBlocks);
+					probabilisticPartition[source] = numProbabilisticBlocks;
+					numProbabilisticBlocks++;
+				}
+			}
+		} else {
+			numProbabilisticBlocks = 1;
+		}
 		BitSet probabilisticSplitters = new BitSet(numProbabilisticBlocks);
 		probabilisticSplitters.flip(0, numProbabilisticBlocks);
 		int numProbabilisticBlocksOld;

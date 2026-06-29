@@ -45,7 +45,7 @@ import explicit.MDPSimple;
 import explicit.Model;
 import explicit.ModelExplicit;
 import explicit.rewards.Rewards;
-import explicit.rewards.StateRewardsSimple;
+import explicit.rewards.RewardsSimple;
 import parser.State;
 import prism.Evaluator;
 import prism.PrismComponent;
@@ -112,7 +112,7 @@ public abstract class Bisimulation<Value> extends PrismComponent
 		minimised = minimiseDTMC(dtmc);
 		if (minimised) {
 			DTMCSimple<Value> dtmcNew = buildReducedDTMC(dtmc);
-			attachStatesAndLabels(dtmc, dtmcNew);
+			attachAnnotations(dtmc, dtmcNew);
 			timer = System.currentTimeMillis() - timer;
 			mainLog.println("Minimisation: " + numStates + " to " + numBlocks + " States");
 			mainLog.println("Time for bisimulation computation: " + timer / 1000.0 + " seconds.");
@@ -138,7 +138,7 @@ public abstract class Bisimulation<Value> extends PrismComponent
 		minimised = minimiseCTMC(ctmc);
 		if (minimised) {
 			CTMCSimple<Value> ctmcNew = buildReducedCTMC(ctmc);
-			attachStatesAndLabels(ctmc, ctmcNew);
+			attachAnnotations(ctmc, ctmcNew);
 			timer = System.currentTimeMillis() - timer;
 			mainLog.println("Minimisation: " + numStates + " to " + numBlocks + " States");
 			mainLog.println("Time for bisimulation computation: " + timer / 1000.0 + " seconds.");
@@ -164,7 +164,7 @@ public abstract class Bisimulation<Value> extends PrismComponent
 		minimised = minimiseMDP(mdp);
 		if (minimised) {
 			MDPSimple<Value> mdpNew = buildReducedMDP(mdp);
-			attachStatesAndLabels(mdp, mdpNew);
+			attachAnnotations(mdp, mdpNew);
 			timer = System.currentTimeMillis() - timer;
 			mainLog.println("Minimisation: " + numStates + " to " + numBlocks + " States");
 			mainLog.println("Time for bisimulation computation: " + timer / 1000.0 + " seconds.");
@@ -212,8 +212,10 @@ public abstract class Bisimulation<Value> extends PrismComponent
 	 * States are in the same set, that is, are mapped to the same integer, if
 	 * and only if they are probabilistic bisimilar.
 	 *
+	 * Any transition rewards attached to the model are also respected.
+	 *
 	 * @param mdp The MDP
-	 * @return True if the state space is minimised, false otherwise.
+	 * @return True if the state space is minimised, false otherwise
 	 */
 	protected boolean minimiseMDP(MDP<Value> mdp)
 	{
@@ -376,7 +378,7 @@ public abstract class Bisimulation<Value> extends PrismComponent
 	 * Computes the signatures (lifting of the probability distribution) of each
 	 * block in the current partition and stores it in {@code probabilities}.
 	 *
-	 * @param mdp  The MDP.
+	 * @param mdp  The MDP
 	 * @param eval the evaluator to manipulate values.
 	 */
 	protected void mdpLifting(MDP<Value> mdp, Evaluator<Value> eval)
@@ -412,12 +414,13 @@ public abstract class Bisimulation<Value> extends PrismComponent
 	 * Attach a list of states to the minimised model by adding a representative state
 	 * from the original model.
 	 * Also attach information about the propositions (used for bisimulation
-	 * minimisation) to the minimised model, in the form of labels (stored as BitSets).
+	 * minimisation) to the minimised model, in the form of labels (stored as BitSets),
+	 * and, if present, the rewards attached to the original model.
 	 *
 	 * @param model     The original model
 	 * @param modelNew  The minimised model
 	 */
-	protected void attachStatesAndLabels(Model<Value> model, ModelExplicit<Value> modelNew)
+	protected void attachAnnotations(Model<Value> model, ModelExplicit<Value> modelNew)
 	{
 		// Attach states
 		if (model.getStatesList() != null) {
@@ -448,6 +451,18 @@ public abstract class Bisimulation<Value> extends PrismComponent
 				propBSnew.set(partition[j]);
 			}
 			modelNew.addLabel(propName, propBSnew);
+		}
+
+		// Build state rewards for the minimised model
+		if (model.getNumRewards() > 0) {
+			Rewards<Value> rewards = model.getRewards(0);
+			if (rewards.hasStateRewards()) {
+				RewardsSimple<Value> rewardsNew = new RewardsSimple<Value>(numBlocks);
+				for (int i = 0; i < numStates; i++) {
+					rewardsNew.setStateReward(partition[i], rewards.getStateReward(i));
+				}
+				modelNew.addRewards(model.getRewardName(0), model.getRewardPosition(0), rewardsNew);
+			}
 		}
 	}
 
