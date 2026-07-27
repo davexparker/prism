@@ -2,7 +2,8 @@
 // combined formats (.pexp), mode=restrict/reduce and reach=true/false, all mirroring
 // -exportmodel's file/format/label handling. State 3 is reachable in the full model but
 // not under the optimal (Pmax) strategy for reaching "goal1", so it exercises reach=true
-// dropping/reindexing of unreachable states (and their labels).
+// dropping/reindexing of unreachable states (and their labels). Reward structure "energy"
+// has both state and transition rewards, to exercise reward copying into induced models.
 
 mdp
 
@@ -26,3 +27,9 @@ endmodule
 label "hazard" = s=1;
 label "goal1" = s=5;
 label "goal2" = s=2|s=3;
+
+rewards "energy"
+	true : 0.1;
+	s<2 | s>3 : 2.2;
+	[stuck] true : 3.5;
+endrewards
