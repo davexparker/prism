@@ -3822,7 +3822,8 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 		// NB: for finite-memory (e.g. LTL-derived) strategies exported without
 		// restricting to reachable states, this is too late (the relevant states/product
 		// model were already built earlier, during model checking) - see doBuildModel().
-		if (exportOptions.getType() == StrategyExportType.INDUCED_MODEL && strat instanceof strat.StrategyExplicit) {
+		if (mergedExportOptions.getType() == StrategyExportType.INDUCED_MODEL && strat instanceof strat.StrategyExplicit
+				&& mergedExportOptions.getInducedModelExportOptions().getShowRewards()) {
 			attachRewardsToModel(((strat.StrategyExplicit<?>) strat).getModel());
 		}
 		// Export to file (or use main log)
