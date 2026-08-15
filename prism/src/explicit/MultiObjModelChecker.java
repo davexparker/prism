@@ -223,37 +223,16 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 		}
 
 		// Enumerate all MECs; classify as positive-reward (→ inf states) or zero-reward (→ EC sinks).
-		// A MEC is positive-reward if any state has positive state reward or any MEC action
-		// (with all successors within the MEC) has positive transition reward.
 		MDPModelChecker mdpMC = (MDPModelChecker) mc;
-		ECComputer ecs = ECComputer.createECComputer(this, mdp);
+		MecClassification mecs = classifyMecs(mdp, rewards, moQuery, dim);
 		BitSet positiveECs = new BitSet();
+		for (int s = 0; s < n; s++) {
+			if (mecs.positiveMecForState[s] != null) {
+				positiveECs.set(s);
+			}
+		}
 		// mecForState[s]: the zero-reward MEC BitSet containing s, or null if s is not in any zero-reward MEC
-		BitSet[] mecForState = new BitSet[n];
-		ecs.computeMECStatesStreaming(ec -> {
-			boolean isPositive = false;
-			outer:
-			for (int state : new IterableStateSet(ec, n)) {
-				for (int i = 0; i < dim; i++) {
-					if (rewards.get(i).getStateReward(state) > 0) { isPositive = true; break outer; }
-				}
-				for (int ch = 0, nc = mdp.getNumChoices(state); ch < nc; ch++) {
-					if (!mdp.allSuccessorsInSet(state, ch, ec)) continue; // not a MEC action
-					for (int i = 0; i < dim; i++) {
-						if (rewards.get(i).getTransitionReward(state, ch) > 0) { isPositive = true; break outer; }
-					}
-				}
-			}
-			if (isPositive) {
-				positiveECs.or(ec);
-			} else {
-				// Zero-reward MEC: record membership for each state in the MEC
-				BitSet ecCopy = (BitSet) ec.clone();
-				for (int state : new IterableStateSet(ec, n)) {
-					mecForState[state] = ecCopy;
-				}
-			}
-		});
+		BitSet[] mecForState = mecs.zeroMecForState;
 
 		// inf = {s : Pmax(s → positiveECs) > 0}
 		BitSet inf = mdpMC.prob0(mdp, null, positiveECs, false, null);
@@ -496,6 +475,72 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 			}
 		}
 		return neg;
+	}
+
+	/**
+	 * Classification of a model's maximal end components (MECs) by whether any of
+	 * {@code rewards} has a positive value (state or MEC-internal transition reward)
+	 * reachable while staying inside. Used to mark states from which infinite reward is
+	 * achievable (positive MECs), and states that are safe to loop in forever without
+	 * accumulating further reward (zero-reward MECs).
+	 */
+	private static class MecClassification
+	{
+		/** For each state in a positive MEC, that MEC's BitSet; {@code null} otherwise. */
+		final BitSet[] positiveMecForState;
+		/** For each state in a zero-reward MEC, that MEC's BitSet; {@code null} otherwise. */
+		final BitSet[] zeroMecForState;
+
+		MecClassification(BitSet[] positiveMecForState, BitSet[] zeroMecForState)
+		{
+			this.positiveMecForState = positiveMecForState;
+			this.zeroMecForState = zeroMecForState;
+		}
+	}
+
+	/**
+	 * Classify the MECs of {@code model}, across all of {@code rewards} (see
+	 * {@link MecClassification}).
+	 *
+	 * <p>Reward objectives that were originally minimising have already been negated
+	 * in-place (by {@link #checkMultiObjective}) before this is called, so their stored
+	 * values are &le; 0 where the true (pre-negation) reward is &ge; 0: a true positive
+	 * reward on such an objective therefore shows up here as a <em>negative</em> stored
+	 * value, not a positive one. {@code moQuery.isRewardNegated(i)} tells us which sign to
+	 * treat as "true positive reward" for objective {@code i}.
+	 */
+	private MecClassification classifyMecs(MDP<Double> mdp, List<Rewards<Double>> rewards, MultiObjQuery moQuery, int dim) throws PrismException
+	{
+		int n = mdp.getNumStates();
+		BitSet[] positiveMecForState = new BitSet[n];
+		BitSet[] zeroMecForState = new BitSet[n];
+		ECComputer ecs = ECComputer.createECComputer(this, mdp);
+		ecs.computeMECStatesStreaming(ec -> {
+			boolean isPositive = false;
+			outer:
+			for (int state : new IterableStateSet(ec, n)) {
+				for (int i = 0; i < dim; i++) {
+					double sr = rewards.get(i).getStateReward(state);
+					if (moQuery.isRewardNegated(i) ? (sr < 0) : (sr > 0)) { isPositive = true; break outer; }
+				}
+				for (int ch = 0, nc = mdp.getNumChoices(state); ch < nc; ch++) {
+					if (!mdp.allSuccessorsInSet(state, ch, ec)) continue; // not a MEC action
+					for (int i = 0; i < dim; i++) {
+						double tr = rewards.get(i).getTransitionReward(state, ch);
+						if (moQuery.isRewardNegated(i) ? (tr < 0) : (tr > 0)) { isPositive = true; break outer; }
+					}
+				}
+			}
+			BitSet ecCopy = (BitSet) ec.clone();
+			for (int state : new IterableStateSet(ec, n)) {
+				if (isPositive) {
+					positiveMecForState[state] = ecCopy;
+				} else {
+					zeroMecForState[state] = ecCopy;
+				}
+			}
+		});
+		return new MecClassification(positiveMecForState, zeroMecForState);
 	}
 
 	/**
