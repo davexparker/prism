@@ -1,0 +1,34 @@
+// IMDP regression test for multi-objective model checking (Pareto curve
+// generation and achievability queries) on the explicit engine.
+//
+// From state 0, action [toS1] reaches state 1 (which then accrues reward
+// "r1") with probability in [0.6,0.9], and state 2 (reward "r2") with the
+// complementary probability. Action [toS2] is symmetric, favouring state 2.
+// Both r1 and r2 are one-off transition rewards (paid once, on leaving
+// state 1/2), so total cumulative reward (R[C]) is always finite.
+//
+// Multi-objective queries use robust ("maxmin") semantics: the policy
+// maximises while the interval uncertainty is resolved adversarially
+// (minimised). Under [toS1], nature drives P(reach 1) to its lower bound
+// (0.6) when r1 is weighted more heavily than r2, giving a worst-case
+// point of (r1=6, r2=1); [toS2] is the symmetric mirror image, giving
+// (r1=1, r2=6). These are the two Pareto-optimal corner points, hand
+// verified independently of the implementation.
+mdp
+
+module m
+	s : [0..3] init 0;
+	[toS1] s=0 -> [0.6,0.9]:(s'=1) + [0.1,0.4]:(s'=2);
+	[toS2] s=0 -> [0.1,0.4]:(s'=1) + [0.6,0.9]:(s'=2);
+	[] s=1 -> (s'=3);
+	[] s=2 -> (s'=3);
+	[] s=3 -> true;
+endmodule
+
+rewards "r1"
+	[] s=1 : 10;
+endrewards
+
+rewards "r2"
+	[] s=2 : 10;
+endrewards

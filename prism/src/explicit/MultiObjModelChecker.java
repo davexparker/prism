@@ -41,15 +41,12 @@ import acceptance.AcceptanceRabin;
 import automata.DA;
 import common.IterableStateSet;
 import explicit.modelviews.MDPDroppedChoicesCached;
-import explicit.rewards.MCRewardsFromMDPRewards;
-import explicit.rewards.MDPRewards;
 import explicit.rewards.Rewards;
 import explicit.rewards.RewardsSimple;
 import parser.ast.Expression;
 import parser.ast.ExpressionFunc;
 import parser.ast.ExpressionQuant;
 import parser.ast.ExpressionReward;
-import explicit.ModelCheckerResult;
 import prism.MultiObjModelCheckerUtils;
 import prism.MultiObjQuery;
 import prism.MultiObjQueryInstance;
@@ -62,13 +59,21 @@ import prism.PrismNotSupportedException;
 import prism.PrismSettings;
 import prism.TileList;
 import solver.LPSolver;
-import strat.MDStrategyArray;
 
 /**
  * Multi-objective model checking for the explicit engine.
  *
  * <p>Currently supports R[C] (unbounded cumulative reward) objectives only.
  * P objectives, step-bounded R[C&lt;=k], and end-component handling are deferred.
+ *
+ * <p>Supports both {@link MDP} and {@link IMDP} models. For IMDPs, all objectives are
+ * evaluated under robust ("maxmin") semantics: the policy maximises while the interval
+ * uncertainty is resolved adversarially (minimised). The action chosen at each state is the
+ * one robustly best for the combined weighted objective (uncertainty resolved <em>jointly</em>
+ * against the weighted combination); each objective's own reported value is then its own,
+ * <em>independently</em> resolved worst case under that action (see {@link
+ * #buildIMDPWeightedSolver} for why these must differ). The LP solution method is not
+ * supported for IMDPs (only value iteration, {@code -valiter}).
  */
 public class MultiObjModelChecker extends prism.MultiObjModelChecker
 {
@@ -85,15 +90,15 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 	 * Top-level entry point for multi-objective model checking.
 	 * Parses the query, validates it, and dispatches to Pareto or achievability computation.
 	 *
-	 * @param model          The explicit-state MDP
+	 * @param model          The explicit-state MDP or IMDP
 	 * @param expr           The multi(...) expression
 	 * @param statesOfInterest States of interest (must contain the single initial state)
 	 * @return TileList for Pareto queries; Double for achievability/numerical queries
 	 */
 	@SuppressWarnings("unchecked")
-	public Object checkMultiObjective(explicit.MDP<?> model, ExpressionFunc expr, BitSet statesOfInterest) throws PrismException
+	public Object checkMultiObjective(explicit.NondetModel<?> model, ExpressionFunc expr, BitSet statesOfInterest) throws PrismException
 	{
-		MDP<Double> mdp = (MDP<Double>) model;
+		NondetModel<Double> ndModel = (NondetModel<Double>) model;
 		int n = expr.getNumOperands();
 
 		// Parse query
@@ -113,8 +118,8 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 		List<Rewards<Double>> rewardsList = new ArrayList<>(n);
 		for (int i = 0; i < n; i++) {
 			ExpressionReward exprReward = (ExpressionReward) expr.getOperand(i);
-			int r = exprReward.getRewardStructIndexByIndexObject(mc.getRewardGenerator(mdp), mc.getConstantValues());
-			rewardsList.add((Rewards<Double>) mc.constructRewards(mdp, r));
+			int r = exprReward.getRewardStructIndexByIndexObject(mc.getRewardGenerator(ndModel), mc.getConstantValues());
+			rewardsList.add((Rewards<Double>) mc.constructRewards(ndModel, r));
 		}
 
 		// Bundle into an instance (no DRA, no probability targets for reward-only queries)
@@ -124,7 +129,7 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 		// Negate minimising rewards in-place, then canonicalise all to R_MAX / R_GE
 		for (int i = 0; i < moQuery.numRewardObjectives(); i++) {
 			if (moQuery.getRewardOperator(i) == Operator.R_LE || moQuery.getRewardOperator(i) == Operator.R_MIN) {
-				instance.rewards.set(i, negateRewards(mdp, instance.rewards.get(i)));
+				instance.rewards.set(i, negateRewards(ndModel, instance.rewards.get(i)));
 			}
 		}
 		moQuery.makeAllRewardUp();
@@ -132,16 +137,19 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 		int initState = statesOfInterest.nextSetBit(0);
 		int numNumerical = moQuery.numberOfNumerical();
 
-		// LP path: solve the entire query as a single occupancy-measure LP
+		// LP path: solve the entire query as a single occupancy-measure LP (MDP only)
 		if (settings.getChoice(PrismSettings.PRISM_MDP_MULTI_SOLN_METHOD) == Prism.MDP_MULTI_LP) {
+			if (!(ndModel instanceof MDP)) {
+				throw new PrismNotSupportedException("Multi-objective LP solving is not supported for " + ndModel.getModelType() + "s with the explicit engine; use -valiter");
+			}
 			if (numNumerical >= 2) {
 				throw new PrismNotSupportedException("Pareto curve computation is not supported with linear programming for the explicit engine; use -valiter");
 			}
-			return checkMultiObjectiveLP(mdp, initState, instance);
+			return checkMultiObjectiveLP((MDP<Double>) ndModel, initState, instance);
 		}
 
 		// Value iteration path
-		Object result = checkMultiObjectiveValIter(mdp, initState, instance);
+		Object result = checkMultiObjectiveValIter(ndModel, initState, instance);
 		if (result instanceof TileList) {
 			List<Expression> exprs = new ArrayList<>(expr.getNumOperands());
 			for (int i = 0; i < expr.getNumOperands(); i++) exprs.add(expr.getOperand(i));
@@ -153,15 +161,23 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 	/**
 	 * Perform multi-objective model checking using value iteration (weighted-sum sweeps).
 	 * Handles both Pareto curve generation (numNumerical >= 2) and achievability/numerical
-	 * queries (numNumerical <= 1).
+	 * queries (numNumerical <= 1). Dispatches to an MDP- or IMDP-specific weighted-sum
+	 * solver depending on the model type.
 	 */
-	private Object checkMultiObjectiveValIter(MDP<Double> mdp, int initState,
+	private Object checkMultiObjectiveValIter(NondetModel<Double> model, int initState,
 	                                           MultiObjQueryInstance<Rewards<Double>, BitSet> instance)
 	        throws PrismException
 	{
 		MultiObjQuery moQuery = instance.moQuery;
 		int numNumerical = moQuery.numberOfNumerical();
-		WeightedObjectiveSolver solver = buildExplicitWeightedSolver(mdp, initState, instance);
+		WeightedObjectiveSolver solver;
+		if (model instanceof MDP) {
+			solver = buildExplicitWeightedSolver((MDP<Double>) model, initState, instance);
+		} else if (model instanceof IMDP) {
+			solver = buildIMDPWeightedSolver((IMDP<Double>) model, initState, instance);
+		} else {
+			throw new PrismNotSupportedException("Multi-objective model checking is not supported for " + model.getModelType() + "s with the explicit engine");
+		}
 
 		if (numNumerical >= 2) {
 			// Pareto curve: seed with one extreme point per objective, then iterate
@@ -464,7 +480,7 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 	 * Build a negated copy of a reward structure (all values multiplied by -1).
 	 * Used to convert minimising objectives to maximising before running the solver.
 	 */
-	private Rewards<Double> negateRewards(MDP<Double> mdp, Rewards<Double> rew)
+	private Rewards<Double> negateRewards(NondetModel<Double> mdp, Rewards<Double> rew)
 	{
 		int numStates = mdp.getNumStates();
 		RewardsSimple<Double> neg = new RewardsSimple<>(numStates);
@@ -494,6 +510,8 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 	 * policies, a single (state, choice) pair cannot distinguish "used once, necessarily, while
 	 * passing through" from "used to loop forever", so a reward penalty on that pair would
 	 * suppress legitimate one-off transits through the MEC along with genuine infinite loops.
+	 * {@link #buildIMDPWeightedSolver} does the equivalent for IMDPs, via the model-agnostic
+	 * {@link #classifyPositiveMecsForPruning} (not this class, which is LP-path-specific).
 	 */
 	private static class MecClassification
 	{
@@ -520,12 +538,12 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 	 * value, not a positive one. {@code moQuery.isRewardNegated(i)} tells us which sign to
 	 * treat as "true positive reward" for objective {@code i}.
 	 */
-	private MecClassification classifyMecs(MDP<Double> mdp, List<Rewards<Double>> rewards, MultiObjQuery moQuery, int dim) throws PrismException
+	private MecClassification classifyMecs(NondetModel<Double> model, List<Rewards<Double>> rewards, MultiObjQuery moQuery, int dim) throws PrismException
 	{
-		int n = mdp.getNumStates();
+		int n = model.getNumStates();
 		BitSet[] positiveMecForState = new BitSet[n];
 		BitSet[] zeroMecForState = new BitSet[n];
-		ECComputer ecs = ECComputer.createECComputer(this, mdp);
+		ECComputer ecs = ECComputer.createECComputer(this, model);
 		ecs.computeMECStatesStreaming(ec -> {
 			boolean isPositive = false;
 			outer:
@@ -534,8 +552,8 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 					double sr = rewards.get(i).getStateReward(state);
 					if (moQuery.isRewardNegated(i) ? (sr < 0) : (sr > 0)) { isPositive = true; break outer; }
 				}
-				for (int ch = 0, nc = mdp.getNumChoices(state); ch < nc; ch++) {
-					if (!mdp.allSuccessorsInSet(state, ch, ec)) continue; // not a MEC action
+				for (int ch = 0, nc = model.getNumChoices(state); ch < nc; ch++) {
+					if (!model.allSuccessorsInSet(state, ch, ec)) continue; // not a MEC action
 					for (int i = 0; i < dim; i++) {
 						double tr = rewards.get(i).getTransitionReward(state, ch);
 						if (moQuery.isRewardNegated(i) ? (tr < 0) : (tr > 0)) { isPositive = true; break outer; }
@@ -610,11 +628,15 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 	 * this choice, and returns the combined value used to select the best action.
 	 *
 	 * <p>For MDP there is no uncertainty to resolve, so the combined value is simply the
-	 * weighted sum of {@code pd2} once it is filled in. IMDP will need a genuinely separate,
-	 * jointly-resolved quantity here — minimising a weighted sum of objectives jointly over
-	 * interval uncertainty is not the same as separately minimising each objective and then
-	 * combining — but that's not implemented by this refactor; the MDP case is the only
-	 * consumer so far, and it doesn't have any uncertainty to resolve at all.
+	 * weighted sum of {@code pd2} once it is filled in. For IMDP the combined value is a
+	 * <em>separate</em>, jointly-resolved quantity (see {@link #buildIMDPWeightedSolver}):
+	 * minimising a weighted sum of objectives jointly over the interval uncertainty is not the
+	 * same as separately minimising each objective and then combining — the joint minimum is
+	 * always &le; the combination of the separate minimums. Each objective's own robust
+	 * worst-case value has to be resolved independently to be a sound guarantee for that
+	 * objective; only the policy-selection step (this combined value) should resolve the
+	 * uncertainty jointly, since that's what makes the chosen action itself robust for the
+	 * weighted-sum objective.
 	 *
 	 * <p>Does not include state reward — {@link #runWeightedMultiObjectiveVI} adds that
 	 * uniformly, since it doesn't depend on how a transition's uncertainty resolves.
@@ -723,21 +745,22 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 	 * picking a policy that is arbitrarily (or divergently) bad for an objective the combined
 	 * value doesn't see.
 	 *
-	 * <p>The model-specific part of how a choice's value is computed (fixed transition
-	 * probabilities for MDP; interval-uncertainty resolution for other model types) is supplied
-	 * via {@code choiceValue}, so this loop itself stays model-agnostic.
+	 * <p>Shared between the MDP and IMDP weighted solvers ({@link #buildExplicitWeightedSolver},
+	 * {@link #buildIMDPWeightedSolver}); the model-specific part of how a choice's value is
+	 * computed (fixed transition probabilities for MDP, worst-case interval resolution for
+	 * IMDP) is supplied via {@code choiceValue}.
 	 *
-	 * <p>Assumes {@code model} has already had MEC-internal actions with positive reward (under
-	 * any objective) pruned by the caller (see {@link #buildExplicitWeightedSolver}), either
-	 * structurally (a pruned model) or via {@code choiceAvailable}, so every value computed here
-	 * is finite.
+	 * <p>For MDP, {@code model} is assumed already MEC-pruned by the caller (via
+	 * {@link explicit.modelviews.MDPDroppedChoicesCached}), so every value computed here is
+	 * finite; {@code choiceAvailable} is {@code null}. IMDP has no equivalent pruned-choices
+	 * view, so pruning is instead expressed as a {@code choiceAvailable} predicate.
 	 *
-	 * @param model           The model to solve on (MEC-pruned already)
+	 * @param model           The model to solve on (MEC-pruned already, for MDP)
 	 * @param rewards         One reward structure per objective, already canonicalised to maximising
 	 * @param weights         Weight vector, one entry per objective
 	 * @param initState       The initial state, whose values are returned
 	 * @param useGS           Whether to use Gauss-Seidel (in-place) rather than value iteration (double-buffered)
-	 * @param choiceAvailable Optional predicate for choices to skip (pruning); {@code null} means all available
+	 * @param choiceAvailable Optional predicate for choices to skip (pruning, IMDP only); {@code null} means all available
 	 * @param choiceValue     Computes a choice's combined value and fills its per-objective values
 	 */
 	private double[] runWeightedMultiObjectiveVI(NondetModel<Double> model, List<Rewards<Double>> rewards,
@@ -887,5 +910,101 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 		double[] result = new double[dim];
 		for (int i = 0; i < dim; i++) result[i] = psoln[i][initState];
 		return result;
+	}
+
+	/**
+	 * Build a {@link WeightedObjectiveSolver} for IMDPs, under robust ("maxmin") semantics: the
+	 * policy maximises while the interval uncertainty is resolved adversarially (minimised).
+	 *
+	 * <p>Mirrors {@link #buildExplicitWeightedSolver}'s structure — upfront positive-MEC pruning
+	 * once per query (via {@link #classifyPositiveMecsForPruning}, model-agnostic already),
+	 * then a single {@link #runWeightedMultiObjectiveVI} pass per weight vector — but with two
+	 * IMDP-specific differences:
+	 * <ul>
+	 *   <li>There is no {@link explicit.modelviews.MDPDroppedChoicesCached}-equivalent view for
+	 *       IMDP, so pruning is passed through as a {@code choiceAvailable} predicate instead of
+	 *       a pruned model.</li>
+	 *   <li>Each choice's value resolves the interval uncertainty {@code dim+1} times: once
+	 *       independently per objective (for the value stored/reported/tie-broken — see
+	 *       {@link ChoiceValueComputer}), and once more jointly over the combined weighted
+	 *       vector (for {@code d2}, used only to select the best action).</li>
+	 * </ul>
+	 *
+	 * <p>Callers must have already negated minimising reward structures and canonicalised
+	 * {@code instance.moQuery} to R_MAX/R_GE via {@link MultiObjQuery#makeAllRewardUp()}.
+	 */
+	private WeightedObjectiveSolver buildIMDPWeightedSolver(IMDP<Double> imdp, int initState,
+	                                                          MultiObjQueryInstance<Rewards<Double>, BitSet> instance)
+	        throws PrismException
+	{
+		int numStates = imdp.getNumStates();
+		int dim = instance.moQuery.numRewardObjectives();
+		List<Rewards<Double>> rewards = instance.rewards;
+
+		// Step-bounded R[C<=k] requires a different VI loop — deferred
+		for (int i = 0; i < dim; i++) {
+			if (instance.moQuery.getRewardStepBound(i) != -1) {
+				throw new PrismNotSupportedException("Step-bounded R[C<=k] objectives are not yet supported for multi-objective model checking with the explicit engine");
+			}
+		}
+
+		// Precondition for graph-based algorithms (prob0/ECComputer) to be uncertainty-independent
+		imdp.checkLowerBoundsArePositive();
+
+		UMDPModelChecker umdpMC = (UMDPModelChecker) mc;
+		MinMax maxMinUnc = MinMax.max().setMinUnc(true);
+
+		// Upfront precomputation, once per query (see buildExplicitWeightedSolver for the full
+		// rationale). classifyPositiveMecsForPruning is model-agnostic (graph/support-based
+		// only), so it applies unchanged to IMDP.
+		BitSet[] positiveMecForState = classifyPositiveMecsForPruning(imdp, rewards, instance.moQuery, dim);
+		BitSet positiveMecStates = new BitSet();
+		for (int s = 0; s < numStates; s++) {
+			if (positiveMecForState[s] != null) positiveMecStates.set(s);
+		}
+		BitSet reachable = umdpMC.mcMDP.prob0(imdp, null, positiveMecStates, false, null);
+		reachable.flip(0, numStates);
+		if (reachable.get(initState)) {
+			throw new PrismNotSupportedException("Cannot use multi-objective model checking with maximising objectives and non-zero reward end components");
+		}
+		BiPredicate<Integer, Integer> choiceAvailable = (s, ch) ->
+				!(positiveMecForState[s] != null && imdp.allSuccessorsInSet(s, ch, positiveMecForState[s]));
+
+		boolean useGS = settings.getChoice(PrismSettings.PRISM_MDP_MULTI_SOLN_METHOD) == Prism.MDP_MULTI_GAUSSSEIDEL;
+
+		ChoiceValueComputer choiceValue = (s, ch, psoln, w, pd2) -> {
+			DoubleIntervalDistribution did = IntervalUtils.extractDoubleIntervalDistribution(
+					imdp.getIntervalTransitionsIterator(s, ch), imdp.getNumTransitions(s, ch));
+
+			// Each objective's own value: resolved independently, against ITS OWN worst case
+			// (see ChoiceValueComputer's doc for why this can't be shared across objectives).
+			for (int i = 0; i < dim; i++) {
+				pd2[i] = IDTMC.mvMultUncSingle(did, psoln[i], maxMinUnc) + rewards.get(i).getTransitionReward(s, ch);
+			}
+
+			// Combined value: resolved jointly, against the combined (weighted) vector — used
+			// only to select the best action, not stored/reported. Reuses did's interval bounds
+			// (unaffected by which vector is being resolved) via a distribution with an identity
+			// index mapping into a small local vector, rather than allocating a full state-sized
+			// array just to hold did.size real entries.
+			DoubleIntervalDistribution didLocal = new DoubleIntervalDistribution(did.size);
+			didLocal.lower = did.lower;
+			didLocal.upper = did.upper;
+			double[] combinedVect = new double[did.size];
+			for (int k = 0; k < did.size; k++) {
+				didLocal.index[k] = k;
+				int t = did.index[k];
+				double v = 0.0;
+				for (int i = 0; i < dim; i++) v += w[i] * psoln[i][t];
+				combinedVect[k] = v;
+			}
+			double d2 = IDTMC.mvMultUncSingle(didLocal, combinedVect, maxMinUnc);
+			for (int i = 0; i < dim; i++) {
+				d2 += w[i] * rewards.get(i).getTransitionReward(s, ch);
+			}
+			return d2;
+		};
+
+		return weights -> runWeightedMultiObjectiveVI(imdp, rewards, weights, initState, useGS, choiceAvailable, choiceValue);
 	}
 }

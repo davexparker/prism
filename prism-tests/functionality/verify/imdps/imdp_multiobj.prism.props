@@ -1,0 +1,29 @@
+// Single-objective sanity checks: robust (maxmin) total reward matches the
+// multi-objective result for a query with one trivial constraint.
+// RESULT: 6.0
+R{"r1"}maxmin=? [ C ];
+
+// RESULT: 6.0
+R{"r2"}maxmin=? [ C ];
+
+// RESULT: 6.0
+multi(R{"r1"}max=? [ C ],R{"r2"}>=0 [ C ]);
+
+// RESULT: 6.0
+multi(R{"r2"}max=? [ C ],R{"r1"}>=0 [ C ]);
+
+// Achievability: (5.5,0.5) is dominated by the (6,1) corner point, so
+// feasible; (6.5,1.5) exceeds the maximum robustly achievable r1 (6), so
+// infeasible regardless of r2.
+// RESULT: true
+multi(R{"r1"}>=5.5 [ C ],R{"r2"}>=0.5 [ C ]);
+
+// RESULT: false
+multi(R{"r1"}>=6.5 [ C ],R{"r2"}>=1.5 [ C ]);
+
+// Genuine Pareto curve (2 numerical reward objectives): the two corner
+// points (6,1) and (1,6), hand-derived from the robust minimiser's
+// incentive to push the reachability probability to whichever interval
+// endpoint minimises the weighted sum.
+// RESULT: [(6,1),(1,6)]
+multi(R{"r1"}max=? [ C ],R{"r2"}max=? [ C ]);

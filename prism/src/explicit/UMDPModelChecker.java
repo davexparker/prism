@@ -37,12 +37,17 @@ import common.IterableStateSet;
 import explicit.rewards.MDPRewards;
 import explicit.rewards.Rewards;
 import parser.ast.Expression;
+import parser.ast.ExpressionFunc;
+import parser.type.TypeBool;
 import parser.type.TypeDouble;
+import parser.type.TypeVoid;
 import prism.AccuracyFactory;
 import prism.Evaluator;
 import prism.PrismComponent;
 import prism.PrismException;
+import prism.PrismNotSupportedException;
 import prism.PrismUtils;
+import prism.TileList;
 import strat.FMDStrategyStep;
 import prism.PrismFileLog;
 import strat.FMDStrategyProduct;
@@ -69,6 +74,29 @@ public class UMDPModelChecker extends ProbModelChecker
 	}
 
 	// Model checking functions
+
+	@Override
+	protected StateValues checkExpressionFunc(Model<?> model, ExpressionFunc expr, BitSet statesOfInterest) throws PrismException
+	{
+		if (expr.getNameCode() == ExpressionFunc.MULTI) {
+			if (!(model instanceof IMDP)) {
+				throw new PrismNotSupportedException("Multi-objective model checking is not supported for " + model.getModelType() + "s with the explicit engine");
+			}
+			explicit.MultiObjModelChecker mcMo = new explicit.MultiObjModelChecker(this, this);
+			Object value = mcMo.checkMultiObjective((IMDP<?>) model, expr, statesOfInterest);
+			if (value instanceof TileList) {
+				return StateValues.createFromSingleValue(TypeVoid.getInstance(), value, model);
+			}
+			if (value instanceof Boolean) {
+				return StateValues.createFromSingleValue(TypeBool.getInstance(), (Boolean) value, model);
+			}
+			if (value instanceof Double) {
+				return StateValues.createFromSingleValue(TypeDouble.getInstance(), (Double) value, model);
+			}
+			throw new PrismException("Internal error: unexpected return from checkMultiObjective");
+		}
+		return super.checkExpressionFunc(model, expr, statesOfInterest);
+	}
 
 	@Override
 	@SuppressWarnings("unchecked")
