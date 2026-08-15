@@ -1,0 +1,50 @@
+// IMDP regression test for multi-objective weighted-sum value iteration on the
+// explicit engine: a model on which the iteration used to settle into a stable
+// 2-cycle and never converge.
+//
+// The weighted-sum kernel selects an action by a combined value but propagates
+// the individual per-objective values. Those must agree: the combined value has
+// to be exactly the weighted sum of the individual ones. It previously was not
+// for IMDPs — the individual values resolved the interval uncertainty per
+// objective (against each objective's own worst case, which is what makes each
+// one a sound robust guarantee), while the selection value resolved it once
+// jointly against the combined weighted vector. Since min of a weighted sum is
+// >= the weighted sum of the mins, selection systematically overestimated what
+// it then wrote back, so an action would win one sweep, store a lower value,
+// lose the next sweep, and oscillate forever.
+//
+// Reproducing that needs (a) a cycle, so values feed back into themselves,
+// (b) intervals wide enough for the two quantities to differ by more than the
+// margin between the best and second-best action, and (c) two objectives that
+// pull towards different successors. Here [c1]/[c2] are deterministic choices
+// competing against the wide-interval moves [b1]/[b2] around the 0-1-2 cycle,
+// and "cost" and "gain" disagree about which of states 1 and 2 is worth
+// visiting.
+mdp
+
+module m
+	x : [0..4] init 0;
+	g1 : bool init false;
+	g2 : bool init false;
+
+	[u0] x=0 -> [0.25,0.75]:(x'=1) + [0.25,0.75]:(x'=2);
+	[b1] x=1 -> [0.25,0.75]:(x'=0) + [0.25,0.75]:(x'=3);
+	[b2] x=2 -> [0.25,0.75]:(x'=3) + [0.25,0.75]:(x'=0);
+	[c1] x=1 & !g1 -> (g1'=true);
+	[c2] x=2 & !g2 -> (g2'=true);
+	[f]  x=3 -> (x'=4);
+	[l]  x=4 -> true;
+endmodule
+
+rewards "cost"
+	[u0] true : 1;
+	[b1] true : 1.5;
+	[b2] true : 2.5;
+	[c1] true : 3;
+	[c2] true : 3;
+endrewards
+
+rewards "gain"
+	[c1] true : 10;
+	[c2] true : 4;
+endrewards

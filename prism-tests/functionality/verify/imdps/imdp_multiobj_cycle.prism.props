@@ -1,0 +1,29 @@
+// Single-objective robust anchors for the two Pareto corner points, computed by
+// the (independent) robust single-objective code path.
+//
+// Minimal cost is hand-derivable. Writing V, V1, V2 for the worst-case expected
+// cost from states 0, 1, 2 (state 3 onwards is free), and noting that nature
+// maximises cost so puts its 0.75 upper bound on the costlier successor:
+//   V1 = 1.5 + 0.75V, V2 = 2.5 + 0.75V, and V2 > V1, so
+//   V  = 1 + 0.75*V2 + 0.25*V1 = 3.25 + 0.75V, giving V = 13.
+// RESULT: 13
+R{"cost"}minmax=? [ C ];
+
+// RESULT: 80/13
+R{"gain"}maxmin=? [ C ];
+
+// The same two values via the multi-objective solver, one objective at a time.
+// RESULT: 13
+multi(R{"cost"}min=? [ C ], R{"gain"}>=0 [ C ]);
+
+// RESULT: 80/13
+multi(R{"gain"}max=? [ C ], R{"cost"}<=1000 [ C ]);
+
+// The Pareto curve itself: this is the query that used to fail outright with
+// "Iterative method did not converge within 10000 iterations". Its corner
+// points are the two single-objective values above — (13, 0) never gathers, and
+// 80/13 is the maximum robustly guaranteed gain; the other point is
+// (461/26, 80/13). Pareto points are compared with an absolute tolerance of
+// 1e-5 and must be written as decimals, hence the tightened -epsilon in .args.
+// RESULT: [(13,0),(17.73076923,6.15384615)]
+multi(R{"cost"}min=? [ C ], R{"gain"}max=? [ C ]);

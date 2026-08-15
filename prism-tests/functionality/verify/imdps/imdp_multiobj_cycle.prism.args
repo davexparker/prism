@@ -1,0 +1,2 @@
+-ex -valiter -epsilon 1e-11
+-ex -gs -epsilon 1e-11
