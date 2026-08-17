@@ -39,6 +39,7 @@ import strat.MRStrategy;
 import acceptance.AcceptanceRabin;
 import automata.DA;
 import common.IterableStateSet;
+import explicit.modelviews.MDPDroppedChoicesCached;
 import explicit.rewards.MCRewardsFromMDPRewards;
 import explicit.rewards.MDPRewards;
 import explicit.rewards.Rewards;
@@ -480,9 +481,18 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 	/**
 	 * Classification of a model's maximal end components (MECs) by whether any of
 	 * {@code rewards} has a positive value (state or MEC-internal transition reward)
-	 * reachable while staying inside. Used to mark states from which infinite reward is
-	 * achievable (positive MECs), and states that are safe to loop in forever without
-	 * accumulating further reward (zero-reward MECs).
+	 * reachable while staying inside. Used by the LP solution method ({@link
+	 * #checkMultiObjectiveLP}) to mark states from which infinite reward is achievable.
+	 *
+	 * <p>The symbolic engine uses the equivalent classification ({@code removeNonZeroMecsForMax})
+	 * to physically prune the model once, up front, shared between its LP and value-iteration
+	 * methods. The explicit engine's value-iteration path ({@link #buildExplicitWeightedSolver})
+	 * does the same: it builds an {@link explicit.modelviews.MDPDroppedChoicesCached} view that
+	 * structurally removes MEC-internal actions of positive MECs. This has to be done by removing
+	 * the actions outright, not by penalising them in the weighted-sum reward: for memoryless
+	 * policies, a single (state, choice) pair cannot distinguish "used once, necessarily, while
+	 * passing through" from "used to loop forever", so a reward penalty on that pair would
+	 * suppress legitimate one-off transits through the MEC along with genuine infinite loops.
 	 */
 	private static class MecClassification
 	{
@@ -544,15 +554,65 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 	}
 
 	/**
+	 * Classify a model's maximal end components (MECs) by whether any objective that was
+	 * <em>originally</em> maximising (R_MAX/R_GE, before {@link MultiObjQuery#makeAllRewardUp()}
+	 * canonicalised every objective to maximising form) has positive reward (state or
+	 * MEC-internal transition reward) reachable while staying inside.
+	 *
+	 * <p>Deliberately narrower than {@link #classifyMecs}: objectives that were originally
+	 * minimising ({@code moQuery.isRewardNegated(i)}) are excluded entirely, not sign-flipped.
+	 * A MEC whose stored (negated) reward is positive there would mean the true, original
+	 * reward is negative — looping forever would drive the maximised (stored) value to
+	 * <em>negative</em> infinity, which is a real, correctly-computed value a maximiser
+	 * naturally avoids, not a hazard requiring pruning. This mirrors the symbolic engine's
+	 * {@code hasMaxReward}/{@code removeNonZeroMecsForMax}, which is scoped the same way, via
+	 * the pre-canonicalisation reward operator.
+	 *
+	 * @return For each state in a MEC positive under some originally-maximising objective, that
+	 *         MEC's BitSet; {@code null} otherwise.
+	 */
+	private BitSet[] classifyPositiveMecsForPruning(NondetModel<Double> model, List<Rewards<Double>> rewards, MultiObjQuery moQuery, int dim) throws PrismException
+	{
+		int n = model.getNumStates();
+		BitSet[] positiveMecForState = new BitSet[n];
+		ECComputer ecs = ECComputer.createECComputer(this, model);
+		ecs.computeMECStatesStreaming(ec -> {
+			boolean isPositive = false;
+			outer:
+			for (int state : new IterableStateSet(ec, n)) {
+				for (int i = 0; i < dim; i++) {
+					if (moQuery.isRewardNegated(i)) continue;
+					if (rewards.get(i).getStateReward(state) > 0) { isPositive = true; break outer; }
+				}
+				for (int ch = 0, nc = model.getNumChoices(state); ch < nc; ch++) {
+					if (!model.allSuccessorsInSet(state, ch, ec)) continue; // not a MEC action
+					for (int i = 0; i < dim; i++) {
+						if (moQuery.isRewardNegated(i)) continue;
+						if (rewards.get(i).getTransitionReward(state, ch) > 0) { isPositive = true; break outer; }
+					}
+				}
+			}
+			if (isPositive) {
+				BitSet ecCopy = (BitSet) ec.clone();
+				for (int state : new IterableStateSet(ec, n)) {
+					positiveMecForState[state] = ecCopy;
+				}
+			}
+		});
+		return positiveMecForState;
+	}
+
+	/**
 	 * Build a {@link WeightedObjectiveSolver} for the explicit engine.
 	 *
-	 * <p>For each weight vector the returned solver:
-	 * <ol>
-	 *   <li>Constructs a combined weighted reward structure.</li>
-	 *   <li>Solves the weighted-sum MDP to find the optimal policy.</li>
-	 *   <li>Evaluates each individual reward objective under that fixed policy via DTMC VI.</li>
-	 *   <li>Returns the per-objective values at the initial state.</li>
-	 * </ol>
+	 * <p>Mirrors the symbolic engine's approach (see {@code symbolic.comp.MultiObjModelChecker
+	 * #removeNonZeroMecsForMax} and {@code PS_NondetMultiObj[GS].cc}): a single precomputation
+	 * pass, done once for the whole query (not per weight vector), permanently prunes MEC-internal
+	 * actions that carry positive reward under any objective; then each weight vector is solved by
+	 * {@link #solveWeightedMultiObjective} — one VI/GS pass that picks the weighted-value-maximising
+	 * action per state and accumulates every individual objective's value along that same action, in
+	 * lock-step, rather than solving the weighted sum and separately re-evaluating objectives on a
+	 * post-hoc extracted policy.
 	 *
 	 * <p>Callers must have already negated minimising reward structures and canonicalised
 	 * {@code instance.moQuery} to R_MAX/R_GE via {@link MultiObjQuery#makeAllRewardUp()}.
@@ -574,50 +634,190 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 
 		MDPModelChecker mdpMC = (MDPModelChecker) mc;
 
-		return weights -> {
-			// Step A: build weighted reward structure
-			RewardsSimple<Double> wRew = new RewardsSimple<>(numStates);
-			for (int s = 0; s < numStates; s++) {
-				double sr = 0.0;
-				for (int ri = 0; ri < dim; ri++) {
-					sr += weights[ri] * rewards.get(ri).getStateReward(s);
-				}
-				if (sr != 0) wRew.setStateReward(s, sr);
-				for (int ch = 0; ch < mdp.getNumChoices(s); ch++) {
-					double tr = 0.0;
-					for (int ri = 0; ri < dim; ri++) {
-						tr += weights[ri] * rewards.get(ri).getTransitionReward(s, ch);
+		// Upfront precomputation, once per query: find MECs with positive reward under any
+		// objective that was *originally* maximising (R_MAX/R_GE before makeAllRewardUp()
+		// canonicalised everything to maximising form). Objectives that were originally
+		// minimising (R_MIN/R_LE, now stored negated) are deliberately excluded here: looping
+		// forever in a MEC that is positive in the ORIGINAL sense means the negated (stored,
+		// maximised) value there is unboundedly *negative* — a real, correctly-computed value
+		// that a maximiser will naturally avoid, not a hazard that needs pruning (mirrors
+		// symbolic's `hasMaxReward`/`removeNonZeroMecsForMax`, which is likewise scoped to
+		// objectives whose ORIGINAL operator is R_MAX/R_GE).
+		//
+		// If a MEC positive under an originally-maximising objective is reachable from the
+		// initial state, no weight vector can give a finite answer for that objective, so fail
+		// fast (matching the symbolic engine's restriction). Otherwise permanently prune those
+		// MEC-internal actions, so that no later weighted-sum solve — even one where that
+		// objective's weight happens to be near zero — can be tricked into treating looping in
+		// the MEC as free.
+		BitSet[] positiveMecForState = classifyPositiveMecsForPruning(mdp, rewards, instance.moQuery, dim);
+		BitSet positiveMecStates = new BitSet();
+		for (int s = 0; s < numStates; s++) {
+			if (positiveMecForState[s] != null) positiveMecStates.set(s);
+		}
+		BitSet reachable = mdpMC.prob0(mdp, null, positiveMecStates, false, null);
+		reachable.flip(0, numStates);
+		if (reachable.get(initState)) {
+			throw new PrismNotSupportedException("Cannot use multi-objective model checking with maximising objectives and non-zero reward end components");
+		}
+		MDP<Double> prunedMdp = new MDPDroppedChoicesCached<>(mdp,
+				(s, ch) -> positiveMecForState[s] != null && mdp.allSuccessorsInSet(s, ch, positiveMecForState[s]));
+
+		boolean useGS = settings.getChoice(PrismSettings.PRISM_MDP_MULTI_SOLN_METHOD) == Prism.MDP_MULTI_GAUSSSEIDEL;
+
+		return weights -> solveWeightedMultiObjective(prunedMdp, rewards, weights, initState, useGS);
+	}
+
+	/**
+	 * Solve a single weighted-sum query on an MDP, computing the combined (weighted) value and
+	 * every individual objective's value simultaneously in one VI/GS pass — mirroring the
+	 * symbolic engine's {@code PS_NondetMultiObj[GS].cc} kernels. At each state and iteration,
+	 * the action maximising the combined weighted value is chosen; ties are broken in favour of
+	 * whichever action is better for some individual objective (first-improving in objective
+	 * index order). Because the same action is used both to determine the combined optimum and
+	 * to accumulate each individual objective's value, there is no separate "extract a policy,
+	 * then re-evaluate objectives on it" step — and so no risk of the extraction step picking a
+	 * policy that is arbitrarily (or divergently) bad for an objective the weighted value doesn't
+	 * see.
+	 *
+	 * <p>Assumes {@code mdp} has already had MEC-internal actions with positive reward (under any
+	 * objective) pruned by the caller (see {@link #buildExplicitWeightedSolver}), so every value
+	 * computed here is finite.
+	 *
+	 * @param mdp      The (already MEC-pruned) MDP
+	 * @param rewards  One reward structure per objective, already canonicalised to maximising
+	 * @param weights  Weight vector, one entry per objective
+	 * @param initState The initial state, whose values are returned
+	 * @param useGS    Whether to use Gauss-Seidel (in-place) rather than value iteration (double-buffered)
+	 */
+	private double[] solveWeightedMultiObjective(MDP<Double> mdp, List<Rewards<Double>> rewards,
+	                                              double[] weights, int initState, boolean useGS)
+	        throws PrismException
+	{
+		int n = mdp.getNumStates();
+		int dim = rewards.size();
+
+		double[] soln = new double[n];
+		double[] soln2 = useGS ? soln : new double[n];
+		double[][] psoln = new double[dim][n];
+		double[][] psoln2 = new double[dim][];
+		for (int i = 0; i < dim; i++) {
+			psoln2[i] = useGS ? psoln[i] : new double[n];
+		}
+
+		double[] pd1 = new double[dim];
+		double[] pd2 = new double[dim];
+		double[] oldIndiv = new double[dim];
+		double[] maxDiffIndiv = new double[dim];
+
+		boolean absolute = mc.termCrit == ProbModelChecker.TermCrit.ABSOLUTE;
+		int iters = 0;
+		boolean weightedDone = false;
+		boolean done = false;
+		while (!done && iters < mc.maxIters) {
+			iters++;
+			double maxDiffCombined = 0.0;
+			Arrays.fill(maxDiffIndiv, 0.0);
+
+			for (int s = 0; s < n; s++) {
+				double oldCombined = soln[s];
+				for (int i = 0; i < dim; i++) oldIndiv[i] = psoln[i][s];
+
+				double d1 = Double.NEGATIVE_INFINITY;
+				Arrays.fill(pd1, 0.0);
+				boolean first = true;
+				int numChoices = mdp.getNumChoices(s);
+				for (int ch = 0; ch < numChoices; ch++) {
+					Arrays.fill(pd2, 0.0);
+					Iterator<Map.Entry<Integer, Double>> it = mdp.getTransitionsIterator(s, ch);
+					while (it.hasNext()) {
+						Map.Entry<Integer, Double> e = it.next();
+						int t = e.getKey();
+						double p = e.getValue();
+						for (int i = 0; i < dim; i++) {
+							pd2[i] += p * psoln[i][t];
+						}
 					}
-					if (tr != 0) wRew.setTransitionReward(s, ch, tr);
+					double d2 = 0.0;
+					for (int i = 0; i < dim; i++) {
+						pd2[i] += rewards.get(i).getTransitionReward(s, ch);
+						d2 += weights[i] * pd2[i];
+					}
+					// Treat d2/d1 as tied within a small relative tolerance, not exact equality:
+					// two choices that are mathematically tied on the combined value can still
+					// compute to slightly different floating-point results (different summation
+					// order, accumulated rounding over many iterations, ...), especially once a
+					// choice's own value is itself still converging. An exact-equality tie-break
+					// would then let one choice "win" outright on a floating-point artifact,
+					// permanently locking out the individual-objective comparison that's supposed
+					// to arbitrate between genuinely-tied choices.
+					double tol = mc.termCritParam * Math.max(1.0, Math.max(Math.abs(d1), Math.abs(d2)));
+					boolean pickThis;
+					if (first || d2 > d1 + tol) {
+						pickThis = true;
+					} else if (d2 < d1 - tol) {
+						pickThis = false;
+					} else {
+						pickThis = false;
+						for (int i = 0; i < dim; i++) {
+							if (pd2[i] > pd1[i]) { pickThis = true; break; }
+						}
+					}
+					if (pickThis) {
+						d1 = d2;
+						System.arraycopy(pd2, 0, pd1, 0, dim);
+					}
+					first = false;
+				}
+				if (first) {
+					// No choices (e.g. all pruned as MEC-internal): treat as a zero-reward sink.
+					d1 = 0.0;
+					Arrays.fill(pd1, 0.0);
+				}
+				// State reward is earned once, regardless of choice
+				for (int i = 0; i < dim; i++) {
+					double sr = rewards.get(i).getStateReward(s);
+					pd1[i] += sr;
+					d1 += weights[i] * sr;
+				}
+
+				soln2[s] = d1;
+				for (int i = 0; i < dim; i++) psoln2[i][s] = pd1[i];
+
+				double diffC = absolute ? Math.abs(d1 - oldCombined) : Math.abs(d1 - oldCombined) / Math.abs(d1);
+				if (!Double.isNaN(diffC)) maxDiffCombined = Math.max(maxDiffCombined, diffC);
+				for (int i = 0; i < dim; i++) {
+					double diffI = absolute ? Math.abs(pd1[i] - oldIndiv[i]) : Math.abs(pd1[i] - oldIndiv[i]) / Math.abs(pd1[i]);
+					if (!Double.isNaN(diffI)) maxDiffIndiv[i] = Math.max(maxDiffIndiv[i], diffI);
 				}
 			}
 
-			// Step B: solve MDP weighted-sum — unbounded cumulative reward (R[C])
-			// Request strategy output to avoid tie-breaking issues in post-hoc argmax extraction
-			boolean prevGenStrat = mdpMC.genStrat;
-			mdpMC.setGenStrat(true);
-			ModelCheckerResult resW = mdpMC.computeTotalRewards(mdp, wRew, false);
-			mdpMC.setGenStrat(prevGenStrat);
-
-			// Step C: extract strategy from VI result (choice indices, -1/−2/−3 for undefined/arbitrary/unreachable)
-			@SuppressWarnings("unchecked")
-			MDStrategyArray<Double> mdStrat = (MDStrategyArray<Double>) resW.strat;
-			int[] strat = new int[numStates];
-			for (int s = 0; s < numStates; s++) {
-				int c = mdStrat.getChoiceIndex(s, 0);
-				strat[s] = (c >= 0) ? c : 0;
+			// Two-phase convergence, mirroring the symbolic kernel: only start requiring the
+			// individual objective values to stabilise once the combined (weighted) value already
+			// has, since the greedy policy itself is still liable to change until then.
+			if (!weightedDone) {
+				weightedDone = maxDiffCombined <= mc.termCritParam;
+			} else {
+				double maxDiffAll = 0.0;
+				for (int i = 0; i < dim; i++) maxDiffAll = Math.max(maxDiffAll, maxDiffIndiv[i]);
+				done = maxDiffAll <= mc.termCritParam;
 			}
 
-			// Step D: evaluate each reward objective under the fixed policy via DTMC VI
-			DTMC<Double> dtmc = new DTMCFromMDPMemorylessAdversary<>(mdp, strat);
-			DTMCModelChecker dtmcMC = new DTMCModelChecker(mc);
-			double[] objVals = new double[dim];
-			for (int i = 0; i < dim; i++) {
-				MCRewardsFromMDPRewards<Double> mcRew = new MCRewardsFromMDPRewards<>((MDPRewards<Double>) rewards.get(i), strat);
-				ModelCheckerResult ri = dtmcMC.computeTotalRewards(dtmc, mcRew);
-				objVals[i] = ri.soln[initState];
+			if (!useGS) {
+				double[] tmp = soln; soln = soln2; soln2 = tmp;
+				for (int i = 0; i < dim; i++) {
+					double[] t = psoln[i]; psoln[i] = psoln2[i]; psoln2[i] = t;
+				}
 			}
-			return objVals;
-		};
+		}
+
+		if (!done) {
+			throw new PrismException("Iterative method did not converge within " + mc.maxIters + " iterations.\n"
+					+ "Consider using a different numerical method or increasing the maximum number of iterations.");
+		}
+
+		double[] result = new double[dim];
+		for (int i = 0; i < dim; i++) result[i] = psoln[i][initState];
+		return result;
 	}
 }
