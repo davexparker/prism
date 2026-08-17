@@ -762,6 +762,24 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 		double[] oldIndiv = new double[dim];
 		double[] maxDiffIndiv = new double[dim];
 
+		// Once the combined value has converged (weightedDone), the greedy per-iteration
+		// tie-break is frozen into a fixed policy (strat[s] = the winning choice index at each
+		// state, or NO_CHOICES if none were available) rather than kept re-deciding every
+		// iteration. Two choices that are *exactly* tied on the combined value, but each better
+		// than the other on a different individual objective, can otherwise make the tie-break's
+		// pick permanently oscillate: feeding back choice A's values makes B look better next
+		// sweep, and vice versa, forming a stable 2-cycle that never converges (found via random
+		// stress-testing — the combined value settles in a handful of iterations while the
+		// individual values cycle forever). Freezing is safe here — unlike the old decompose-then-
+		// extract-then-separately-evaluate design this kernel replaced — because the frozen policy
+		// was chosen *with* individual-objective-aware tie-breaking throughout the search, not via
+		// a blind scalar-only solve; freezing only removes the (by-definition-tied, hence
+		// value-neutral) re-litigation of ties once the combined optimum is already known.
+		final int NO_CHOICES = -2;
+		int[] strat = new int[n];
+		Arrays.fill(strat, -1);
+		boolean locked = false;
+
 		boolean absolute = mc.termCrit == ProbModelChecker.TermCrit.ABSOLUTE;
 		int iters = 0;
 		boolean weightedDone = false;
@@ -778,9 +796,11 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 				double d1 = Double.NEGATIVE_INFINITY;
 				Arrays.fill(pd1, 0.0);
 				boolean first = true;
-				int numChoices = model.getNumChoices(s);
-				for (int ch = 0; ch < numChoices; ch++) {
-					if (choiceAvailable != null && !choiceAvailable.test(s, ch)) continue;
+				int bestCh = NO_CHOICES;
+				int numChoices = locked ? (strat[s] == NO_CHOICES ? 0 : 1) : model.getNumChoices(s);
+				for (int chIdx = 0; chIdx < numChoices; chIdx++) {
+					int ch = locked ? strat[s] : chIdx;
+					if (!locked && choiceAvailable != null && !choiceAvailable.test(s, ch)) continue;
 					Arrays.fill(pd2, 0.0);
 					double d2 = choiceValue.compute(s, ch, psoln, weights, pd2);
 					// Treat d2/d1 as tied within a small relative tolerance, not exact equality:
@@ -806,6 +826,7 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 					if (pickThis) {
 						d1 = d2;
 						System.arraycopy(pd2, 0, pd1, 0, dim);
+						bestCh = ch;
 					}
 					first = false;
 				}
@@ -830,14 +851,21 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 					double diffI = absolute ? Math.abs(pd1[i] - oldIndiv[i]) : Math.abs(pd1[i] - oldIndiv[i]) / Math.abs(pd1[i]);
 					if (!Double.isNaN(diffI)) maxDiffIndiv[i] = Math.max(maxDiffIndiv[i], diffI);
 				}
+
+				if (weightedDone && !locked) {
+					strat[s] = bestCh;
+				}
 			}
 
 			// Two-phase convergence, mirroring the symbolic kernel: only start requiring the
 			// individual objective values to stabilise once the combined (weighted) value already
-			// has, since the greedy policy itself is still liable to change until then.
+			// has, since the greedy policy itself is still liable to change until then. Once that
+			// phase begins, the policy computed in the sweep that just ran (populated into strat[]
+			// above) is frozen for all subsequent sweeps — see the comment on strat[] above.
 			if (!weightedDone) {
 				weightedDone = maxDiffCombined <= mc.termCritParam;
 			} else {
+				locked = true;
 				double maxDiffAll = 0.0;
 				for (int i = 0; i < dim; i++) maxDiffAll = Math.max(maxDiffAll, maxDiffIndiv[i]);
 				done = maxDiffAll <= mc.termCritParam;
