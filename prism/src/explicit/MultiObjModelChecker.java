@@ -33,6 +33,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiPredicate;
 
 import strat.MRStrategy;
 
@@ -603,13 +604,35 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 	}
 
 	/**
+	 * Computes the value of a single choice for {@link #runWeightedMultiObjectiveVI}, given the
+	 * current per-objective value estimates and the weight vector: fills {@code pd2} (pre-sized
+	 * to the number of objectives, zeroed by the caller) with each objective's own value for
+	 * this choice, and returns the combined value used to select the best action.
+	 *
+	 * <p>For MDP there is no uncertainty to resolve, so the combined value is simply the
+	 * weighted sum of {@code pd2} once it is filled in. IMDP will need a genuinely separate,
+	 * jointly-resolved quantity here — minimising a weighted sum of objectives jointly over
+	 * interval uncertainty is not the same as separately minimising each objective and then
+	 * combining — but that's not implemented by this refactor; the MDP case is the only
+	 * consumer so far, and it doesn't have any uncertainty to resolve at all.
+	 *
+	 * <p>Does not include state reward — {@link #runWeightedMultiObjectiveVI} adds that
+	 * uniformly, since it doesn't depend on how a transition's uncertainty resolves.
+	 */
+	@FunctionalInterface
+	private interface ChoiceValueComputer
+	{
+		double compute(int s, int ch, double[][] psoln, double[] weights, double[] pd2);
+	}
+
+	/**
 	 * Build a {@link WeightedObjectiveSolver} for the explicit engine.
 	 *
 	 * <p>Mirrors the symbolic engine's approach (see {@code symbolic.comp.MultiObjModelChecker
 	 * #removeNonZeroMecsForMax} and {@code PS_NondetMultiObj[GS].cc}): a single precomputation
 	 * pass, done once for the whole query (not per weight vector), permanently prunes MEC-internal
 	 * actions that carry positive reward under any objective; then each weight vector is solved by
-	 * {@link #solveWeightedMultiObjective} — one VI/GS pass that picks the weighted-value-maximising
+	 * {@link #runWeightedMultiObjectiveVI} — one VI/GS pass that picks the weighted-value-maximising
 	 * action per state and accumulates every individual objective's value along that same action, in
 	 * lock-step, rather than solving the weighted sum and separately re-evaluating objectives on a
 	 * post-hoc extracted policy.
@@ -665,36 +688,65 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 
 		boolean useGS = settings.getChoice(PrismSettings.PRISM_MDP_MULTI_SOLN_METHOD) == Prism.MDP_MULTI_GAUSSSEIDEL;
 
-		return weights -> solveWeightedMultiObjective(prunedMdp, rewards, weights, initState, useGS);
+		// Fixed transition probabilities: no uncertainty to resolve, so the combined value is
+		// just the weighted sum of the (single) per-objective values.
+		ChoiceValueComputer choiceValue = (s, ch, psoln, w, pd2) -> {
+			Iterator<Map.Entry<Integer, Double>> it = prunedMdp.getTransitionsIterator(s, ch);
+			while (it.hasNext()) {
+				Map.Entry<Integer, Double> e = it.next();
+				int t = e.getKey();
+				double p = e.getValue();
+				for (int i = 0; i < dim; i++) {
+					pd2[i] += p * psoln[i][t];
+				}
+			}
+			double d2 = 0.0;
+			for (int i = 0; i < dim; i++) {
+				pd2[i] += rewards.get(i).getTransitionReward(s, ch);
+				d2 += w[i] * pd2[i];
+			}
+			return d2;
+		};
+
+		return weights -> runWeightedMultiObjectiveVI(prunedMdp, rewards, weights, initState, useGS, null, choiceValue);
 	}
 
 	/**
-	 * Solve a single weighted-sum query on an MDP, computing the combined (weighted) value and
-	 * every individual objective's value simultaneously in one VI/GS pass — mirroring the
-	 * symbolic engine's {@code PS_NondetMultiObj[GS].cc} kernels. At each state and iteration,
-	 * the action maximising the combined weighted value is chosen; ties are broken in favour of
-	 * whichever action is better for some individual objective (first-improving in objective
-	 * index order). Because the same action is used both to determine the combined optimum and
-	 * to accumulate each individual objective's value, there is no separate "extract a policy,
-	 * then re-evaluate objectives on it" step — and so no risk of the extraction step picking a
-	 * policy that is arbitrarily (or divergently) bad for an objective the weighted value doesn't
-	 * see.
+	 * Solve a single weighted-sum query, computing the combined (weighted) value and every
+	 * individual objective's value simultaneously in one VI/GS pass — mirroring the symbolic
+	 * engine's {@code PS_NondetMultiObj[GS].cc} kernels. At each state and iteration, the action
+	 * maximising the combined value ({@link ChoiceValueComputer}) is chosen; ties are broken in
+	 * favour of whichever action is better for some individual objective (first-improving in
+	 * objective index order). Because the same action is used both to determine the combined
+	 * optimum and to accumulate each individual objective's value, there is no separate "extract
+	 * a policy, then re-evaluate objectives on it" step — and so no risk of the extraction step
+	 * picking a policy that is arbitrarily (or divergently) bad for an objective the combined
+	 * value doesn't see.
 	 *
-	 * <p>Assumes {@code mdp} has already had MEC-internal actions with positive reward (under any
-	 * objective) pruned by the caller (see {@link #buildExplicitWeightedSolver}), so every value
-	 * computed here is finite.
+	 * <p>The model-specific part of how a choice's value is computed (fixed transition
+	 * probabilities for MDP; interval-uncertainty resolution for other model types) is supplied
+	 * via {@code choiceValue}, so this loop itself stays model-agnostic.
 	 *
-	 * @param mdp      The (already MEC-pruned) MDP
-	 * @param rewards  One reward structure per objective, already canonicalised to maximising
-	 * @param weights  Weight vector, one entry per objective
-	 * @param initState The initial state, whose values are returned
-	 * @param useGS    Whether to use Gauss-Seidel (in-place) rather than value iteration (double-buffered)
+	 * <p>Assumes {@code model} has already had MEC-internal actions with positive reward (under
+	 * any objective) pruned by the caller (see {@link #buildExplicitWeightedSolver}), either
+	 * structurally (a pruned model) or via {@code choiceAvailable}, so every value computed here
+	 * is finite.
+	 *
+	 * @param model           The model to solve on (MEC-pruned already)
+	 * @param rewards         One reward structure per objective, already canonicalised to maximising
+	 * @param weights         Weight vector, one entry per objective
+	 * @param initState       The initial state, whose values are returned
+	 * @param useGS           Whether to use Gauss-Seidel (in-place) rather than value iteration (double-buffered)
+	 * @param choiceAvailable Optional predicate for choices to skip (pruning); {@code null} means all available
+	 * @param choiceValue     Computes a choice's combined value and fills its per-objective values
 	 */
-	private double[] solveWeightedMultiObjective(MDP<Double> mdp, List<Rewards<Double>> rewards,
-	                                              double[] weights, int initState, boolean useGS)
+	private double[] runWeightedMultiObjectiveVI(NondetModel<Double> model, List<Rewards<Double>> rewards,
+	                                              double[] weights, int initState, boolean useGS,
+	                                              BiPredicate<Integer, Integer> choiceAvailable,
+	                                              ChoiceValueComputer choiceValue)
 	        throws PrismException
 	{
-		int n = mdp.getNumStates();
+		int n = model.getNumStates();
 		int dim = rewards.size();
 
 		double[] soln = new double[n];
@@ -726,23 +778,11 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 				double d1 = Double.NEGATIVE_INFINITY;
 				Arrays.fill(pd1, 0.0);
 				boolean first = true;
-				int numChoices = mdp.getNumChoices(s);
+				int numChoices = model.getNumChoices(s);
 				for (int ch = 0; ch < numChoices; ch++) {
+					if (choiceAvailable != null && !choiceAvailable.test(s, ch)) continue;
 					Arrays.fill(pd2, 0.0);
-					Iterator<Map.Entry<Integer, Double>> it = mdp.getTransitionsIterator(s, ch);
-					while (it.hasNext()) {
-						Map.Entry<Integer, Double> e = it.next();
-						int t = e.getKey();
-						double p = e.getValue();
-						for (int i = 0; i < dim; i++) {
-							pd2[i] += p * psoln[i][t];
-						}
-					}
-					double d2 = 0.0;
-					for (int i = 0; i < dim; i++) {
-						pd2[i] += rewards.get(i).getTransitionReward(s, ch);
-						d2 += weights[i] * pd2[i];
-					}
+					double d2 = choiceValue.compute(s, ch, psoln, weights, pd2);
 					// Treat d2/d1 as tied within a small relative tolerance, not exact equality:
 					// two choices that are mathematically tied on the combined value can still
 					// compute to slightly different floating-point results (different summation
