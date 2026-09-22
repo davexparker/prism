@@ -81,6 +81,13 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 	/** The parent model checker providing access to settings, log, and single-objective solvers. */
 	private final ProbModelChecker mc;
 
+	/**
+	 * Blend factor for the damped retry of {@link #runWeightedMultiObjectiveVI}: plain averaging
+	 * of successive iterates, which is enough to damp out the 2-cycles seen in practice while
+	 * still making reasonable progress per sweep.
+	 */
+	private static final double DAMPING_FACTOR = 0.5;
+
 	public MultiObjModelChecker(PrismComponent parent, ProbModelChecker mc) throws PrismException
 	{
 		super(parent);
@@ -764,6 +771,60 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 	                                              ChoiceValueComputer choiceValue)
 	        throws PrismException
 	{
+		// Undamped first: that converges for almost every weight vector, and is markedly faster.
+		boolean[] combinedConverged = new boolean[1];
+		double[] result = runWeightedMultiObjectiveVI(model, rewards, weights, initState, useGS,
+				choiceAvailable, choiceValue, 1.0, combinedConverged);
+		if (result != null) {
+			return result;
+		}
+		// Two quite different things can stop this iteration converging, told apart by whether
+		// the *combined* (weighted) value settled:
+		//
+		//  - It did not. The greedy per-state iteration maximises sum_i w_i * (objective i's own
+		//    value under the shared policy); for IMDP each of those values is resolved against its
+		//    own worst-case nature strategy, so the sum is not the value of any single-objective
+		//    problem and satisfies no Bellman optimality equation. There is then no guarantee that
+		//    the greedy iteration has a fixed point it converges to, and on some models/weight
+		//    vectors it settles into a stable 2-cycle instead. Averaging successive iterates damps
+		//    that cycle out without changing what a fixed point is, so a damped retry still solves
+		//    the same equations — worth trying.
+		//
+		//  - It did, but some individual objective's value never settled. That objective is
+		//    genuinely unbounded under the policy the combined value picked: a weight vector that
+		//    puts (near-)zero weight on it lets the policy loop forever in an end component that
+		//    is positive for it, and the sequence really is diverging rather than cycling.
+		//    Damping averages a diverging sequence into another diverging sequence, so retrying
+		//    would just burn another maxIters sweeps. Fail straight away and let the caller fall
+		//    back (see prism.MultiObjModelChecker#buildAxisInitialPoints, which retries such a
+		//    direction with weights skewed away from the axis).
+		if (!combinedConverged[0]) {
+			mainLog.println("Weighted-sum iteration did not converge; retrying with damping factor " + DAMPING_FACTOR);
+			result = runWeightedMultiObjectiveVI(model, rewards, weights, initState, useGS,
+					choiceAvailable, choiceValue, DAMPING_FACTOR, combinedConverged);
+			if (result != null) {
+				return result;
+			}
+		}
+		throw new PrismException("Iterative method did not converge within " + mc.maxIters + " iterations.\n"
+				+ "Consider using a different numerical method or increasing the maximum number of iterations.");
+	}
+
+	/**
+	 * One attempt at {@link #runWeightedMultiObjectiveVI}, optionally damped: each state's new
+	 * values are blended as {@code damping * new + (1 - damping) * old}, with {@code damping == 1.0}
+	 * meaning the plain undamped update. Returns {@code null} if it did not converge within
+	 * {@code maxIters}, rather than throwing, so the caller can retry; {@code combinedConverged[0]}
+	 * then says whether it was the combined (weighted) value or only some individual objective's
+	 * value that failed to settle, which is what distinguishes a cycle from a divergence.
+	 */
+	private double[] runWeightedMultiObjectiveVI(NondetModel<Double> model, List<Rewards<Double>> rewards,
+	                                              double[] weights, int initState, boolean useGS,
+	                                              BiPredicate<Integer, Integer> choiceAvailable,
+	                                              ChoiceValueComputer choiceValue, double damping,
+	                                              boolean[] combinedConverged)
+	        throws PrismException
+	{
 		int n = model.getNumStates();
 		int dim = rewards.size();
 
@@ -860,6 +921,10 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 					d1 += weights[i] * sr;
 				}
 
+				if (damping != 1.0) {
+					d1 = damping * d1 + (1.0 - damping) * oldCombined;
+					for (int i = 0; i < dim; i++) pd1[i] = damping * pd1[i] + (1.0 - damping) * oldIndiv[i];
+				}
 				soln2[s] = d1;
 				for (int i = 0; i < dim; i++) psoln2[i][s] = pd1[i];
 
@@ -897,9 +962,9 @@ public class MultiObjModelChecker extends prism.MultiObjModelChecker
 			}
 		}
 
+		combinedConverged[0] = weightedDone;
 		if (!done) {
-			throw new PrismException("Iterative method did not converge within " + mc.maxIters + " iterations.\n"
-					+ "Consider using a different numerical method or increasing the maximum number of iterations.");
+			return null;
 		}
 
 		double[] result = new double[dim];
