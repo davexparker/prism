@@ -2260,6 +2260,21 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 	 */
 	private void chooseEngineForModelBuild()
 	{
+		// Interval-valued rewards are only supported by the explicit engine
+		ModulesFile modulesFile = getPRISMModel();
+		if (modulesFile != null && modulesFile.rewardsContainIntervals()) {
+			if (getCurrentEngine() == PrismEngine.SYMBOLIC) {
+				mainLog.println("\nSwitching to explicit engine, which supports interval-valued rewards...");
+				engineOld = getEngine();
+				engineSwitched = true;
+				try {
+					setEngine(Prism.EXPLICIT);
+				} catch (PrismException e) {
+					// Won't happen
+				}
+			}
+			return;
+		}
 		// For some models, automatically switch engine
 		switch (getModelType()) {
 			case IDTMC:
@@ -3419,6 +3434,13 @@ public class Prism extends PrismComponent implements PrismSettingsListener
 		}
 		if ((getModelType() == ModelType.IDTMC || getModelType() == ModelType.IMDP) && getCurrentEngine() == PrismEngine.SYMBOLIC) {
 			mainLog.printWarning("Switching to explicit engine to allow model checking of interval model.");
+			engineSwitch = true;
+			lastEngine = getEngine();
+			switchedToExplicitEngine = true;
+			setEngine(Prism.EXPLICIT);
+		}
+		if (getPRISMModel() != null && getPRISMModel().rewardsContainIntervals() && getCurrentEngine() == PrismEngine.SYMBOLIC) {
+			mainLog.printWarning("Switching to explicit engine to allow model checking with interval-valued rewards.");
 			engineSwitch = true;
 			lastEngine = getEngine();
 			switchedToExplicitEngine = true;

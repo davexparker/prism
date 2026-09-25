@@ -959,12 +959,24 @@ RewardStruct RewardStruct() :
 	( LOOKAHEAD(<DQUOTE>) <DQUOTE> name = Identifier() <DQUOTE> { rs.setName(name); } )?
 	// Reward structure items
 	( { begin2 = getToken(1); s = null; } ( <LBRACKET> { s = ""; } ( s=Identifier() )? <RBRACKET> )?
-	guard = Expression(false, false) <COLON> value = Expression(false, false) <SEMICOLON>
+	guard = Expression(false, false) <COLON> value = RewardValue() <SEMICOLON>
 	{ rsi = new RewardStructItem(s, guard, value); rsi.setPosition(begin2, getToken(0)); rs.addItem(rsi); } )*
 	<ENDREWARDS>
 	{ rs.setPosition(begin, getToken(0)); return rs; }
 }
-	
+
+// A reward value: either a plain expression, or an interval [lo,hi]
+// (mirrors ProbOrRateOrInterval(), which does the same for probabilities/rates)
+
+Expression RewardValue() :
+{
+	Expression val;
+}
+{
+	( val = Expression(false, false) | val = ExpressionInterval(false, false) )
+	{ return val; }
+}
+
 // Initial states ("init...endinit" construct)
 
 Expression Init() :

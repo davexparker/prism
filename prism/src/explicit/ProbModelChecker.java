@@ -33,6 +33,7 @@ import java.util.BitSet;
 import java.util.EnumSet;
 import java.util.List;
 
+import common.Interval;
 import explicit.rewards.ConstructRewards;
 import explicit.rewards.MCRewards;
 import explicit.rewards.MDPRewards;
@@ -983,6 +984,12 @@ public class ProbModelChecker extends NonProbModelChecker
 
 		// Build rewards for the index specified in the R operator
 		int r = expr.getRewardStructIndexByIndexObject(getRewardGenerator(model), constantValues);
+
+		// Interval-valued reward structures are handled separately
+		if (getRewardGenerator(model).rewardStructContainsIntervals(r)) {
+			return checkExpressionRewardIntervals(model, expr, r, minMax, statesOfInterest);
+		}
+
 		mainLog.println("Building reward structure...");
 		// Instantaneous-reward properties (e.g. R=?[I=k]) look up a single state's reward
 		// rather than cumulating rewards, so negative rewards are not an issue there
@@ -1003,6 +1010,23 @@ public class ProbModelChecker extends NonProbModelChecker
 			rews.applyPredicate(v -> opInfo.apply((double) v, rews.getAccuracy()));
 		}
 		return rews;
+	}
+
+	/**
+	 * Model check an R operator expression whose reward structure (index {@code r})
+	 * is interval-valued, and return the values for all states.
+	 */
+	@SuppressWarnings("unchecked")
+	protected StateValues checkExpressionRewardIntervals(Model<?> model, ExpressionReward expr, int r, MinMax minMax, BitSet statesOfInterest) throws PrismException
+	{
+		mainLog.println("Building interval-valued reward structure...");
+		Rewards<?> rewards = constructIntervalRewards(model, r, false);
+		switch (model.getModelType()) {
+		case MDP:
+			return ((MDPModelChecker) this).checkRewardFormulaIntervals((MDP<Double>) model, (Rewards<Interval<Double>>) rewards, expr.getExpression(), minMax, statesOfInterest);
+		default:
+			throw new PrismNotSupportedException("Interval-valued rewards are not supported for " + model.getModelType() + "s");
+		}
 	}
 
 	/**

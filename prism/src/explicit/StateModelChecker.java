@@ -1566,6 +1566,19 @@ public class StateModelChecker extends PrismComponent
 			return true;
 		}
 
+		@Override
+		public boolean rewardStructContainsIntervals(int r)
+		{
+			// Rewards attached directly to the model are never interval-valued
+			if (getModelAttachedRewards(r) != null) {
+				return false;
+			}
+			if (rewardGen != null && r < rewardGen.getNumRewardStructs()) {
+				return rewardGen.rewardStructContainsIntervals(r);
+			}
+			return false;
+		}
+
 		// Methods to implement RewardGenerator
 
 		@Override
@@ -1690,6 +1703,30 @@ public class StateModelChecker extends PrismComponent
 		public Model<Value> getRewardObjectModel()
 		{
 			return model;
+		}
+
+		@Override
+		public Evaluator<Interval<Value>> getIntervalRewardEvaluator() throws PrismException
+		{
+			return rewardGen != null ? rewardGen.getIntervalRewardEvaluator() : RewardGenerator.super.getIntervalRewardEvaluator();
+		}
+
+		@Override
+		public Interval<Value> getStateRewardInterval(int r, State state, boolean allowNegative) throws PrismException
+		{
+			if (rewardGen != null && r < rewardGen.getNumRewardStructs()) {
+				return rewardGen.getStateRewardInterval(r, state, allowNegative);
+			}
+			throw new PrismException("Invalid interval reward index " + r);
+		}
+
+		@Override
+		public Interval<Value> getStateActionRewardInterval(int r, State state, Object action, boolean allowNegative) throws PrismException
+		{
+			if (rewardGen != null && r < rewardGen.getNumRewardStructs()) {
+				return rewardGen.getStateActionRewardInterval(r, state, action, allowNegative);
+			}
+			throw new PrismException("Invalid interval reward index " + r);
 		}
 
 		/**
@@ -1834,6 +1871,9 @@ public class StateModelChecker extends PrismComponent
 	protected <Value> Rewards<Value> constructRewards(Model<Value> model, int r, boolean allowNegativeRewards, boolean expected) throws PrismException
 	{
 		RewardGenerator<Value> combinedRewardGen = getRewardGenerator(model);
+		if (combinedRewardGen.rewardStructContainsIntervals(r)) {
+			throw new PrismNotSupportedException("Reward structure \"" + combinedRewardGen.getRewardStructName(r) + "\" is interval-valued, which is not supported here");
+		}
 		if (expected && model.getModelType() == ModelType.IDTMC && combinedRewardGen.rewardStructHasTransitionRewards(r)) {
 			throw new PrismNotSupportedException("Transition rewards not supported for " + model.getModelType() + "s");
 		}
@@ -1842,17 +1882,35 @@ public class StateModelChecker extends PrismComponent
 	}
 
 	/**
+	 * Construct interval-valued rewards for the reward structure with index {@code r},
+	 * i.e., one for which {@link RewardGenerator#rewardStructContainsIntervals(int)} is true.
+	 * Indexing is as for {@link #constructRewards(Model, int, boolean, boolean)}.
+	 */
+	protected <Value> Rewards<Interval<Value>> constructIntervalRewards(Model<Value> model, int r, boolean allowNegativeRewards) throws PrismException
+	{
+		RewardGenerator<Value> combinedRewardGen = getRewardGenerator(model);
+		ConstructRewards constructRewards = new ConstructRewards(this).setAllowNegativeRewards(allowNegativeRewards);
+		return constructRewards.buildIntervalRewardStructure(model, combinedRewardGen, r);
+	}
+
+	/**
 	 * Get values and names for all the reward structures relevant/available for a model,
 	 * which may include a combination of those that can be obtained/constructed from the
 	 * reward generator or are already attached to the model (see {@link #getRewardGenerator(Model)}).
+	 * Interval-valued reward structures are omitted.
 	 */
 	public <Value> Pair<List<Rewards<Value>>, List<String>> getAllRewards(Model<Value> model) throws PrismException
 	{
 		RewardGenerator<Value> combinedRewardGen = getRewardGenerator(model);
-		List<String> rewardNames = new ArrayList<>(combinedRewardGen.getRewardStructNames());
-		List<Rewards<Value>> rewards = new ArrayList<>(rewardNames.size());
+		List<String> allRewardNames = combinedRewardGen.getRewardStructNames();
+		List<String> rewardNames = new ArrayList<>(allRewardNames.size());
+		List<Rewards<Value>> rewards = new ArrayList<>(allRewardNames.size());
 		ConstructRewards constructRewards = new ConstructRewards(this).allowNegativeRewards();
-		for (int r = 0; r < rewardNames.size(); r++) {
+		for (int r = 0; r < allRewardNames.size(); r++) {
+			if (combinedRewardGen.rewardStructContainsIntervals(r)) {
+				continue;
+			}
+			rewardNames.add(allRewardNames.get(r));
 			rewards.add(constructRewards.buildRewardStructure(model, combinedRewardGen, r));
 		}
 		return new Pair<>(rewards, rewardNames);

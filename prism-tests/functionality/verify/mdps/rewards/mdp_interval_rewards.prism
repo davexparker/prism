@@ -1,0 +1,14 @@
+mdp
+
+module M
+	s : [0..2] init 0;
+	[safe]  s=0 -> 1:(s'=1);
+	[risky] s=0 -> 0.5:(s'=1) + 0.5:(s'=2);
+	[]      s=1 -> 1:(s'=1);
+	[]      s=2 -> 1:(s'=0);
+endmodule
+
+rewards "r"
+	[safe]  true : [9,11];
+	[risky] true : [0,2];
+endrewards

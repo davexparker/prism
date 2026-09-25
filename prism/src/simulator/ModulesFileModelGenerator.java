@@ -237,7 +237,7 @@ public class ModulesFileModelGenerator<Value> implements ModelGenerator<Value>, 
 	{
 		this.parent = parent;
 		this.eval = eval;
-		if (modulesFile.getModelType().uncertain()) {
+		if (modulesFile.getModelType().uncertain() || modulesFile.rewardsContainIntervals()) {
 			evalInt = eval.createIntervalEvaluator();
 		}
 		
@@ -811,6 +811,71 @@ public class ModulesFileModelGenerator<Value> implements ModelGenerator<Value>, 
 							}
 						}
 						d = eval.add(d, rew);
+					}
+				}
+			}
+		}
+		return d;
+	}
+
+	@Override
+	public boolean rewardStructContainsIntervals(int r)
+	{
+		return modulesFile.getRewardStruct(r).containsIntervals();
+	}
+
+	@Override
+	public Evaluator<Interval<Value>> getIntervalRewardEvaluator()
+	{
+		return evalInt;
+	}
+
+	@Override
+	public Interval<Value> getStateRewardInterval(int r, State state, boolean allowNegative) throws PrismException
+	{
+		RewardStruct rewStr = modulesFile.getRewardStruct(r);
+		int n = rewStr.getNumItems();
+		Interval<Value> d = evalInt.zero();
+		for (int i = 0; i < n; i++) {
+			if (!rewStr.getRewardStructItem(i).isTransitionReward()) {
+				Expression guard = rewStr.getStates(i);
+				boolean guardSat = guard.evaluateBoolean(ec.setState(state));
+				if (guardSat) {
+					Interval<Value> rew = evalInt.evaluate(rewStr.getReward(i), modulesFile.getConstantValues(), state);
+					if (!evalInt.isFinite(rew)) {
+						throw new PrismLangException("Reward structure is not finite at state " + state, rewStr.getReward(i));
+					}
+					if (!allowNegative && !evalInt.geq(rew, evalInt.zero())) {
+						throw new PrismLangException("Reward structure is negative (" + rew + ") at state " + state, originalModulesFile.getRewardStruct(r).getReward(i));
+					}
+					d = evalInt.add(d, rew);
+				}
+			}
+		}
+		return d;
+	}
+
+	@Override
+	public Interval<Value> getStateActionRewardInterval(int r, State state, Object action, boolean allowNegative) throws PrismException
+	{
+		RewardStruct rewStr = modulesFile.getRewardStruct(r);
+		int n = rewStr.getNumItems();
+		Interval<Value> d = evalInt.zero();
+		for (int i = 0; i < n; i++) {
+			if (rewStr.getRewardStructItem(i).isTransitionReward()) {
+				Expression guard = rewStr.getStates(i);
+				String cmdAction = rewStr.getSynch(i);
+				if (action == null ? (cmdAction.isEmpty()) : action.equals(cmdAction)) {
+					boolean guardSat = guard.evaluateBoolean(ec.setState(state));
+					if (guardSat) {
+						Interval<Value> rew = evalInt.evaluate(rewStr.getReward(i), modulesFile.getConstantValues(), state);
+						if (!evalInt.isFinite(rew)) {
+							throw new PrismLangException("Reward structure is not finite at state " + state, rewStr.getReward(i));
+						}
+						if (!allowNegative && !evalInt.geq(rew, evalInt.zero())) {
+							throw new PrismLangException("Reward structure is negative (" + rew + ") at state " + state, originalModulesFile.getRewardStruct(r).getReward(i));
+						}
+						d = evalInt.add(d, rew);
 					}
 				}
 			}

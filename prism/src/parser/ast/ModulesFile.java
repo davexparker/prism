@@ -1507,14 +1507,34 @@ public class ModulesFile extends ASTElement implements ModelInfo, RewardGenerato
 				throw new PrismLangException("Intervals only allowed in DTMCs and MDPs currently");
 			}
 		}
+		// Interval-valued rewards do not change the model type (unlike interval probabilities
+		// above): they are a property of individual reward structures, not the model as a whole.
+		// Currently, they are only supported for nondeterministic models.
+		if (rewardsContainIntervals() && !modelType.nondeterministic()) {
+			throw new PrismLangException("Interval-valued rewards are currently only allowed in MDPs");
+		}
 	}
-	
+
 	/**
 	 * Returns true if one or more of the probabilities in a guarded command contains an interval.
 	 */
 	public boolean probabilitiesContainIntervals()
 	{
 		return findIntervalInProbabilities() != null;
+	}
+
+	/**
+	 * Returns true if one or more of the reward structures in this model contains
+	 * an interval-valued reward item (i.e. a value given as [lo,hi]).
+	 */
+	public boolean rewardsContainIntervals()
+	{
+		for (RewardStruct rs : rewardStructs) {
+			if (rs.containsIntervals()) {
+				return true;
+			}
+		}
+		return false;
 	}
 	
 	/**

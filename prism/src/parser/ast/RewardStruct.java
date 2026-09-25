@@ -116,6 +116,22 @@ public class RewardStruct extends ASTElement
 		return getRewardStructItem(i).getReward();
 	}
 
+	/**
+	 * Does this reward structure contain any interval-valued reward items
+	 * (i.e. values given as [lo,hi] rather than a precise value)?
+	 * Only meaningful once the reward items have been type-checked.
+	 */
+	public boolean containsIntervals()
+	{
+		int n = getNumItems();
+		for (int i = 0; i < n; i++) {
+			if (getReward(i).getType() instanceof parser.type.TypeInterval) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	// Methods required for ASTElement:
 	
 	/**

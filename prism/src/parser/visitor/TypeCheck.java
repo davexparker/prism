@@ -164,8 +164,11 @@ public class TypeCheck extends ASTTraverse
 		if (!(e.getStates().getType() instanceof TypeBool)) {
 			throw new PrismLangException("Type error in reward struct item: guard must be Boolean", e.getStates());
 		}
-		if (!TypeDouble.getInstance().canCastTypeTo(e.getReward().getType())) {
-			throw new PrismLangException("Type error in reward struct item: value must be an int or double", e.getReward());
+		Type typeRew = e.getReward().getType();
+		boolean typeOK = TypeDouble.getInstance().canCastTypeTo(typeRew);
+		typeOK |= typeRew instanceof TypeInterval && TypeDouble.getInstance().canCastTypeTo(((TypeInterval) typeRew).getSubType());
+		if (!typeOK) {
+			throw new PrismLangException("Type error in reward struct item: value must be an int, double or interval", e.getReward());
 		}
 	}
 

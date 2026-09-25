@@ -251,7 +251,54 @@ public class ConstructRewards extends PrismComponent
 	}
 
 	/**
-	 * Construct rewards from a model and reward structure. 
+	 * Construct an interval-valued reward structure for a model from a reward generator,
+	 * i.e., one for which {@link RewardGenerator#rewardStructContainsIntervals(int)} is true.
+	 * Currently only supported for nondeterministic models.
+	 * @param model The model
+	 * @param rewardGen The RewardGenerator defining the rewards
+	 * @param r The index of the reward structure to build
+	 */
+	public <Value> Rewards<Interval<Value>> buildIntervalRewardStructure(Model<Value> model, RewardGenerator<Value> rewardGen, int r) throws PrismException
+	{
+		if (!model.getModelType().nondeterministic()) {
+			throw new PrismNotSupportedException("Interval-valued rewards are not supported for " + model.getModelType() + "s");
+		}
+		if (!rewardGen.isRewardLookupSupported(r, RewardLookup.BY_STATE)) {
+			throw new PrismNotSupportedException("Interval-valued rewards require reward lookup by state");
+		}
+		int numStates = model.getNumStates();
+		List<State> statesList = model.getStatesList();
+		Evaluator<Interval<Value>> evalInt = rewardGen.getIntervalRewardEvaluator();
+		RewardsSimple<Interval<Value>> rewards = new RewardsSimple<>(numStates);
+		rewards.setEvaluator(evalInt);
+		NondetModel<Value> nondetModel = (NondetModel<Value>) model;
+		for (int s = 0; s < numStates; s++) {
+			State state = statesList.get(s);
+			// State rewards
+			if (rewardGen.rewardStructHasStateRewards(r)) {
+				Interval<Value> rew = rewardGen.getStateRewardInterval(r, state, allowNegative);
+				checkStateReward(rew, evalInt, state, null);
+				rewards.addToStateReward(s, rew);
+			}
+			// Transition rewards (on choices)
+			if (rewardGen.rewardStructHasTransitionRewards(r)) {
+				// Don't add rewards to transitions added to "fix" deadlock states
+				if (model.isDeadlockState(s)) {
+					continue;
+				}
+				int numChoices = nondetModel.getNumChoices(s);
+				for (int k = 0; k < numChoices; k++) {
+					Interval<Value> rew = rewardGen.getStateActionRewardInterval(r, state, nondetModel.getAction(s, k), allowNegative);
+					checkTransitionReward(rew, evalInt, state, null);
+					rewards.addToTransitionReward(s, k, rew);
+				}
+			}
+		}
+		return rewards;
+	}
+
+	/**
+	 * Construct rewards from a model and reward structure.
 	 * @param model The model
 	 * @param rewStr The reward structure
 	 * @param constantValues Values for any undefined constants needed

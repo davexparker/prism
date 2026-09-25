@@ -123,4 +123,15 @@ public interface RewardInfo
 		// By default, assume that any reward structures that do exist may have transition rewards
 		return true;
 	}
+
+	/**
+	 * Returns true if the {@code r}th reward structure is interval-valued,
+	 * i.e., its values are given as [lo,hi] bounds rather than precise values.
+	 * ({@code r} is indexed from 0, not from 1 like at the user (property language) level).
+	 */
+	public default boolean rewardStructContainsIntervals(int r)
+	{
+		// By default, reward structures are not interval-valued
+		return false;
+	}
 }

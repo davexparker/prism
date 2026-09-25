@@ -38,6 +38,7 @@ import java.util.PrimitiveIterator;
 import acceptance.AcceptanceReach;
 import acceptance.AcceptanceType;
 import common.IntSet;
+import common.Interval;
 import common.IterableBitSet;
 import common.IterableStateSet;
 import common.StopWatch;
@@ -46,10 +47,7 @@ import explicit.modelviews.EquivalenceRelationInteger;
 import explicit.modelviews.MDPDroppedAllChoices;
 import explicit.modelviews.MDPDroppedChoicesCached;
 import explicit.modelviews.MDPEquiv;
-import explicit.rewards.MCRewards;
-import explicit.rewards.MCRewardsFromMDPRewards;
-import explicit.rewards.MDPRewards;
-import explicit.rewards.Rewards;
+import explicit.rewards.*;
 import io.ModelExportFormat;
 import parser.ast.Expression;
 import solver.LPSolver;
@@ -87,6 +85,32 @@ public class MDPModelChecker extends ProbModelChecker
 	}
 	
 	// Model checking functions
+
+	/**
+	 * Model check the reward formula {@code expr} (the contents of an R operator)
+	 * for an MDP against an interval-valued reward structure.
+	 * <br>
+	 * Placeholder: not yet implemented.
+	 * @param mdp The MDP
+	 * @param intervalRewards The interval-valued rewards
+	 * @param expr The reward formula
+	 * @param minMax Min/max info (strategy resolution; and, in future, reward interval resolution)
+	 * @param statesOfInterest The states of interest
+	 */
+	public StateValues checkRewardFormulaIntervals(MDP<Double> mdp, Rewards<Interval<Double>> intervalRewards, Expression expr, MinMax minMax, BitSet statesOfInterest) throws PrismException
+	{
+		mainLog.println("\nRewards:" + intervalRewards);
+
+		double disc = 0.99;
+		setGenStrat(true);
+		RewardsSimple<Double> rews = new RewardsSimple<>(intervalRewards, mdp, Interval::getLower, mdp.getEvaluator());
+		ModelCheckerResult res = computeTotalRewards(mdp, rews, minMax.isMin(), disc);
+		mainLog.println("Rewards: " + Arrays.toString(res.soln));
+		MDStrategy<?> strat = (MDStrategy<?>) res.strat;
+		mainLog.println("Strategy: " + strat);
+
+		throw new PrismNotSupportedException("Model checking MDPs with interval-valued rewards is not yet implemented");
+	}
 
 	@SuppressWarnings("unchecked")
 	@Override
