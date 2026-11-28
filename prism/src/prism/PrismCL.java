@@ -2536,6 +2536,10 @@ public class PrismCL implements PrismModelListener
 		// Normal operation: just run PrismCL
 		if (!(args.length > 0 && "-ng".equals(args[0]))) {
 			new PrismCL().go(args);
+			// Exit explicitly, rather than waiting for any non-daemon threads,
+			// e.g. the AWT event thread started by Swing objects in the settings,
+			// which would delay exit by about a second
+			System.exit(0);
 		}
 		// Nailgun server mode (-ng switch)
 		else {
