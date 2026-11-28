@@ -170,9 +170,6 @@ public abstract class Setting
      */
     public void setValue(Object obj) throws SettingException
     {
-        SettingEditor editor = getSettingEditor();
-        if(editor != null) editor.stopEditing();
-        
         if(obj.getClass().isAssignableFrom(getValueClass())) //do a check that the object is in the correct format
         {
             //System.out.println("checking constraints");
@@ -195,9 +192,6 @@ public abstract class Setting
      */
     public void editValue(Object obj) throws SettingException
     {
-        SettingEditor editor = getSettingEditor();
-        if(editor != null) editor.stopEditing();
-    
         if(obj.getClass().isAssignableFrom(this.getValueClass()))
         {
             checkObjectWithConstraints(obj);
@@ -215,8 +209,7 @@ public abstract class Setting
     public void setEnabled(boolean enable)
     {
         this.enabled = enable;
-        getSettingEditor().stopEditing();
-        
+
     }
     
     public boolean isEnabled()
